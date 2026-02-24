@@ -1,0 +1,105 @@
+# er-triage-app
+
+A mobile-first React + TypeScript app for ER patient triage assignment. Replaces round-robin team rotation with formula-driven scoring that considers provider capacity, patient acuity/load, decay over time, and cooldown buffers. Built with Vite, Tailwind CSS v4, React 19.
+
+## Setup
+
+```bash
+cd er-triage-app
+npm install
+npm run dev              # dev server (Vite)
+npm run build            # type-check + production build → dist/
+```
+
+## Architecture
+
+- `src/types.ts` — all TypeScript types: `Provider`, `Patient`, `Buffer`, `TeamScore`, `Recommendation`, `ShiftState`, `ShiftAction`
+- `src/constants.ts` — tuning parameters (see below)
+- `src/engine/recommendation.ts` — pure-function scoring engine
+- `src/context/ShiftContext.tsx` — `useReducer`-based state management
+- `src/App.tsx` — root: role selection → shift setup (charge nurse) → dashboard; 1s TICK interval
+- `src/components/`
+  - `Dashboard.tsx` — main view: sticky header, help toggle (?), color legend, team cards grid, FAB
+  - `TeamCard.tsx` — capacity ratio, buffer bars, collapsible providers (default collapsed), patient badges
+  - `AssignPatient.tsx` — modal: tier selection with clinical examples, team selection, override flow
+  - `HelpSection.tsx` — collapsible guide (intro, formula, example, capacity, decay, buffers, recommendations, overrides, nomenclature)
+  - `ShiftSetup.tsx` — charge nurse team builder
+  - `RoleSelection.tsx` — role picker + LOAD_DEMO button
+  - `ProviderStatusToggle.tsx` — provider status cycling
+  - `PatientBadge.tsx` — acuity color, decay timer, weight indicator
+  - `OverrideModal.tsx` — override reason selection
+
+## Scoring Formula
+
+```
+Capacity Ratio = Team Capacity / (Patient Load + Buffer Load)
+```
+
+Highest ratio (among non-buffered teams) = recommended. Team 4 (Trauma) excluded from auto-recommendations.
+
+**Tiebreakers:** not-buffered first → highest ratio → least recent assignment → lowest team ID.
+
+### Capacity Weights (provider type × status multiplier)
+
+| Provider        | Weight |
+|-----------------|--------|
+| Attending       | 17.5   |
+| Senior Resident | 15.0   |
+| PA              | 10.0   |
+| Junior Resident | 7.5    |
+| Rotator         | 3.75   |
+
+| Status          | Multiplier |
+|-----------------|------------|
+| Active          | 1.0        |
+| Taking Signout  | 0.5        |
+| In Procedure    | 0.25       |
+| Off Floor       | 0.0        |
+
+### Acuity Weights & Decay
+
+| Tier      | Initial | Decay                          |
+|-----------|---------|--------------------------------|
+| Tier One  | 5       | → 3 at 60m → 1 at 120m        |
+| Tier Two  | 3       | → 1 at 90m                     |
+| Tier Three| 1       | → 0 at 120m                    |
+
+### Buffer Durations
+
+| Spawning Tier | Duration |
+|---------------|----------|
+| Tier One      | 35 min   |
+| Tier Two      | 25 min   |
+| Tier Three    | 15 min   |
+
+Buffer stacking is **additive** — 3 rapid assignments = ~3× duration, not max(). Merged buffers show combined count.
+
+### Capacity Terms (displayed on cards)
+
+| Ratio    | Label        | Color   |
+|----------|--------------|---------|
+| ≥ 10     | Ready        | emerald |
+| ≥ 5      | Stable       | green   |
+| ≥ 3.35   | Manageable   | yellow  |
+| ≥ 2      | Very Busy    | orange  |
+| ≥ 0.05   | High Load    | red     |
+| 0        | Overwhelmed  | dark red|
+
+## Key Design Decisions
+
+- **All state is client-side** (`useReducer` + React context). No backend yet.
+- **Provider status auto-expires** — off_floor at 15min, in_procedure/taking_signout at 30min.
+- **Team 4 (Trauma)** is visible but excluded from auto-recommendations; assignment only via manual override.
+- **Demo mode** randomizes provider names, team compositions, statuses, and simulates patient arrivals chronologically through the recommendation engine for balanced distribution.
+- **Buffer bar width** is computed directly from `remainingMs / (elapsed + remaining)` each render (not CSS animation) so it stays in sync with the app clock.
+- **Patient nomenclature**: `C-###` = critical/new arrival, `F-###` = floor upgrade, time display = minutes until next decay, `w:N` = current decayed weight.
+
+## Next Step: Real-Time Backend
+
+The app needs a backend so multiple phones/tablets can share the same shift state. Requirements:
+- Real-time sync: all connected clients see updates instantly (provider status changes, new patient assignments, buffer countdowns)
+- Conflict resolution: two users assigning a patient simultaneously must not corrupt state
+- Minimal infrastructure: ideally a single service (e.g. WebSocket server, or Firebase/Supabase real-time)
+- The recommendation engine (`recommendation.ts`) is pure functions and can run on either client or server
+- State shape is already defined in `types.ts` — `ShiftState` is the single source of truth
+- Auth can be simple (shift code / room code) — no user accounts needed initially
