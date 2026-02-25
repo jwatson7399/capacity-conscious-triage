@@ -25,18 +25,18 @@ export default function ProviderStatusToggle({ provider, canManage, now, onSwap 
   const effective = CAPACITY_WEIGHTS[provider.type] * STATUS_MULTIPLIERS[provider.status];
 
   return (
-    <div className="py-2 border-b border-gray-50 last:border-0">
+    <div className="py-2 border-b border-gray-50 dark:border-slate-700 last:border-0">
       <div className="flex items-center gap-2">
         <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${STATUS_COLORS[provider.status]}`} />
         <div className="flex-1 min-w-0">
-          <div className="font-medium text-gray-900 truncate">{provider.name}</div>
-          <div className="text-xs text-gray-500">
+          <div className="font-medium text-gray-900 dark:text-gray-100 truncate">{provider.name}</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">
             {PROVIDER_TYPE_LABELS[provider.type]}
-            {effective > 0 && <span className="ml-1">({effective.toFixed(1)})</span>}
+            {effective > 0 && <span className="ml-1">(capacity: {effective.toFixed(1)})</span>}
           </div>
         </div>
         {provider.status !== 'active' && (
-          <span className="text-xs text-gray-500">{STATUS_LABELS[provider.status]}</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">{STATUS_LABELS[provider.status]}</span>
         )}
         {provider.statusExpiresAt && (
           <span className="text-sm font-mono font-bold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
@@ -76,7 +76,7 @@ export default function ProviderStatusToggle({ provider, canManage, now, onSwap 
                   : 'bg-gray-100 text-gray-700 active:bg-gray-200'
               }`}
             >
-              {STATUS_LABELS[s]}
+              {STATUS_LABELS[s]} <span className="text-xs opacity-70">({Math.round(STATUS_MULTIPLIERS[s] * 100)}% capacity)</span>
             </button>
           ))}
         </div>

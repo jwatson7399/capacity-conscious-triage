@@ -1,11 +1,11 @@
-import type { ProviderType, ProviderStatus, AcuityTier } from './types';
+import type { ProviderType, ProviderStatus, AcuityTier, TeamId } from './types';
 
 export const CAPACITY_WEIGHTS: Record<ProviderType, number> = {
   attending: 17.5,
   senior_resident: 15,
   junior_resident: 7.5,
   pa: 10,
-  rotator: 3.75,
+  rotator: 1,
 };
 
 export const STATUS_MULTIPLIERS: Record<ProviderStatus, number> = {
@@ -51,10 +51,21 @@ export const STATUS_EXPIRE_MS_MAP: Record<ProviderStatus, number | null> = {
 
 export const TRAUMA_TEAM_ID = 4 as const;
 
+export const TEAM_CLOSE_TRANSFER_MS = 60 * 60 * 1000;
+export const TEAM_CLOSE_TRANSFER_TARGETS: Record<number, TeamId> = { 3: 1, 4: 2 };
+
+export const DECEASED_BUFFER_MS = 30 * 60 * 1000;
+
 export const ACUITY_LABELS: Record<AcuityTier, string> = {
-  tier_one: 'Tier One',
-  tier_two: 'Tier Two',
-  tier_three: 'Tier Three',
+  tier_one: 'Red',
+  tier_two: 'Yellow',
+  tier_three: 'Purple',
+};
+
+export const ACUITY_DESCRIPTORS: Record<AcuityTier, string> = {
+  tier_one: 'Critical Action',
+  tier_two: 'Emergent',
+  tier_three: 'Soft A-Side',
 };
 
 export const PROVIDER_TYPE_LABELS: Record<ProviderType, string> = {
@@ -63,6 +74,14 @@ export const PROVIDER_TYPE_LABELS: Record<ProviderType, string> = {
   junior_resident: 'Resident (PGY 1-2)',
   pa: 'PA',
   rotator: 'Rotator',
+};
+
+export const PROVIDER_TYPE_SHORT: Record<ProviderType, string> = {
+  attending: 'ATT',
+  senior_resident: 'SR',
+  junior_resident: 'JR',
+  pa: 'PA',
+  rotator: 'ROT',
 };
 
 export const STATUS_LABELS: Record<ProviderStatus, string> = {

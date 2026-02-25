@@ -9,18 +9,29 @@ import {
   TRAUMA_TEAM_ID,
 } from '../constants';
 
-export function getEffectiveCapacity(providers: Provider[], now: number): number {
+export interface ScoringOverrides {
+  capacityWeights?: Record<string, number>;
+  statusMultipliers?: Record<string, number>;
+  acuityWeights?: Record<string, number>;
+  decaySteps?: Record<string, Array<{ afterMs: number; weight: number }>>;
+  bufferDurations?: Record<string, number>;
+}
+
+export function getEffectiveCapacity(providers: Provider[], now: number, overrides?: ScoringOverrides): number {
+  const cw = overrides?.capacityWeights ?? CAPACITY_WEIGHTS;
+  const sm = overrides?.statusMultipliers ?? STATUS_MULTIPLIERS;
   return providers.reduce((sum, p) => {
-    // Auto-expire check: if expired, treat as active
     const status = (p.statusExpiresAt !== null && p.statusExpiresAt <= now) ? 'active' : p.status;
-    return sum + CAPACITY_WEIGHTS[p.type] * STATUS_MULTIPLIERS[status];
+    return sum + (cw[p.type] ?? 0) * (sm[status] ?? 0);
   }, 0);
 }
 
-export function getDecayedAcuityWeight(patient: Patient, now: number): number {
+export function getDecayedAcuityWeight(patient: Patient, now: number, overrides?: ScoringOverrides): number {
   const elapsed = now - (patient.upgradedAt ?? patient.assignedAt);
-  const base = ACUITY_WEIGHTS[patient.acuity];
-  const steps = ACUITY_DECAY[patient.acuity];
+  const aw = overrides?.acuityWeights ?? ACUITY_WEIGHTS;
+  const ds = overrides?.decaySteps ?? ACUITY_DECAY;
+  const base = aw[patient.acuity] ?? 0;
+  const steps = ds[patient.acuity] ?? [];
   let weight = base;
   for (const step of steps) {
     if (elapsed >= step.afterMs) {
@@ -30,19 +41,14 @@ export function getDecayedAcuityWeight(patient: Patient, now: number): number {
   return weight;
 }
 
-export function getCurrentLoad(patients: Patient[], teamId: TeamId, now: number): number {
+export function getCurrentLoad(patients: Patient[], teamId: TeamId, now: number, overrides?: ScoringOverrides): number {
   return patients
     .filter(p => p.assignedTeamId === teamId)
-    .reduce((sum, p) => sum + getDecayedAcuityWeight(p, now), 0);
+    .reduce((sum, p) => sum + getDecayedAcuityWeight(p, now, overrides), 0);
 }
 
 export function getActiveBuffers(buffers: Buffer[], teamId: TeamId, now: number): Buffer[] {
   return buffers.filter(b => b.teamId === teamId && b.expiresAt > now);
-}
-
-export function getBufferLoad(buffers: Buffer[], teamId: TeamId, now: number): number {
-  return getActiveBuffers(buffers, teamId, now)
-    .reduce((sum, b) => sum + ACUITY_WEIGHTS[b.tier], 0);
 }
 
 export function isTeamBuffered(buffers: Buffer[], teamId: TeamId, now: number): boolean {
@@ -55,12 +61,12 @@ export function scoreTeam(
   patients: Patient[],
   buffers: Buffer[],
   now: number,
+  overrides?: ScoringOverrides,
 ): TeamScore {
   const teamProviders = providers.filter(p => p.teamId === teamId);
-  const capacity = getEffectiveCapacity(teamProviders, now);
-  const load = getCurrentLoad(patients, teamId, now);
-  const bufferLoad = getBufferLoad(buffers, teamId, now);
-  const capacityRatio = (load + bufferLoad) === 0 ? Infinity : capacity / (load + bufferLoad);
+  const capacity = getEffectiveCapacity(teamProviders, now, overrides);
+  const load = getCurrentLoad(patients, teamId, now, overrides);
+  const capacityRatio = capacity === 0 ? 0 : load === 0 ? Infinity : capacity / load;
   const teamPatients = patients.filter(p => p.assignedTeamId === teamId);
   const lastAssigned = teamPatients.length === 0 ? 0 : Math.max(...teamPatients.map(p => p.assignedAt));
 
@@ -68,7 +74,6 @@ export function scoreTeam(
     teamId,
     capacity,
     load,
-    bufferLoad,
     capacityRatio,
     lastAssigned,
     isBuffered: isTeamBuffered(buffers, teamId, now),
@@ -80,16 +85,27 @@ export function getRecommendation(
   patients: Patient[],
   buffers: Buffer[],
   now: number,
+  closedTeams: Record<number, number> = {},
+  overrides?: ScoringOverrides,
 ): Recommendation {
   const teamIds: TeamId[] = [1, 2, 3, 4];
-  const scores = teamIds.map(id => scoreTeam(id, providers, patients, buffers, now));
-  const candidates = scores.filter(s => s.teamId !== TRAUMA_TEAM_ID);
+  const scores = teamIds.map(id => scoreTeam(id, providers, patients, buffers, now, overrides));
+  const candidates = scores.filter(s => s.teamId !== TRAUMA_TEAM_ID && !(s.teamId in closedTeams));
 
   // Sort: not-buffered first, then highest capacityRatio, then least recent assignment, then lowest team id
+  // When ALL candidates are buffered, prioritize recency over ratio to force alternation
+  const allBuffered = candidates.length > 0 && candidates.every(s => s.isBuffered);
   const ranked = [...candidates].sort((a, b) => {
-    if (a.isBuffered !== b.isBuffered) return a.isBuffered ? 1 : -1;
+    if (!allBuffered) {
+      if (a.isBuffered !== b.isBuffered) return a.isBuffered ? 1 : -1;
+    }
+    if (allBuffered) {
+      if (a.lastAssigned !== b.lastAssigned) return a.lastAssigned - b.lastAssigned;
+    }
     if (a.capacityRatio !== b.capacityRatio) return b.capacityRatio - a.capacityRatio;
-    if (a.lastAssigned !== b.lastAssigned) return a.lastAssigned - b.lastAssigned;
+    if (!allBuffered) {
+      if (a.lastAssigned !== b.lastAssigned) return a.lastAssigned - b.lastAssigned;
+    }
     return a.teamId - b.teamId;
   });
 
@@ -103,13 +119,14 @@ export function getRecommendation(
   };
 }
 
-export function createBuffer(teamId: TeamId, tier: AcuityTier, now: number): Buffer {
+export function createBuffer(teamId: TeamId, tier: AcuityTier, now: number, overrides?: ScoringOverrides): Buffer {
+  const durations = overrides?.bufferDurations ?? BUFFER_DURATIONS_MS;
   return {
     id: uid(),
     teamId,
     tier,
     createdAt: now,
-    expiresAt: now + BUFFER_DURATIONS_MS[tier],
+    expiresAt: now + (durations[tier] ?? BUFFER_DURATIONS_MS[tier]),
   };
 }
 

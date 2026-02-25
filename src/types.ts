@@ -24,6 +24,7 @@ export interface Patient {
   assignedAt: number;
   upgradedAt?: number;
   originalAcuity?: AcuityTier;
+  deceased?: boolean;
 }
 
 export interface Buffer {
@@ -33,6 +34,7 @@ export interface Buffer {
   createdAt: number;
   expiresAt: number;
   mergedCount?: number;
+  deceasedPatientId?: string;
 }
 
 export interface AssignmentOverride {
@@ -41,6 +43,47 @@ export interface AssignmentOverride {
   assignedTeamId: TeamId;
   reason: string;
   overriddenAt: number;
+}
+
+export interface DecayStep {
+  afterMs: number;
+  weight: number;
+}
+
+export interface SimOverrides {
+  capacityWeights: Record<ProviderType, number>;
+  statusMultipliers: Record<ProviderStatus, number>;
+  acuityWeights: Record<AcuityTier, number>;
+  bufferDurations: Record<AcuityTier, number>;
+  decaySteps: Record<AcuityTier, DecayStep[]>;
+  arrivalRatePerHour: number;
+  acuityDistribution: { tier_one: number; tier_two: number; tier_three: number };
+  floorUpgradeChance: number;
+}
+
+export interface SimTimelineEntry {
+  arrivalTime: number;
+  acuity: AcuityTier;
+  isFloor: boolean;
+}
+
+export interface SimSnapshot {
+  state: ShiftState;
+  simTime: number;
+}
+
+export interface SimulationState {
+  active: boolean;
+  baseTime: number;
+  speed: number;
+  paused: boolean;
+  seed: number;
+  shiftDurationMs: number;
+  timeline: SimTimelineEntry[];
+  nextArrivalIndex: number;
+  snapshots: SimSnapshot[];
+  overrides: SimOverrides;
+  permanentlyClosedTeams: number[];
 }
 
 export interface ShiftState {
@@ -52,13 +95,14 @@ export interface ShiftState {
   currentRole: Role | null;
   shiftStarted: boolean;
   now: number;
+  closedTeams: Record<number, number>;
+  simulation?: SimulationState;
 }
 
 export interface TeamScore {
   teamId: TeamId;
   capacity: number;
   load: number;
-  bufferLoad: number;
   capacityRatio: number;
   lastAssigned: number;
   isBuffered: boolean;
@@ -80,4 +124,15 @@ export type ShiftAction =
   | { type: 'UPGRADE_PATIENT'; patientId: string }
   | { type: 'REASSIGN_PATIENT'; patientId: string; toTeamId: TeamId; reason: string }
   | { type: 'SWAP_PROVIDER'; outProviderId: string; incoming: Omit<Provider, 'id' | 'status' | 'statusExpiresAt'> }
-  | { type: 'LOAD_DEMO' };
+  | { type: 'CLOSE_TEAM'; teamId: TeamId }
+  | { type: 'SIGNOUT_PATIENTS'; fromTeamId: TeamId; toTeamId: TeamId }
+  | { type: 'DECEASE_PATIENT'; patientId: string }
+  | { type: 'DOWNGRADE_PATIENT'; patientId: string }
+  | { type: 'LOAD_DEMO' }
+  | { type: 'LOAD_TOUR_DEMO' }
+  | { type: 'START_SIMULATION'; providers: Provider[]; seed: number; shiftDurationMs: number; overrides: SimOverrides; closedTeams?: Record<number, number> }
+  | { type: 'SET_SIM_SPEED'; speed: number }
+  | { type: 'TOGGLE_SIM_PAUSE' }
+  | { type: 'SIM_REWIND'; snapshotIndex: number }
+  | { type: 'SET_SIM_OVERRIDE'; overrides: Partial<SimOverrides> }
+  | { type: 'SIM_SKIP_TO_NEXT' };

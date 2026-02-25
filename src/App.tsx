@@ -1,4 +1,4 @@
-import { useEffect, Component, type ReactNode } from 'react';
+import { useState, useEffect, Component, type ReactNode } from 'react';
 import { ShiftProvider, useShift } from './context/ShiftContext';
 import RoleSelection from './components/RoleSelection';
 import ShiftSetup from './components/ShiftSetup';
@@ -30,6 +30,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 
 function AppInner() {
   const { state, dispatch } = useShift();
+  const [tourActive, setTourActive] = useState(false);
 
   // Global 1-second ticker
   useEffect(() => {
@@ -37,9 +38,28 @@ function AppInner() {
     return () => clearInterval(id);
   }, [dispatch]);
 
-  if (!state.currentRole) return <RoleSelection />;
+  // Auto-start tour from ?tour URL param
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('tour')) {
+      dispatch({ type: 'LOAD_TOUR_DEMO' });
+      setTourActive(true);
+    }
+  }, [dispatch]);
+
+  const handleTourComplete = () => {
+    setTourActive(false);
+    history.replaceState(null, '', window.location.pathname);
+  };
+
+  const handleStartTour = () => {
+    dispatch({ type: 'LOAD_TOUR_DEMO' });
+    setTourActive(true);
+  };
+
+  if (!state.currentRole) return <RoleSelection onStartTour={handleStartTour} />;
   if (!state.shiftStarted && state.currentRole === 'charge_nurse') return <ShiftSetup />;
-  return <Dashboard />;
+  return <Dashboard tourActive={tourActive} onTourComplete={handleTourComplete} />;
 }
 
 export default function App() {

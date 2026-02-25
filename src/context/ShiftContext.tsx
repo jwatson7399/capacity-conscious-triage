@@ -1,9 +1,21 @@
 import { createContext, useContext, useReducer, useMemo, type ReactNode } from 'react';
-import type { ShiftState, ShiftAction, Recommendation } from '../types';
-import { STATUS_EXPIRE_MS_MAP, BUFFER_DURATIONS_MS } from '../constants';
-import { getRecommendation, createBuffer } from '../engine/recommendation';
+import type { ShiftState, ShiftAction, Recommendation, SimulationState } from '../types';
+import { STATUS_EXPIRE_MS_MAP, BUFFER_DURATIONS_MS, TEAM_CLOSE_TRANSFER_MS, TEAM_CLOSE_TRANSFER_TARGETS, DECEASED_BUFFER_MS } from '../constants';
+import { getRecommendation, createBuffer, type ScoringOverrides } from '../engine/recommendation';
 import { uid } from '../uid';
 import type { Provider, Patient, Buffer, TeamId } from '../types';
+import { generateTimeline, takeSnapshot, addSnapshot } from '../engine/simulation';
+
+function simOverridesToScoring(sim: SimulationState | undefined): ScoringOverrides | undefined {
+  if (!sim) return undefined;
+  return {
+    capacityWeights: sim.overrides.capacityWeights,
+    statusMultipliers: sim.overrides.statusMultipliers,
+    acuityWeights: sim.overrides.acuityWeights,
+    decaySteps: sim.overrides.decaySteps,
+    bufferDurations: sim.overrides.bufferDurations,
+  };
+}
 
 const initialState: ShiftState = {
   providers: [],
@@ -14,6 +26,7 @@ const initialState: ShiftState = {
   currentRole: null,
   shiftStarted: false,
   now: Date.now(),
+  closedTeams: {},
 };
 
 function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
@@ -27,7 +40,24 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
       return { ...state, providers: action.providers, shiftStarted: true };
 
     case 'TICK': {
-      const tickNow = Date.now();
+      const sim = state.simulation;
+      // In simulation mode: advance sim clock; when paused, no-op
+      if (sim?.active && sim.paused) return state;
+
+      const tickInterval = 1000; // 1s real-time tick
+      const tickNow = sim?.active
+        ? state.now + tickInterval * sim.speed
+        : Date.now();
+
+      // Check shift end in simulation mode
+      if (sim?.active && tickNow >= sim.baseTime + sim.shiftDurationMs) {
+        return {
+          ...state,
+          now: sim.baseTime + sim.shiftDurationMs,
+          simulation: { ...sim, paused: true },
+        };
+      }
+
       // Auto-expire provider statuses
       const providers = state.providers.map(p => {
         if (p.statusExpiresAt !== null && p.statusExpiresAt <= tickNow) {
@@ -37,7 +67,93 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
       });
       // Remove expired buffers
       const buffers = state.buffers.filter(b => b.expiresAt > tickNow);
-      return { ...state, now: tickNow, providers, buffers };
+      // Auto-transfer patients from closed teams after timeout
+      // Skip permanently closed teams (from simulation setup)
+      const permaClosed = sim?.permanentlyClosedTeams;
+      let patients = state.patients;
+      let closedTeams = state.closedTeams;
+      for (const [teamIdStr, closedAt] of Object.entries(closedTeams)) {
+        const teamId = Number(teamIdStr);
+        if (permaClosed?.includes(teamId)) continue;
+        if (tickNow >= closedAt + TEAM_CLOSE_TRANSFER_MS) {
+          const target = TEAM_CLOSE_TRANSFER_TARGETS[teamId];
+          if (target) {
+            patients = patients.map(p =>
+              p.assignedTeamId === teamId ? { ...p, assignedTeamId: target } : p
+            );
+          }
+          const { [teamId]: _, ...rest } = closedTeams;
+          closedTeams = rest;
+        }
+      }
+
+      let newState: ShiftState = { ...state, now: tickNow, providers, buffers, patients, closedTeams };
+
+      // Simulation: process pending arrivals
+      if (sim?.active) {
+        let { nextArrivalIndex, snapshots } = sim;
+        let { patients: simPatients, buffers: simBuffers, patientCounter } = newState;
+        const scoringOverrides = simOverridesToScoring(sim);
+        let arrivedAny = false;
+
+        while (nextArrivalIndex < sim.timeline.length && sim.timeline[nextArrivalIndex].arrivalTime <= tickNow) {
+          const entry = sim.timeline[nextArrivalIndex];
+          nextArrivalIndex++;
+          arrivedAny = true;
+
+          const prefix = entry.isFloor ? 'F' : 'C';
+          const count = patientCounter[prefix] + 1;
+          const id = `${prefix}-${String(count).padStart(3, '0')}`;
+
+          // Get recommendation at arrival time
+          const rec = getRecommendation(providers, simPatients, simBuffers, tickNow, closedTeams, scoringOverrides);
+          const teamId = rec.first ?? (1 as TeamId);
+
+          const patient = { id, acuity: entry.acuity, assignedTeamId: teamId, assignedAt: tickNow };
+          const newBuffer = createBuffer(teamId, entry.acuity, tickNow, scoringOverrides);
+
+          // Merge stacked buffers
+          const existingTeamBuffers = simBuffers.filter(b => b.teamId === teamId && b.expiresAt > tickNow && !b.deceasedPatientId);
+          const otherBuffers = simBuffers.filter(b => !(b.teamId === teamId && b.expiresAt > tickNow && !b.deceasedPatientId));
+          if (existingTeamBuffers.length > 0) {
+            const allBufs = [...existingTeamBuffers, newBuffer];
+            const currentExpiry = Math.max(...existingTeamBuffers.map(b => b.expiresAt));
+            const newDuration = newBuffer.expiresAt - newBuffer.createdAt;
+            const latestExpiry = Math.max(currentExpiry, tickNow) + newDuration;
+            const tierRank = { tier_one: 0, tier_two: 1, tier_three: 2 } as const;
+            const bestTier = allBufs.reduce((best, b) => tierRank[b.tier] < tierRank[best.tier] ? b : best).tier;
+            const totalCount = allBufs.reduce((sum, b) => sum + (b.mergedCount ?? 1), 0);
+            simBuffers = [...otherBuffers, {
+              id: newBuffer.id, teamId, tier: bestTier,
+              createdAt: Math.min(...allBufs.map(b => b.createdAt)),
+              expiresAt: latestExpiry, mergedCount: totalCount,
+            }];
+          } else {
+            simBuffers = [...simBuffers, newBuffer];
+          }
+
+          simPatients = [...simPatients, patient];
+          patientCounter = { ...patientCounter, [prefix]: count };
+        }
+
+        // Take snapshot on arrivals (or every 30 sim-seconds)
+        if (arrivedAny) {
+          snapshots = addSnapshot(snapshots, takeSnapshot(
+            { ...newState, patients: simPatients, buffers: simBuffers, patientCounter },
+            tickNow,
+          ));
+        }
+
+        newState = {
+          ...newState,
+          patients: simPatients,
+          buffers: simBuffers,
+          patientCounter,
+          simulation: { ...sim, nextArrivalIndex, snapshots },
+        };
+      }
+
+      return newState;
     }
 
     case 'ASSIGN_PATIENT': {
@@ -50,10 +166,11 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
         assignedTeamId: action.teamId,
         assignedAt: now,
       };
-      const newBuffer = createBuffer(action.teamId, action.tier, now);
+      const scoringOv = simOverridesToScoring(state.simulation);
+      const newBuffer = createBuffer(action.teamId, action.tier, now, scoringOv);
       // Merge stacked buffers for the same team
-      const existingTeamBuffers = state.buffers.filter(b => b.teamId === action.teamId && b.expiresAt > now);
-      const otherBuffers = state.buffers.filter(b => !(b.teamId === action.teamId && b.expiresAt > now));
+      const existingTeamBuffers = state.buffers.filter(b => b.teamId === action.teamId && b.expiresAt > now && !b.deceasedPatientId);
+      const otherBuffers = state.buffers.filter(b => !(b.teamId === action.teamId && b.expiresAt > now && !b.deceasedPatientId));
       let finalBuffers: typeof state.buffers;
       if (existingTeamBuffers.length > 0) {
         const allBuffers = [...existingTeamBuffers, newBuffer];
@@ -117,18 +234,38 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
         };
       });
       const upgraded = state.patients.find(p => p.id === action.patientId);
-      const buffers = upgraded
-        ? [...state.buffers, createBuffer(upgraded.assignedTeamId, 'tier_one', now)]
-        : state.buffers;
-      return { ...state, patients, buffers };
+      let finalBuffers = state.buffers;
+      if (upgraded) {
+        const scoringOv = simOverridesToScoring(state.simulation);
+        const newBuffer = createBuffer(upgraded.assignedTeamId, 'tier_one', now, scoringOv);
+        const existingTeamBuffers = finalBuffers.filter(b => b.teamId === upgraded.assignedTeamId && b.expiresAt > now && !b.deceasedPatientId);
+        const otherBuffers = finalBuffers.filter(b => !(b.teamId === upgraded.assignedTeamId && b.expiresAt > now && !b.deceasedPatientId));
+        if (existingTeamBuffers.length > 0) {
+          const allBuffers = [...existingTeamBuffers, newBuffer];
+          const currentExpiry = Math.max(...existingTeamBuffers.map(b => b.expiresAt));
+          const newDuration = newBuffer.expiresAt - newBuffer.createdAt;
+          const latestExpiry = Math.max(currentExpiry, now) + newDuration;
+          const tierRank = { tier_one: 0, tier_two: 1, tier_three: 2 } as const;
+          const bestTier = allBuffers.reduce((best, b) => tierRank[b.tier] < tierRank[best.tier] ? b : best).tier;
+          const totalCount = allBuffers.reduce((sum, b) => sum + (b.mergedCount ?? 1), 0);
+          finalBuffers = [...otherBuffers, {
+            id: newBuffer.id, teamId: upgraded.assignedTeamId, tier: bestTier,
+            createdAt: Math.min(...allBuffers.map(b => b.createdAt)),
+            expiresAt: latestExpiry, mergedCount: totalCount,
+          }];
+        } else {
+          finalBuffers = [...finalBuffers, newBuffer];
+        }
+      }
+      return { ...state, patients, buffers: finalBuffers };
     }
 
     case 'REASSIGN_PATIENT': {
+      const original = state.patients.find(p => p.id === action.patientId);
       const patients = state.patients.map(p => {
         if (p.id !== action.patientId) return p;
-        return { ...p, assignedTeamId: action.toTeamId };
+        return { ...p, assignedTeamId: action.toTeamId, assignedAt: now };
       });
-      const original = state.patients.find(p => p.id === action.patientId);
       const overrides = original
         ? [...state.overrides, {
             patientId: action.patientId,
@@ -138,7 +275,33 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
             overriddenAt: now,
           }]
         : state.overrides;
-      return { ...state, patients, overrides };
+
+      // Create buffer on receiving team (Fix 1 & 4: buffer + fresh assignedAt)
+      let finalBuffers = state.buffers;
+      if (original) {
+        const scoringOv = simOverridesToScoring(state.simulation);
+        const newBuffer = createBuffer(action.toTeamId, original.acuity, now, scoringOv);
+        const existingTeamBuffers = finalBuffers.filter(b => b.teamId === action.toTeamId && b.expiresAt > now && !b.deceasedPatientId);
+        const otherBuffers = finalBuffers.filter(b => !(b.teamId === action.toTeamId && b.expiresAt > now && !b.deceasedPatientId));
+        if (existingTeamBuffers.length > 0) {
+          const allBuffers = [...existingTeamBuffers, newBuffer];
+          const currentExpiry = Math.max(...existingTeamBuffers.map(b => b.expiresAt));
+          const newDuration = newBuffer.expiresAt - newBuffer.createdAt;
+          const latestExpiry = Math.max(currentExpiry, now) + newDuration;
+          const tierRank = { tier_one: 0, tier_two: 1, tier_three: 2 } as const;
+          const bestTier = allBuffers.reduce((best, b) => tierRank[b.tier] < tierRank[best.tier] ? b : best).tier;
+          const totalCount = allBuffers.reduce((sum, b) => sum + (b.mergedCount ?? 1), 0);
+          finalBuffers = [...otherBuffers, {
+            id: newBuffer.id, teamId: action.toTeamId, tier: bestTier,
+            createdAt: Math.min(...allBuffers.map(b => b.createdAt)),
+            expiresAt: latestExpiry, mergedCount: totalCount,
+          }];
+        } else {
+          finalBuffers = [...finalBuffers, newBuffer];
+        }
+      }
+
+      return { ...state, patients, buffers: finalBuffers, overrides };
     }
 
     case 'SWAP_PROVIDER': {
@@ -150,6 +313,125 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
         statusExpiresAt: null,
       };
       return { ...state, providers: [...providers, newProvider] };
+    }
+
+    case 'CLOSE_TEAM': {
+      const closedTeams = { ...state.closedTeams, [action.teamId]: now };
+      const buffers = state.buffers.filter(b => b.teamId !== action.teamId);
+      return { ...state, closedTeams, buffers };
+    }
+
+    case 'SIGNOUT_PATIENTS': {
+      const patients = state.patients.map(p =>
+        p.assignedTeamId === action.fromTeamId ? { ...p, assignedTeamId: action.toTeamId } : p
+      );
+      const { [action.fromTeamId]: _, ...closedTeams } = state.closedTeams;
+      return { ...state, patients, closedTeams };
+    }
+
+    case 'DECEASE_PATIENT': {
+      const patient = state.patients.find(p => p.id === action.patientId);
+      if (!patient) return state;
+      const patients = state.patients.map(p =>
+        p.id === action.patientId ? { ...p, deceased: true } : p
+      );
+      const newBuffer: Buffer = {
+        id: uid(),
+        teamId: patient.assignedTeamId,
+        tier: patient.acuity,
+        createdAt: now,
+        expiresAt: now + DECEASED_BUFFER_MS,
+        deceasedPatientId: patient.id,
+      };
+      // Merge with existing team buffers (same stacking logic as ASSIGN_PATIENT)
+      const teamId = patient.assignedTeamId;
+      const existingTeamBuffers = state.buffers.filter(b => b.teamId === teamId && b.expiresAt > now);
+      const otherBuffers = state.buffers.filter(b => !(b.teamId === teamId && b.expiresAt > now));
+      let finalBuffers: Buffer[];
+      if (existingTeamBuffers.length > 0) {
+        const allBuffers = [...existingTeamBuffers, newBuffer];
+        const currentExpiry = Math.max(...existingTeamBuffers.map(b => b.expiresAt));
+        const newDuration = newBuffer.expiresAt - newBuffer.createdAt;
+        const latestExpiry = Math.max(currentExpiry, now) + newDuration;
+        const tierRank = { tier_one: 0, tier_two: 1, tier_three: 2 } as const;
+        const bestTier = allBuffers.reduce((best, b) => tierRank[b.tier] < tierRank[best.tier] ? b : best).tier;
+        const totalCount = allBuffers.reduce((sum, b) => sum + (b.mergedCount ?? 1), 0);
+        finalBuffers = [...otherBuffers, {
+          id: newBuffer.id, teamId, tier: bestTier,
+          createdAt: Math.min(...allBuffers.map(b => b.createdAt)),
+          expiresAt: latestExpiry, mergedCount: totalCount,
+        }];
+      } else {
+        finalBuffers = [...state.buffers, newBuffer];
+      }
+      return { ...state, patients, buffers: finalBuffers };
+    }
+
+    case 'DOWNGRADE_PATIENT': {
+      return { ...state, patients: state.patients.filter(p => p.id !== action.patientId) };
+    }
+
+    case 'LOAD_TOUR_DEMO': {
+      // Curated demo state for the guided tour.
+      // Team 2 is buffer-free and recommended. Teams 1 & 3 have active buffers.
+      // Good mix of acuity tiers, provider types, and statuses.
+      const now = Date.now();
+      const m = 60_000; // 1 minute in ms
+
+      const tourProviders: Provider[] = [
+        // Team 1: Attending + 2 Juniors (one in procedure) + PA + Rotator
+        // Capacity: 17.5 + (7.5×0.25) + 7.5 + 10 + 1 = 37.875 ≈ 37.9
+        { id: 'tp1', name: 'King', type: 'attending', status: 'active', statusExpiresAt: null, teamId: 1 },
+        { id: 'tp2', name: 'Chen', type: 'junior_resident', status: 'in_procedure', statusExpiresAt: now + 12 * m, teamId: 1 },
+        { id: 'tp3', name: 'Reeves', type: 'junior_resident', status: 'active', statusExpiresAt: null, teamId: 1 },
+        { id: 'tp3b', name: 'Patel', type: 'pa', status: 'active', statusExpiresAt: null, teamId: 1 },
+        { id: 'tp3c', name: 'Ortiz', type: 'rotator', status: 'active', statusExpiresAt: null, teamId: 1 },
+        // Team 2: Attending + Senior + PA (highest capacity, no buffer → recommended)
+        { id: 'tp4', name: 'Rodriguez', type: 'attending', status: 'active', statusExpiresAt: null, teamId: 2 },
+        { id: 'tp5', name: 'Garcia', type: 'senior_resident', status: 'active', statusExpiresAt: null, teamId: 2 },
+        { id: 'tp6', name: 'Williams', type: 'pa', status: 'active', statusExpiresAt: null, teamId: 2 },
+        // Team 3: Attending + Senior + Rotator
+        { id: 'tp7', name: 'Edwards', type: 'attending', status: 'active', statusExpiresAt: null, teamId: 3 },
+        { id: 'tp8', name: 'Taylor', type: 'senior_resident', status: 'taking_signout', statusExpiresAt: now + 18 * m, teamId: 3 },
+        { id: 'tp9', name: 'Kim', type: 'rotator', status: 'active', statusExpiresAt: null, teamId: 3 },
+        // Team 4 (Trauma): Attending + Junior
+        { id: 'tp10', name: 'Allen', type: 'attending', status: 'active', statusExpiresAt: null, teamId: 4 },
+        { id: 'tp11', name: 'Martinez', type: 'junior_resident', status: 'active', statusExpiresAt: null, teamId: 4 },
+      ];
+
+      const tourPatients: Patient[] = [
+        // Team 1: 1 Red (old, decayed), 1 Yellow (recent → buffer source)
+        { id: 'C-001', acuity: 'tier_one', assignedTeamId: 1, assignedAt: now - 70 * m },
+        { id: 'C-003', acuity: 'tier_two', assignedTeamId: 1, assignedAt: now - 3 * m },
+        // Team 2: 1 Red (old enough that buffer expired, ~40m ago)
+        { id: 'C-002', acuity: 'tier_one', assignedTeamId: 2, assignedAt: now - 40 * m },
+        // Team 3: 1 Yellow (recent → buffer source), 1 Purple (old)
+        { id: 'F-001', acuity: 'tier_two', assignedTeamId: 3, assignedAt: now - 3 * m },
+        { id: 'C-004', acuity: 'tier_three', assignedTeamId: 3, assignedAt: now - 55 * m },
+        // Team 4: 1 Purple
+        { id: 'F-002', acuity: 'tier_three', assignedTeamId: 4, assignedAt: now - 30 * m },
+      ];
+
+      // Team 1: Yellow buffer from C-003 (assigned 3m ago, 25m duration → 22m left)
+      // Team 3: Yellow buffer from F-001 (assigned 3m ago, 25m duration → 22m left)
+      // Team 2: no buffer (Red buffer from C-002 expired: 40m ago, 35m duration)
+      // Buffers are set with plenty of remaining time so they survive the full tour.
+      const tourBuffers: Buffer[] = [
+        { id: 'tb1', teamId: 1, tier: 'tier_two', createdAt: now - 3 * m, expiresAt: now + 22 * m },
+        { id: 'tb2', teamId: 3, tier: 'tier_two', createdAt: now - 3 * m, expiresAt: now + 22 * m },
+      ];
+
+      return {
+        ...state,
+        providers: tourProviders,
+        patients: tourPatients,
+        buffers: tourBuffers,
+        patientCounter: { C: 4, F: 2 },
+        currentRole: 'charge_nurse',
+        shiftStarted: true,
+        now,
+        closedTeams: {},
+      };
     }
 
     case 'LOAD_DEMO': {
@@ -260,6 +542,156 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
         currentRole: 'charge_nurse',
         shiftStarted: true,
         now: demoNow,
+        closedTeams: {},
+      };
+    }
+
+    case 'START_SIMULATION': {
+      const simNow = Date.now();
+      const timeline = generateTimeline(action.seed, action.shiftDurationMs, action.overrides, simNow);
+      const simState: SimulationState = {
+        active: true,
+        baseTime: simNow,
+        speed: 100,
+        paused: false,
+        seed: action.seed,
+        shiftDurationMs: action.shiftDurationMs,
+        timeline,
+        nextArrivalIndex: 0,
+        snapshots: [],
+        overrides: action.overrides,
+        permanentlyClosedTeams: action.closedTeams ? Object.keys(action.closedTeams).map(Number) : [],
+      };
+      return {
+        ...state,
+        providers: action.providers,
+        patients: [],
+        buffers: [],
+        overrides: [],
+        patientCounter: { C: 0, F: 0 },
+        currentRole: 'charge_nurse',
+        shiftStarted: true,
+        now: simNow,
+        closedTeams: action.closedTeams ?? {},
+        simulation: simState,
+      };
+    }
+
+    case 'SET_SIM_SPEED': {
+      if (!state.simulation) return state;
+      return { ...state, simulation: { ...state.simulation, speed: action.speed } };
+    }
+
+    case 'TOGGLE_SIM_PAUSE': {
+      if (!state.simulation) return state;
+      return { ...state, simulation: { ...state.simulation, paused: !state.simulation.paused } };
+    }
+
+    case 'SIM_REWIND': {
+      if (!state.simulation) return state;
+      const snapshot = state.simulation.snapshots[action.snapshotIndex];
+      if (!snapshot) return state;
+      // Restore state from snapshot, keep simulation metadata and ALL snapshots
+      const timelineIndex = state.simulation.timeline.findIndex(e => e.arrivalTime > snapshot.simTime);
+      return {
+        ...snapshot.state,
+        simulation: {
+          ...state.simulation,
+          paused: state.simulation.paused, // preserve play/pause state
+          nextArrivalIndex: timelineIndex === -1 ? state.simulation.timeline.length : timelineIndex,
+          snapshots: state.simulation.snapshots,
+        },
+        now: snapshot.simTime,
+      };
+    }
+
+    case 'SIM_SKIP_TO_NEXT': {
+      if (!state.simulation) return state;
+      const sim = state.simulation;
+      const nextEntry = sim.timeline[sim.nextArrivalIndex];
+      if (!nextEntry) return state; // no more arrivals
+
+      // Jump time to the next arrival, then let the TICK-like logic process it
+      const skipNow = nextEntry.arrivalTime;
+
+      // Auto-expire providers at the new time
+      const providers = state.providers.map(p => {
+        if (p.statusExpiresAt !== null && p.statusExpiresAt <= skipNow) {
+          return { ...p, status: 'active' as const, statusExpiresAt: null };
+        }
+        return p;
+      });
+      const buffers = state.buffers.filter(b => b.expiresAt > skipNow);
+
+      // Process all arrivals up to skipNow
+      let nextIdx = sim.nextArrivalIndex;
+      let simPatients = state.patients;
+      let simBuffers = buffers;
+      let patientCounter = state.patientCounter;
+      let snapshots = sim.snapshots;
+      const scoringOverrides = simOverridesToScoring(sim);
+
+      while (nextIdx < sim.timeline.length && sim.timeline[nextIdx].arrivalTime <= skipNow) {
+        const entry = sim.timeline[nextIdx];
+        nextIdx++;
+
+        const prefix = entry.isFloor ? 'F' : 'C';
+        const count = patientCounter[prefix] + 1;
+        const id = `${prefix}-${String(count).padStart(3, '0')}`;
+
+        const rec = getRecommendation(providers, simPatients, simBuffers, skipNow, state.closedTeams, scoringOverrides);
+        const teamId = rec.first ?? (1 as TeamId);
+
+        const patient = { id, acuity: entry.acuity, assignedTeamId: teamId, assignedAt: skipNow };
+        const newBuffer = createBuffer(teamId, entry.acuity, skipNow, scoringOverrides);
+
+        const existingTeamBuffers = simBuffers.filter(b => b.teamId === teamId && b.expiresAt > skipNow && !b.deceasedPatientId);
+        const otherBuffers = simBuffers.filter(b => !(b.teamId === teamId && b.expiresAt > skipNow && !b.deceasedPatientId));
+        if (existingTeamBuffers.length > 0) {
+          const allBufs = [...existingTeamBuffers, newBuffer];
+          const currentExpiry = Math.max(...existingTeamBuffers.map(b => b.expiresAt));
+          const newDuration = newBuffer.expiresAt - newBuffer.createdAt;
+          const latestExpiry = Math.max(currentExpiry, skipNow) + newDuration;
+          const tierRank = { tier_one: 0, tier_two: 1, tier_three: 2 } as const;
+          const bestTier = allBufs.reduce((best, b) => tierRank[b.tier] < tierRank[best.tier] ? b : best).tier;
+          const totalCount = allBufs.reduce((sum, b) => sum + (b.mergedCount ?? 1), 0);
+          simBuffers = [...otherBuffers, {
+            id: newBuffer.id, teamId, tier: bestTier,
+            createdAt: Math.min(...allBufs.map(b => b.createdAt)),
+            expiresAt: latestExpiry, mergedCount: totalCount,
+          }];
+        } else {
+          simBuffers = [...simBuffers, newBuffer];
+        }
+
+        simPatients = [...simPatients, patient];
+        patientCounter = { ...patientCounter, [prefix]: count };
+      }
+
+      snapshots = addSnapshot(snapshots, takeSnapshot(
+        { ...state, providers, patients: simPatients, buffers: simBuffers, patientCounter },
+        skipNow,
+      ));
+
+      return {
+        ...state,
+        now: skipNow,
+        providers,
+        patients: simPatients,
+        buffers: simBuffers,
+        patientCounter,
+        simulation: { ...sim, nextArrivalIndex: nextIdx, snapshots, paused: sim.paused },
+      };
+    }
+
+    case 'SET_SIM_OVERRIDE': {
+      if (!state.simulation) return state;
+      return {
+        ...state,
+        simulation: {
+          ...state.simulation,
+          overrides: { ...state.simulation.overrides, ...action.overrides },
+        },
       };
     }
 
@@ -279,9 +711,10 @@ const ShiftContext = createContext<ShiftContextValue | null>(null);
 export function ShiftProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(shiftReducer, initialState);
 
+  const scoringOverrides = useMemo(() => simOverridesToScoring(state.simulation), [state.simulation]);
   const recommendation = useMemo(
-    () => getRecommendation(state.providers, state.patients, state.buffers, state.now),
-    [state.providers, state.patients, state.buffers, state.now],
+    () => getRecommendation(state.providers, state.patients, state.buffers, state.now, state.closedTeams, scoringOverrides),
+    [state.providers, state.patients, state.buffers, state.now, state.closedTeams, scoringOverrides],
   );
 
   const value = useMemo(

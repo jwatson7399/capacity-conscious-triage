@@ -32,7 +32,7 @@ npm run build            # type-check + production build → dist/
 ## Scoring Formula
 
 ```
-Capacity Ratio = Team Capacity / (Patient Load + Buffer Load)
+Capacity Ratio = Team Capacity / Patient Load
 ```
 
 Highest ratio (among non-buffered teams) = recommended. Team 4 (Trauma) excluded from auto-recommendations.
@@ -47,7 +47,7 @@ Highest ratio (among non-buffered teams) = recommended. Team 4 (Trauma) excluded
 | Senior Resident | 15.0   |
 | PA              | 10.0   |
 | Junior Resident | 7.5    |
-| Rotator         | 3.75   |
+| Rotator         | 1.0    |
 
 | Status          | Multiplier |
 |-----------------|------------|
