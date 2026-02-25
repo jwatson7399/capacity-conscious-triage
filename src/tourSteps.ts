@@ -114,7 +114,7 @@ export function buildTourSteps(helpers: {
     },
     // 7. The Core Formula
     {
-      targetSelector: '[data-tour="help-formula"]',
+      targetSelector: '[data-tour="help-formula-core"]',
       title: 'The Core Formula',
       description:
         'This tool then divides a teams Capacity by its Patient Load to generate its Capacity Ratio. Higher team ratio means more team bandwidth. The team with the highest ratio is recommended.',

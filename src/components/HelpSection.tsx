@@ -57,13 +57,15 @@ export default function HelpSection({ onClose }: Props) {
       </div>
 
       <Section title="The Core Formula" dataTour="help-formula">
-        <p>Each team receives a continuously updated <strong>capacity ratio</strong>:</p>
-        <pre className="bg-gray-100 dark:bg-slate-700 rounded-lg p-3 font-mono text-xs overflow-x-auto">
+        <div data-tour="help-formula-core">
+          <p>Each team receives a continuously updated <strong>capacity ratio</strong>:</p>
+          <pre className="bg-gray-100 dark:bg-slate-700 rounded-lg p-3 font-mono text-xs overflow-x-auto">
 Capacity Ratio = Team Capacity / Patient Load</pre>
-        <ul className="list-disc ml-4 space-y-1">
-          <li><strong>Team Capacity</strong> — sum of provider weights adjusted by their current status (active, in procedure, taking signout, off floor).</li>
-          <li><strong>Patient Load</strong> — sum of weighted acuity scores for all patients currently on the team, with decay over time.</li>
-        </ul>
+          <ul className="list-disc ml-4 space-y-1">
+            <li><strong>Team Capacity</strong> — sum of provider weights adjusted by their current status (active, in procedure, taking signout, off floor).</li>
+            <li><strong>Patient Load</strong> — sum of weighted acuity scores for all patients currently on the team, with decay over time.</li>
+          </ul>
+        </div>
 
         <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 rounded-lg space-y-1">
           <p className="font-semibold text-gray-800 dark:text-gray-200">What the numbers mean</p>
