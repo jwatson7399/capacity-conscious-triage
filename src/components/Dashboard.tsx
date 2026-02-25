@@ -16,7 +16,7 @@ export default function Dashboard({ tourActive, onTourComplete }: { tourActive?:
   const [showAssign, setShowAssign] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [legendOpen, setLegendOpen] = useState(false);
+  const [legendOpen, setLegendOpen] = useState(!!tourActive);
   const steps = useMemo(() => buildTourSteps({
     openHelp: () => setShowHelp(true),
     closeHelp: () => setShowHelp(false),

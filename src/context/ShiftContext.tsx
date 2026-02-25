@@ -373,7 +373,7 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
 
     case 'LOAD_TOUR_DEMO': {
       // Curated demo state for the guided tour.
-      // Team 2 is buffer-free and recommended. Teams 1 & 3 have active buffers.
+      // Only Team 1 has an active buffer. Teams 2 & 3 are buffer-free.
       // Good mix of acuity tiers, provider types, and statuses.
       const now = Date.now();
       const m = 60_000; // 1 minute in ms
@@ -405,20 +405,19 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
         { id: 'C-003', acuity: 'tier_two', assignedTeamId: 1, assignedAt: now - 3 * m },
         // Team 2: 1 Red (old enough that buffer expired, ~40m ago)
         { id: 'C-002', acuity: 'tier_one', assignedTeamId: 2, assignedAt: now - 40 * m },
-        // Team 3: 1 Yellow (recent → buffer source), 1 Purple (old)
-        { id: 'F-001', acuity: 'tier_two', assignedTeamId: 3, assignedAt: now - 3 * m },
+        // Team 3: 1 Yellow (old, buffer expired), 1 Purple (old)
+        { id: 'F-001', acuity: 'tier_two', assignedTeamId: 3, assignedAt: now - 30 * m },
         { id: 'C-004', acuity: 'tier_three', assignedTeamId: 3, assignedAt: now - 55 * m },
         // Team 4: 1 Purple
         { id: 'F-002', acuity: 'tier_three', assignedTeamId: 4, assignedAt: now - 30 * m },
       ];
 
       // Team 1: Yellow buffer from C-003 (assigned 3m ago, 25m duration → 22m left)
-      // Team 3: Yellow buffer from F-001 (assigned 3m ago, 25m duration → 22m left)
       // Team 2: no buffer (Red buffer from C-002 expired: 40m ago, 35m duration)
-      // Buffers are set with plenty of remaining time so they survive the full tour.
+      // Team 3: no buffer (Yellow buffer from F-001 expired: 30m ago, 25m duration)
+      // Only Team 1 has an active buffer so users can see buffered vs non-buffered.
       const tourBuffers: Buffer[] = [
         { id: 'tb1', teamId: 1, tier: 'tier_two', createdAt: now - 3 * m, expiresAt: now + 22 * m },
-        { id: 'tb2', teamId: 3, tier: 'tier_two', createdAt: now - 3 * m, expiresAt: now + 22 * m },
       ];
 
       return {
