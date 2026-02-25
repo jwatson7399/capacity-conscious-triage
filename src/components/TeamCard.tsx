@@ -13,11 +13,12 @@ interface Props {
   isClosed?: boolean;
   closedAt?: number;
   allCandidatesBuffered?: boolean;
+  tourActive?: boolean;
 }
 
 const PROVIDER_TYPES: ProviderType[] = ['attending', 'senior_resident', 'junior_resident', 'pa', 'rotator'];
 
-export default function TeamCard({ teamId, score, recommendationRank, isClosed, closedAt, allCandidatesBuffered }: Props) {
+export default function TeamCard({ teamId, score, recommendationRank, isClosed, closedAt, allCandidatesBuffered, tourActive }: Props) {
   const { state, dispatch } = useShift();
   const { providers, patients, buffers, now, currentRole } = state;
   const isTrauma = teamId === TRAUMA_TEAM_ID;
@@ -32,7 +33,7 @@ export default function TeamCard({ teamId, score, recommendationRank, isClosed, 
   const [swapping, setSwapping] = useState<string | null>(null);
   const [swapName, setSwapName] = useState('');
   const [swapType, setSwapType] = useState<ProviderType>('senior_resident');
-  const [providersOpen, setProvidersOpen] = useState(false);
+  const [providersOpen, setProvidersOpen] = useState(!!tourActive);
   const [patientsOpen, setPatientsOpen] = useState(true);
   const [hideStabilized, setHideStabilized] = useState(false);
 

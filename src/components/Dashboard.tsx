@@ -179,7 +179,7 @@ export default function Dashboard({ tourActive, onTourComplete }: { tourActive?:
               : null;
             const isClosed = id in state.closedTeams;
             const closedAt = state.closedTeams[id];
-            return <TeamCard key={id} teamId={id} score={score} recommendationRank={rank} isClosed={isClosed} closedAt={closedAt} allCandidatesBuffered={allCandidatesBuffered} />;
+            return <TeamCard key={id} teamId={id} score={score} recommendationRank={rank} isClosed={isClosed} closedAt={closedAt} allCandidatesBuffered={allCandidatesBuffered} tourActive={tourActive} />;
           });
         })()}
       </div>
