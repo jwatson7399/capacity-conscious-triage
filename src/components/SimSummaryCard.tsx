@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { SimulationState, TeamId } from '../types';
 import { statsFromEntries, computeFairness } from '../engine/fairness';
+import { getEffectiveCapacity } from '../engine/recommendation';
 
 interface Props {
   simulation: SimulationState;
@@ -55,8 +56,17 @@ export default function SimSummaryCard({ simulation: sim }: Props) {
   const liveStats = useMemo(() => statsFromEntries(liveShadow.entries), [liveShadow]);
   const shadowStats = useMemo(() => statsFromEntries(shadow.entries), [shadow]);
 
-  const liveFairness = useMemo(() => computeFairness(liveStats, sim.permanentlyClosedTeams), [liveStats, sim.permanentlyClosedTeams]);
-  const shadowFairness = useMemo(() => computeFairness(shadowStats, sim.permanentlyClosedTeams), [shadowStats, sim.permanentlyClosedTeams]);
+  const teamCapacities = useMemo(() => {
+    const caps: Record<number, number> = {};
+    const providers = sim.initialProviders ?? [];
+    for (const t of [1, 2, 3, 4] as TeamId[]) {
+      caps[t] = getEffectiveCapacity(providers.filter(p => p.teamId === t), sim.baseTime);
+    }
+    return caps;
+  }, [sim.initialProviders, sim.baseTime]);
+
+  const liveFairness = useMemo(() => computeFairness(liveStats, sim.permanentlyClosedTeams, teamCapacities), [liveStats, sim.permanentlyClosedTeams, teamCapacities]);
+  const shadowFairness = useMemo(() => computeFairness(shadowStats, sim.permanentlyClosedTeams, teamCapacities), [shadowStats, sim.permanentlyClosedTeams, teamCapacities]);
 
   const eligible = ([1, 2, 3, 4] as TeamId[]).filter(
     t => t !== 4 && !sim.permanentlyClosedTeams.includes(t)

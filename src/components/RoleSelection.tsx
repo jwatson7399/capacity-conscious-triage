@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useShift } from '../context/ShiftContext';
 import type { Role } from '../types';
 import SimulationSetup from './SimulationSetup';
+import BenchmarkReport from './BenchmarkReport';
 
 const roles: { role: Role; label: string; desc: string }[] = [
   { role: 'triage_nurse', label: 'Triage Nurse', desc: 'Assign incoming critical patients to teams' },
@@ -12,8 +13,10 @@ const roles: { role: Role; label: string; desc: string }[] = [
 export default function RoleSelection({ onStartTour }: { onStartTour?: () => void }) {
   const { dispatch } = useShift();
   const [showSimSetup, setShowSimSetup] = useState(false);
+  const [showBenchmark, setShowBenchmark] = useState(false);
 
   if (showSimSetup) return <SimulationSetup onCancel={() => setShowSimSetup(false)} />;
+  if (showBenchmark) return <BenchmarkReport onBack={() => setShowBenchmark(false)} />;
 
   return (
     <div className="dashboard-bg flex flex-col items-center justify-center p-6">
@@ -48,6 +51,12 @@ export default function RoleSelection({ onStartTour }: { onStartTour?: () => voi
           Start Simulation
         </button>
         <p className="text-xs text-slate-500 text-center mt-2">Watch the triage system handle a simulated shift with configurable parameters</p>
+        <button
+          onClick={() => setShowBenchmark(true)}
+          className="w-full mt-3 min-h-[48px] bg-white/10 text-slate-300 rounded-xl px-5 py-3 font-semibold text-sm active:bg-white/20 border border-white/10"
+        >
+          Formula vs Round-Robin: 1,000-Run Review →
+        </button>
         <button
           onClick={() => dispatch({ type: 'LOAD_DEMO' })}
           className="w-full mt-3 min-h-[48px] bg-white/10 text-white rounded-xl px-5 py-3 font-semibold text-base active:bg-white/20 transition-colors border border-white/10"

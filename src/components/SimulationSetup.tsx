@@ -1,36 +1,93 @@
 import { useState } from 'react';
 import { useShift } from '../context/ShiftContext';
-import type { Provider, TeamId, ProviderType } from '../types';
+import type { Provider, TeamId, ProviderType, ProviderStatus, SimStatusChangeEntry } from '../types';
 import { getDefaultOverrides, randomSeed } from '../engine/simulation';
 
-type Preset = 'typical_day' | 'understaffed_night' | 'high_acuity' | 'custom';
+type Preset = 'typical_day' | 'uneven_staffing' | 'mid_shift_chaos' | 'understaffed_night' | 'high_acuity' | 'custom';
+
+interface ProviderDef {
+  type: ProviderType;
+  teamId: TeamId;
+  status?: 'active' | 'in_procedure' | 'taking_signout' | 'off_floor';
+  statusMinutes?: number; // minutes until status expires
+}
+
+interface ScheduledChange {
+  providerIndex: number;   // index into providers array
+  atMinutes: number;       // minutes into shift
+  status: ProviderStatus;
+  durationMinutes: number; // how long the status lasts
+}
 
 interface TeamPreset {
   label: string;
   description: string;
-  providers: Array<{ type: ProviderType; teamId: TeamId }>;
+  providers: ProviderDef[];
   acuityDistribution?: { tier_one: number; tier_two: number; tier_three: number };
   arrivalRate?: number;
   closedTeams?: number[];
+  scheduledChanges?: ScheduledChange[];
 }
 
 const PRESETS: Record<Exclude<Preset, 'custom'>, TeamPreset> = {
   typical_day: {
     label: 'Typical Day',
-    description: '4 teams, full staffing, balanced acuity',
+    description: '4 teams, balanced acuity, steady staffing',
     providers: [
-      // Team 1
+      // Team 1: ATT + SR + JR + PA (50.0) — strong
       { type: 'attending', teamId: 1 }, { type: 'senior_resident', teamId: 1 },
       { type: 'junior_resident', teamId: 1 }, { type: 'pa', teamId: 1 },
-      // Team 2
+      // Team 2: ATT + SR + PA (42.5) — medium-strong
       { type: 'attending', teamId: 2 }, { type: 'senior_resident', teamId: 2 },
-      { type: 'junior_resident', teamId: 2 }, { type: 'pa', teamId: 2 },
-      // Team 3
-      { type: 'attending', teamId: 3 }, { type: 'senior_resident', teamId: 3 },
-      { type: 'pa', teamId: 3 },
-      // Team 4 (trauma)
+      { type: 'pa', teamId: 2 },
+      // Team 3: ATT + JR + Rotator (26.0) — weak
+      { type: 'attending', teamId: 3 }, { type: 'junior_resident', teamId: 3 },
+      { type: 'rotator', teamId: 3 },
+      // Team 4 (trauma): ATT + JR
       { type: 'attending', teamId: 4 }, { type: 'junior_resident', teamId: 4 },
     ],
+  },
+  uneven_staffing: {
+    label: 'Sporadic Staffing',
+    description: 'Providers leave and arrive mid-shift — solo gaps emerge',
+    providers: [
+      // Team 1: ATT + SR + PA + JR (50.0) — powerhouse
+      { type: 'attending', teamId: 1 }, { type: 'senior_resident', teamId: 1 },
+      { type: 'pa', teamId: 1 }, { type: 'junior_resident', teamId: 1 },
+      // Team 2: ATT + SR + JR(off_floor, joins at 7h)
+      // Hours 0-6: ATT+SR (32.5), Hour 6-7: ATT solo (17.5), Hour 7+: ATT+JR (25.0)
+      { type: 'attending', teamId: 2 }, { type: 'senior_resident', teamId: 2 },
+      { type: 'junior_resident', teamId: 2, status: 'off_floor', statusMinutes: 420 },
+      // Team 3: ATT + Rotator (18.5) — barely above solo
+      { type: 'attending', teamId: 3 }, { type: 'rotator', teamId: 3 },
+      // Team 4 (trauma): ATT + JR
+      { type: 'attending', teamId: 4 }, { type: 'junior_resident', teamId: 4 },
+    ],
+    scheduledChanges: [
+      // SR goes off_floor at hour 6 for 60 minutes
+      { providerIndex: 5, atMinutes: 360, status: 'off_floor', durationMinutes: 60 },
+    ],
+  },
+  mid_shift_chaos: {
+    label: 'Mid-Shift Chaos',
+    description: 'Providers variably in procedures, and taking sign out',
+    providers: [
+      // Team 1: ATT (taking_signout) + SR + JR + PA
+      { type: 'attending', teamId: 1, status: 'taking_signout', statusMinutes: 15 },
+      { type: 'senior_resident', teamId: 1 },
+      { type: 'junior_resident', teamId: 1 },
+      { type: 'pa', teamId: 1 },
+      // Team 2: ATT + SR + PA
+      { type: 'attending', teamId: 2 }, { type: 'senior_resident', teamId: 2 },
+      { type: 'pa', teamId: 2 },
+      // Team 3: ATT (off_floor) + JR + Rotator
+      { type: 'attending', teamId: 3, status: 'off_floor', statusMinutes: 10 },
+      { type: 'junior_resident', teamId: 3 },
+      { type: 'rotator', teamId: 3 },
+      // Team 4 (trauma): ATT + JR
+      { type: 'attending', teamId: 4 }, { type: 'junior_resident', teamId: 4 },
+    ],
+    arrivalRate: 5,
   },
   understaffed_night: {
     label: 'Night Shift',
@@ -44,14 +101,17 @@ const PRESETS: Record<Exclude<Preset, 'custom'>, TeamPreset> = {
   },
   high_acuity: {
     label: 'High Acuity Day',
-    description: 'Full staff, heavy red/yellow mix',
+    description: 'Heavy red/yellow mix, high volume',
     providers: [
+      // Team 1: ATT + SR + JR + PA + Rotator (51.0) — heavy
       { type: 'attending', teamId: 1 }, { type: 'senior_resident', teamId: 1 },
       { type: 'junior_resident', teamId: 1 }, { type: 'pa', teamId: 1 }, { type: 'rotator', teamId: 1 },
+      // Team 2: ATT + SR + PA (42.5) — medium
       { type: 'attending', teamId: 2 }, { type: 'senior_resident', teamId: 2 },
-      { type: 'junior_resident', teamId: 2 }, { type: 'pa', teamId: 2 },
-      { type: 'attending', teamId: 3 }, { type: 'senior_resident', teamId: 3 },
-      { type: 'junior_resident', teamId: 3 }, { type: 'pa', teamId: 3 },
+      { type: 'pa', teamId: 2 },
+      // Team 3: ATT + JR (25.0) — light
+      { type: 'attending', teamId: 3 }, { type: 'junior_resident', teamId: 3 },
+      // Team 4 (trauma): ATT + SR
       { type: 'attending', teamId: 4 }, { type: 'senior_resident', teamId: 4 },
     ],
     acuityDistribution: { tier_one: 40, tier_two: 40, tier_three: 20 },
@@ -83,12 +143,13 @@ export default function SimulationSetup({ onCancel }: { onCancel: () => void }) 
 
     // Build providers from preset or custom
     const providerDefs = activePreset?.providers ?? PRESETS.typical_day.providers;
+    const now = Date.now();
     const providers: Provider[] = providerDefs.map((def, i) => ({
       id: `sp${i}`,
       name: PROVIDER_NAMES[i % PROVIDER_NAMES.length],
       type: def.type,
-      status: 'active',
-      statusExpiresAt: null,
+      status: def.status ?? 'active',
+      statusExpiresAt: def.statusMinutes ? now + def.statusMinutes * 60 * 1000 : null,
       teamId: def.teamId,
     }));
 
@@ -96,6 +157,17 @@ export default function SimulationSetup({ onCancel }: { onCancel: () => void }) 
     if (activePreset?.closedTeams) {
       const now = Date.now();
       for (const t of activePreset.closedTeams) closedTeams[t] = now;
+    }
+
+    // Convert scheduledChanges to SimStatusChangeEntry[]
+    let presetStatusChanges: SimStatusChangeEntry[] | undefined;
+    if (activePreset?.scheduledChanges?.length) {
+      presetStatusChanges = activePreset.scheduledChanges.map(sc => ({
+        time: now + sc.atMinutes * 60 * 1000,
+        providerId: providers[sc.providerIndex].id,
+        status: sc.status,
+        durationMs: sc.durationMinutes * 60 * 1000,
+      }));
     }
 
     dispatch({
@@ -106,6 +178,7 @@ export default function SimulationSetup({ onCancel }: { onCancel: () => void }) 
       overrides,
       closedTeams,
       roundRobin,
+      presetStatusChanges,
     });
   };
 

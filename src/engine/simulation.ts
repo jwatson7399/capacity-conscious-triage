@@ -1,4 +1,4 @@
-import type { AcuityTier, SimTimelineEntry, SimOverrides, SimSnapshot, ShiftState, TeamId, Provider, Patient, Buffer, ShadowEntry, ShadowResult } from '../types';
+import type { AcuityTier, SimTimelineEntry, SimStatusChangeEntry, SimOverrides, SimSnapshot, ShiftState, TeamId, Provider, Patient, Buffer, ShadowEntry, ShadowResult } from '../types';
 import {
   CAPACITY_WEIGHTS,
   STATUS_MULTIPLIERS,
@@ -45,6 +45,9 @@ export function getDefaultOverrides(): SimOverrides {
     arrivalRatePerHour: 4,
     acuityDistribution: { tier_one: 25, tier_two: 50, tier_three: 25 },
     floorUpgradeChance: 15,
+    procedureChancePerHour: 0.15,
+    procedureDurationMs: 20 * 60000,
+    signoutWindows: { startMinutes: 30, endMinutes: 45 },
   };
 }
 
@@ -85,6 +88,96 @@ export function generateTimeline(
   }
 
   return timeline;
+}
+
+// --- Status change timeline generation ---
+
+export function generateStatusChanges(
+  seed: number,
+  shiftDurationMs: number,
+  overrides: SimOverrides,
+  startTime: number,
+  providers: Provider[],
+): SimStatusChangeEntry[] {
+  // Use a different seed offset so status changes don't correlate with arrivals
+  const rng = mulberry32(seed + 9999);
+  const changes: SimStatusChangeEntry[] = [];
+  const endTime = startTime + shiftDurationMs;
+  const hourMs = 60 * 60 * 1000;
+  const hours = Math.ceil(shiftDurationMs / hourMs);
+
+  // Procedures: iterate each hour, roll for each provider
+  for (let h = 0; h < hours; h++) {
+    const hourStart = startTime + h * hourMs;
+    const hourEnd = Math.min(hourStart + hourMs, endTime);
+
+    for (const p of providers) {
+      // Attendings go into procedures at half the rate
+      const chance = p.type === 'attending'
+        ? overrides.procedureChancePerHour * 0.5
+        : overrides.procedureChancePerHour;
+
+      if (rng() < chance) {
+        const time = hourStart + rng() * (hourEnd - hourStart);
+        if (time < endTime) {
+          changes.push({
+            time,
+            providerId: p.id,
+            status: 'in_procedure',
+            durationMs: overrides.procedureDurationMs,
+          });
+        }
+      }
+    }
+  }
+
+  // Signout: only attendings, near shift start and end
+  const attendings = providers.filter(p => p.type === 'attending');
+  const { startMinutes, endMinutes } = overrides.signoutWindows;
+  const startWindowEnd = startTime + startMinutes * 60000;
+  const endWindowStart = endTime - endMinutes * 60000;
+
+  // Pick 1-2 attendings for start-of-shift signout
+  const shuffledStart = [...attendings];
+  // Fisher-Yates shuffle with seeded rng
+  for (let i = shuffledStart.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [shuffledStart[i], shuffledStart[j]] = [shuffledStart[j], shuffledStart[i]];
+  }
+  const startCount = Math.min(1 + (rng() < 0.5 ? 1 : 0), shuffledStart.length);
+  for (let i = 0; i < startCount; i++) {
+    const time = startTime + rng() * (startWindowEnd - startTime);
+    const duration = (15 + rng() * 5) * 60000; // 15-20 min
+    changes.push({
+      time,
+      providerId: shuffledStart[i].id,
+      status: 'taking_signout',
+      durationMs: duration,
+    });
+  }
+
+  // Pick 1-2 attendings for end-of-shift signout
+  const shuffledEnd = [...attendings];
+  for (let i = shuffledEnd.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [shuffledEnd[i], shuffledEnd[j]] = [shuffledEnd[j], shuffledEnd[i]];
+  }
+  const endCount = Math.min(1 + (rng() < 0.5 ? 1 : 0), shuffledEnd.length);
+  for (let i = 0; i < endCount; i++) {
+    if (endWindowStart >= endTime) continue;
+    const time = endWindowStart + rng() * (endTime - endWindowStart);
+    const duration = (15 + rng() * 5) * 60000;
+    changes.push({
+      time,
+      providerId: shuffledEnd[i].id,
+      status: 'taking_signout',
+      durationMs: duration,
+    });
+  }
+
+  // Sort by time
+  changes.sort((a, b) => a.time - b.time);
+  return changes;
 }
 
 // --- Snapshot management ---
@@ -128,6 +221,7 @@ export function runShadowSim(
   overrides: SimOverrides,
   _baseTime: number,
   shadowMode: 'round_robin' | 'formula',
+  statusChanges?: SimStatusChangeEntry[],
 ): ShadowResult {
   const scoringOv: ScoringOverrides = {
     capacityWeights: overrides.capacityWeights,
@@ -141,6 +235,7 @@ export function runShadowSim(
   let simPatients: Patient[] = [];
   let simBuffers: Buffer[] = [];
   let rrNext = 0;
+  let nextStatusChangeIndex = 0;
 
   const entries: ShadowEntry[] = [];
   const teamPatientCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
@@ -158,6 +253,19 @@ export function runShadowSim(
   for (let i = 0; i < timeline.length; i++) {
     const entry = timeline[i];
     const now = entry.arrivalTime;
+
+    // Drain pending status changes up to this time
+    if (statusChanges) {
+      while (nextStatusChangeIndex < statusChanges.length && statusChanges[nextStatusChangeIndex].time <= now) {
+        const change = statusChanges[nextStatusChangeIndex];
+        nextStatusChangeIndex++;
+        simProviders = simProviders.map(p => {
+          if (p.id !== change.providerId) return p;
+          if (p.status !== 'active') return p;
+          return { ...p, status: change.status, statusExpiresAt: change.time + change.durationMs };
+        });
+      }
+    }
 
     // Auto-expire provider statuses
     simProviders = simProviders.map(p => {

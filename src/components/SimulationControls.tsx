@@ -3,8 +3,9 @@ import { useShift } from '../context/ShiftContext';
 import SimulationParams from './SimulationParams';
 import type { TeamId } from '../types';
 import { statsFromEntries, computeFairness } from '../engine/fairness';
+import { getEffectiveCapacity } from '../engine/recommendation';
 
-const SPEEDS = [1, 5, 10, 15, 20, 30, 40, 50, 100, 200];
+const SPEEDS = [1, 5, 10, 15, 20, 30, 40, 50, 100, 200, 400];
 
 function formatTime(ms: number): string {
   const totalSec = Math.floor(ms / 1000);
@@ -28,8 +29,17 @@ function ComparisonPanel({ sim, arrivedCount }: { sim: NonNullable<ReturnType<ty
   const liveStats = useMemo(() => statsFromEntries(liveEntries), [liveEntries]);
   const shadowStats = useMemo(() => statsFromEntries(shadowEntries), [shadowEntries]);
 
-  const liveFairness = useMemo(() => computeFairness(liveStats, sim.permanentlyClosedTeams), [liveStats, sim.permanentlyClosedTeams]);
-  const shadowFairness = useMemo(() => computeFairness(shadowStats, sim.permanentlyClosedTeams), [shadowStats, sim.permanentlyClosedTeams]);
+  const teamCapacities = useMemo(() => {
+    const caps: Record<number, number> = {};
+    const providers = sim.initialProviders ?? [];
+    for (const t of [1, 2, 3, 4] as (1|2|3|4)[]) {
+      caps[t] = getEffectiveCapacity(providers.filter(p => p.teamId === t), sim.baseTime);
+    }
+    return caps;
+  }, [sim.initialProviders, sim.baseTime]);
+
+  const liveFairness = useMemo(() => computeFairness(liveStats, sim.permanentlyClosedTeams, teamCapacities), [liveStats, sim.permanentlyClosedTeams, teamCapacities]);
+  const shadowFairness = useMemo(() => computeFairness(shadowStats, sim.permanentlyClosedTeams, teamCapacities), [shadowStats, sim.permanentlyClosedTeams, teamCapacities]);
 
   const eligible = ([1, 2, 3, 4] as TeamId[]).filter(
     t => t !== 4 && !sim.permanentlyClosedTeams.includes(t)

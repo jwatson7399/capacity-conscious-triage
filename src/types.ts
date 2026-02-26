@@ -59,12 +59,22 @@ export interface SimOverrides {
   arrivalRatePerHour: number;
   acuityDistribution: { tier_one: number; tier_two: number; tier_three: number };
   floorUpgradeChance: number;
+  procedureChancePerHour: number;
+  procedureDurationMs: number;
+  signoutWindows: { startMinutes: number; endMinutes: number };
 }
 
 export interface SimTimelineEntry {
   arrivalTime: number;
   acuity: AcuityTier;
   isFloor: boolean;
+}
+
+export interface SimStatusChangeEntry {
+  time: number;
+  providerId: string;
+  status: ProviderStatus;
+  durationMs: number;
 }
 
 export interface SimSnapshot {
@@ -98,7 +108,9 @@ export interface SimulationState {
   seed: number;
   shiftDurationMs: number;
   timeline: SimTimelineEntry[];
+  statusChanges: SimStatusChangeEntry[];
   nextArrivalIndex: number;
+  nextStatusChangeIndex: number;
   snapshots: SimSnapshot[];
   overrides: SimOverrides;
   permanentlyClosedTeams: number[];
@@ -106,6 +118,7 @@ export interface SimulationState {
   roundRobinNext?: number;
   shadow?: ShadowResult;
   liveShadow?: ShadowResult;  // pre-computed stats for the live mode (same algo as shadow but for live mode)
+  initialProviders: Provider[];
 }
 
 export interface ShiftState {
@@ -152,7 +165,7 @@ export type ShiftAction =
   | { type: 'DOWNGRADE_PATIENT'; patientId: string }
   | { type: 'LOAD_DEMO' }
   | { type: 'LOAD_TOUR_DEMO' }
-  | { type: 'START_SIMULATION'; providers: Provider[]; seed: number; shiftDurationMs: number; overrides: SimOverrides; closedTeams?: Record<number, number>; roundRobin?: boolean }
+  | { type: 'START_SIMULATION'; providers: Provider[]; seed: number; shiftDurationMs: number; overrides: SimOverrides; closedTeams?: Record<number, number>; roundRobin?: boolean; presetStatusChanges?: SimStatusChangeEntry[] }
   | { type: 'SET_SIM_SPEED'; speed: number }
   | { type: 'TOGGLE_SIM_PAUSE' }
   | { type: 'SIM_REWIND'; snapshotIndex: number }

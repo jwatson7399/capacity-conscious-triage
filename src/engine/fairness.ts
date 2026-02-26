@@ -7,6 +7,7 @@ export interface ModeStats {
   minRatio: number;
   overwhelms: number;
   teamAcuityLoad: Record<number, { tier_one: number; tier_two: number; tier_three: number }>;
+  avgRatioPerTeam: Record<number, number>;
 }
 
 /** Build ModeStats from a slice of ShadowEntry[] (up to arrivedCount) */
@@ -21,6 +22,8 @@ export function statsFromEntries(entries: ShadowEntry[]): ModeStats {
   let totalRatio = 0;
   let minRatio = Infinity;
   let overwhelms = 0;
+  const ratioSums: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
+  const ratioCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
 
   for (const e of entries) {
     teamCounts[e.teamId]++;
@@ -28,6 +31,13 @@ export function statsFromEntries(entries: ShadowEntry[]): ModeStats {
     totalRatio += e.ratioAtAssignment;
     if (e.ratioAtAssignment < minRatio) minRatio = e.ratioAtAssignment;
     if (e.ratioAtAssignment < 2.0) overwhelms++;
+    ratioSums[e.teamId] += e.ratioAtAssignment;
+    ratioCounts[e.teamId]++;
+  }
+
+  const avgRatioPerTeam: Record<number, number> = {};
+  for (const t of [1, 2, 3, 4]) {
+    avgRatioPerTeam[t] = ratioCounts[t] > 0 ? ratioSums[t] / ratioCounts[t] : Infinity;
   }
 
   return {
@@ -36,11 +46,16 @@ export function statsFromEntries(entries: ShadowEntry[]): ModeStats {
     minRatio: entries.length > 0 ? minRatio : Infinity,
     overwhelms,
     teamAcuityLoad,
+    avgRatioPerTeam,
   };
 }
 
 /** Compute a fairness score (0-100) from mode stats */
-export function computeFairness(stats: ModeStats, permanentlyClosedTeams: number[]): number {
+export function computeFairness(
+  stats: ModeStats,
+  permanentlyClosedTeams: number[],
+  teamCapacities?: Record<number, number>,
+): number {
   const eligible = ([1, 2, 3, 4] as TeamId[]).filter(
     t => t !== TRAUMA_TEAM_ID && !permanentlyClosedTeams.includes(t)
   );
@@ -49,14 +64,28 @@ export function computeFairness(stats: ModeStats, permanentlyClosedTeams: number
   const totalAssignments = counts.reduce((a, b) => a + b, 0);
   if (totalAssignments === 0) return 50;
 
-  const mean = totalAssignments / eligible.length;
+  // Capacity-Proportional Balance (25%): stress = patients / capacity per team
+  let capacityBalance = 1;
+  if (teamCapacities) {
+    const stressPerTeam = eligible.map(t => {
+      const cap = teamCapacities[t] ?? 1;
+      return cap > 0 ? (stats.teamCounts[t] ?? 0) / cap : 100;
+    });
+    const stressMean = stressPerTeam.reduce((a, b) => a + b, 0) / stressPerTeam.length;
+    if (stressMean > 0) {
+      const stressVar = stressPerTeam.reduce((sum, s) => sum + (s - stressMean) ** 2, 0) / stressPerTeam.length;
+      capacityBalance = Math.max(0, Math.min(1, 1 - Math.sqrt(stressVar) / stressMean));
+    }
+  } else {
+    // Fallback: raw count balance (for backward compat)
+    const mean = totalAssignments / eligible.length;
+    if (mean > 0) {
+      const variance = counts.reduce((sum, c) => sum + (c - mean) ** 2, 0) / counts.length;
+      capacityBalance = Math.max(0, Math.min(1, 1 - Math.sqrt(variance) / mean));
+    }
+  }
 
-  // Load Balance (40%): 1 - (stdDev / mean), clamped 0-1
-  const variance = counts.reduce((sum, c) => sum + (c - mean) ** 2, 0) / counts.length;
-  const stdDev = Math.sqrt(variance);
-  const loadBalance = mean > 0 ? Math.max(0, Math.min(1, 1 - stdDev / mean)) : 1;
-
-  // Acuity Balance (25%): 1 - (stdDev of acuity-weighted load / mean)
+  // Acuity Balance (15%): 1 - (stdDev of acuity-weighted load / mean)
   const acuityWeightMap: Record<AcuityTier, number> = { tier_one: 5, tier_two: 3, tier_three: 1 };
   const teamLoads = eligible.map(t => {
     const al = stats.teamAcuityLoad[t];
@@ -70,11 +99,32 @@ export function computeFairness(stats: ModeStats, permanentlyClosedTeams: number
     acuityBalance = Math.max(0, Math.min(1, 1 - Math.sqrt(loadVar) / loadMean));
   }
 
-  // Overwhelm (20%): 1 - (overwhelmEvents / totalAssignments)
+  // Overwhelm Avoidance (30%): 1 - (overwhelmEvents / totalAssignments)
   const overwhelmScore = Math.max(0, Math.min(1, 1 - stats.overwhelms / totalAssignments));
 
   // Min Ratio (15%): min(minRatio / 3.35, 1)
   const minRatioScore = stats.minRatio === Infinity ? 1 : Math.min(stats.minRatio / 3.35, 1);
 
-  return (loadBalance * 0.4 + acuityBalance * 0.25 + overwhelmScore * 0.2 + minRatioScore * 0.15) * 100;
+  // Stress Equity (15%): 1 - stdDev(avgRatioPerTeam) / mean(avgRatioPerTeam)
+  let stressEquity = 1;
+  if (stats.avgRatioPerTeam) {
+    const ratios = eligible
+      .map(t => stats.avgRatioPerTeam[t])
+      .filter(r => r !== undefined && isFinite(r));
+    if (ratios.length > 0) {
+      const ratioMean = ratios.reduce((a, b) => a + b, 0) / ratios.length;
+      if (ratioMean > 0) {
+        const ratioVar = ratios.reduce((sum, r) => sum + (r - ratioMean) ** 2, 0) / ratios.length;
+        stressEquity = Math.max(0, Math.min(1, 1 - Math.sqrt(ratioVar) / ratioMean));
+      }
+    }
+  }
+
+  return (
+    capacityBalance * 0.25 +
+    acuityBalance * 0.15 +
+    overwhelmScore * 0.30 +
+    minRatioScore * 0.15 +
+    stressEquity * 0.15
+  ) * 100;
 }

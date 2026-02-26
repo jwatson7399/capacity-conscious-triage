@@ -4,7 +4,7 @@ import { STATUS_EXPIRE_MS_MAP, BUFFER_DURATIONS_MS, TEAM_CLOSE_TRANSFER_MS, TEAM
 import { getRecommendation, createBuffer, type ScoringOverrides } from '../engine/recommendation';
 import { uid } from '../uid';
 import type { Provider, Patient, Buffer, TeamId } from '../types';
-import { generateTimeline, takeSnapshot, addSnapshot, runShadowSim } from '../engine/simulation';
+import { generateTimeline, generateStatusChanges, takeSnapshot, addSnapshot, runShadowSim } from '../engine/simulation';
 
 function simOverridesToScoring(sim: SimulationState | undefined): ScoringOverrides | undefined {
   if (!sim) return undefined;
@@ -89,9 +89,23 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
 
       let newState: ShiftState = { ...state, now: tickNow, providers, buffers, patients, closedTeams };
 
-      // Simulation: process pending arrivals
+      // Simulation: process pending status changes and arrivals
       if (sim?.active) {
-        let { nextArrivalIndex, snapshots, roundRobinNext } = sim;
+        let { nextArrivalIndex, nextStatusChangeIndex, snapshots, roundRobinNext } = sim;
+
+        // Process status changes
+        let simProviders = newState.providers;
+        while (nextStatusChangeIndex < sim.statusChanges.length && sim.statusChanges[nextStatusChangeIndex].time <= tickNow) {
+          const change = sim.statusChanges[nextStatusChangeIndex];
+          nextStatusChangeIndex++;
+          // Only apply if provider is currently active (don't override existing non-active status)
+          simProviders = simProviders.map(p => {
+            if (p.id !== change.providerId) return p;
+            if (p.status !== 'active') return p;
+            return { ...p, status: change.status, statusExpiresAt: change.time + change.durationMs };
+          });
+        }
+        newState = { ...newState, providers: simProviders };
         let rrNext = roundRobinNext ?? 0;
         let { patients: simPatients, buffers: simBuffers, patientCounter } = newState;
         const scoringOverrides = simOverridesToScoring(sim);
@@ -160,7 +174,7 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
           patients: simPatients,
           buffers: simBuffers,
           patientCounter,
-          simulation: { ...sim, nextArrivalIndex, snapshots, roundRobinNext: rrNext },
+          simulation: { ...sim, nextArrivalIndex, nextStatusChangeIndex, snapshots, roundRobinNext: rrNext },
         };
       }
 
@@ -559,16 +573,22 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
     case 'START_SIMULATION': {
       const simNow = Date.now();
       const timeline = generateTimeline(action.seed, action.shiftDurationMs, action.overrides, simNow);
+      const generatedChanges = generateStatusChanges(action.seed, action.shiftDurationMs, action.overrides, simNow, action.providers);
+      const statusChanges = action.presetStatusChanges
+        ? [...generatedChanges, ...action.presetStatusChanges].sort((a, b) => a.time - b.time)
+        : generatedChanges;
       const permaClosed = action.closedTeams ? Object.keys(action.closedTeams).map(Number) : [];
       const shadowMode = action.roundRobin ? 'formula' : 'round_robin';
       const liveMode = action.roundRobin ? 'round_robin' : 'formula';
       const shadow = runShadowSim(
         action.providers, timeline, action.closedTeams ?? {}, permaClosed,
         action.overrides, simNow, shadowMode as 'round_robin' | 'formula',
+        statusChanges,
       );
       const liveShadow = runShadowSim(
         action.providers, timeline, action.closedTeams ?? {}, permaClosed,
         action.overrides, simNow, liveMode as 'round_robin' | 'formula',
+        statusChanges,
       );
       const simState: SimulationState = {
         active: true,
@@ -578,7 +598,9 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
         seed: action.seed,
         shiftDurationMs: action.shiftDurationMs,
         timeline,
+        statusChanges,
         nextArrivalIndex: 0,
+        nextStatusChangeIndex: 0,
         snapshots: [],
         overrides: action.overrides,
         permanentlyClosedTeams: permaClosed,
@@ -586,6 +608,7 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
         roundRobinNext: 0,
         shadow,
         liveShadow,
+        initialProviders: action.providers.map(p => ({ ...p })),
       };
       return {
         ...state,
@@ -618,12 +641,14 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
       if (!snapshot) return state;
       // Restore state from snapshot, keep simulation metadata and ALL snapshots
       const timelineIndex = state.simulation.timeline.findIndex(e => e.arrivalTime > snapshot.simTime);
+      const statusChangeIndex = state.simulation.statusChanges.findIndex(e => e.time > snapshot.simTime);
       return {
         ...snapshot.state,
         simulation: {
           ...state.simulation,
           paused: state.simulation.paused, // preserve play/pause state
           nextArrivalIndex: timelineIndex === -1 ? state.simulation.timeline.length : timelineIndex,
+          nextStatusChangeIndex: statusChangeIndex === -1 ? state.simulation.statusChanges.length : statusChangeIndex,
           snapshots: state.simulation.snapshots,
         },
         now: snapshot.simTime,
