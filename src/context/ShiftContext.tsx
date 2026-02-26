@@ -1,6 +1,6 @@
 import { createContext, useContext, useReducer, useMemo, type ReactNode } from 'react';
 import type { ShiftState, ShiftAction, Recommendation, SimulationState } from '../types';
-import { STATUS_EXPIRE_MS_MAP, BUFFER_DURATIONS_MS, TEAM_CLOSE_TRANSFER_MS, TEAM_CLOSE_TRANSFER_TARGETS, DECEASED_BUFFER_MS } from '../constants';
+import { STATUS_EXPIRE_MS_MAP, BUFFER_DURATIONS_MS, TEAM_CLOSE_TRANSFER_MS, TEAM_CLOSE_TRANSFER_TARGETS, DECEASED_BUFFER_MS, TRAUMA_TEAM_ID } from '../constants';
 import { getRecommendation, createBuffer, type ScoringOverrides } from '../engine/recommendation';
 import { uid } from '../uid';
 import type { Provider, Patient, Buffer, TeamId } from '../types';
@@ -91,7 +91,8 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
 
       // Simulation: process pending arrivals
       if (sim?.active) {
-        let { nextArrivalIndex, snapshots } = sim;
+        let { nextArrivalIndex, snapshots, roundRobinNext } = sim;
+        let rrNext = roundRobinNext ?? 0;
         let { patients: simPatients, buffers: simBuffers, patientCounter } = newState;
         const scoringOverrides = simOverridesToScoring(sim);
         let arrivedAny = false;
@@ -105,9 +106,19 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
           const count = patientCounter[prefix] + 1;
           const id = `${prefix}-${String(count).padStart(3, '0')}`;
 
-          // Get recommendation at arrival time
-          const rec = getRecommendation(providers, simPatients, simBuffers, tickNow, closedTeams, scoringOverrides);
-          const teamId = rec.first ?? (1 as TeamId);
+          // Get team assignment — round-robin or formula-driven
+          let teamId: TeamId;
+          if (sim.roundRobin) {
+            const eligible = ([1, 2, 3, 4] as TeamId[]).filter(
+              t => t !== TRAUMA_TEAM_ID && !(t in closedTeams) && !sim.permanentlyClosedTeams.includes(t)
+            );
+            const rrIdx = rrNext % eligible.length;
+            teamId = eligible[rrIdx];
+            rrNext++;
+          } else {
+            const rec = getRecommendation(providers, simPatients, simBuffers, tickNow, closedTeams, scoringOverrides);
+            teamId = rec.first ?? (1 as TeamId);
+          }
 
           const patient = { id, acuity: entry.acuity, assignedTeamId: teamId, assignedAt: tickNow };
           const newBuffer = createBuffer(teamId, entry.acuity, tickNow, scoringOverrides);
@@ -149,7 +160,7 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
           patients: simPatients,
           buffers: simBuffers,
           patientCounter,
-          simulation: { ...sim, nextArrivalIndex, snapshots },
+          simulation: { ...sim, nextArrivalIndex, snapshots, roundRobinNext: rrNext },
         };
       }
 
@@ -560,6 +571,8 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
         snapshots: [],
         overrides: action.overrides,
         permanentlyClosedTeams: action.closedTeams ? Object.keys(action.closedTeams).map(Number) : [],
+        roundRobin: action.roundRobin ?? false,
+        roundRobinNext: 0,
       };
       return {
         ...state,

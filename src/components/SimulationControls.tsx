@@ -161,7 +161,10 @@ export default function SimulationControls() {
         {/* Stats line */}
         <div className="flex justify-between mt-1 text-[10px] text-slate-500">
           <span>{arrivedCount}/{totalArrivals} patients arrived</span>
-          <span>Seed: {sim.seed}</span>
+          <span className="flex items-center gap-2">
+            {sim.roundRobin && <span className="text-amber-400 font-semibold">ROUND ROBIN</span>}
+            Seed: {sim.seed}
+          </span>
         </div>
       </div>
 

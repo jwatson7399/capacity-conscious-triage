@@ -84,6 +84,8 @@ export interface SimulationState {
   snapshots: SimSnapshot[];
   overrides: SimOverrides;
   permanentlyClosedTeams: number[];
+  roundRobin?: boolean;
+  roundRobinNext?: number;
 }
 
 export interface ShiftState {
@@ -130,7 +132,7 @@ export type ShiftAction =
   | { type: 'DOWNGRADE_PATIENT'; patientId: string }
   | { type: 'LOAD_DEMO' }
   | { type: 'LOAD_TOUR_DEMO' }
-  | { type: 'START_SIMULATION'; providers: Provider[]; seed: number; shiftDurationMs: number; overrides: SimOverrides; closedTeams?: Record<number, number> }
+  | { type: 'START_SIMULATION'; providers: Provider[]; seed: number; shiftDurationMs: number; overrides: SimOverrides; closedTeams?: Record<number, number>; roundRobin?: boolean }
   | { type: 'SET_SIM_SPEED'; speed: number }
   | { type: 'TOGGLE_SIM_PAUSE' }
   | { type: 'SIM_REWIND'; snapshotIndex: number }

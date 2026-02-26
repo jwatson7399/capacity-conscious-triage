@@ -72,6 +72,7 @@ export default function SimulationSetup({ onCancel }: { onCancel: () => void }) 
   const [arrivalRate, setArrivalRate] = useState(4);
   const [acuityDist, setAcuityDist] = useState({ tier_one: 25, tier_two: 50, tier_three: 25 });
   const [seed, setSeed] = useState(() => randomSeed());
+  const [roundRobin, setRoundRobin] = useState(false);
 
   const activePreset = preset !== 'custom' ? PRESETS[preset] : null;
 
@@ -104,6 +105,7 @@ export default function SimulationSetup({ onCancel }: { onCancel: () => void }) 
       shiftDurationMs: shiftHours * 60 * 60 * 1000,
       overrides,
       closedTeams,
+      roundRobin,
     });
   };
 
@@ -202,6 +204,34 @@ export default function SimulationSetup({ onCancel }: { onCancel: () => void }) 
               <span className="text-xs text-slate-400 w-8">{acuityDist.tier_three}%</span>
             </div>
           </div>
+        </div>
+
+        {/* Assignment Mode */}
+        <div>
+          <label className="text-sm font-semibold text-slate-300 block mb-2">Assignment Mode</label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setRoundRobin(false)}
+              className={`rounded-xl px-3 py-3 text-left text-sm transition-colors ${
+                !roundRobin ? 'bg-blue-600 text-white' : 'bg-white/10 text-slate-300 active:bg-white/20'
+              }`}
+            >
+              <div className="font-semibold">Formula-Driven</div>
+              <div className="text-xs opacity-70 mt-0.5">Capacity ratio + buffers</div>
+            </button>
+            <button
+              onClick={() => setRoundRobin(true)}
+              className={`rounded-xl px-3 py-3 text-left text-sm transition-colors ${
+                roundRobin ? 'bg-amber-600 text-white' : 'bg-white/10 text-slate-300 active:bg-white/20'
+              }`}
+            >
+              <div className="font-semibold">Round Robin</div>
+              <div className="text-xs opacity-70 mt-0.5">Rotate teams 1 → 2 → 3</div>
+            </button>
+          </div>
+          {roundRobin && (
+            <p className="text-xs text-amber-400 mt-1.5">Patients rotate evenly regardless of team capacity, acuity, or load — use to compare against formula-driven mode with the same seed.</p>
+          )}
         </div>
 
         {/* Seed */}
