@@ -72,6 +72,24 @@ export interface SimSnapshot {
   simTime: number;
 }
 
+export interface ShadowEntry {
+  arrivalIndex: number;
+  arrivalTime: number;
+  acuity: AcuityTier;
+  teamId: TeamId;
+  ratioAtAssignment: number;
+}
+
+export interface ShadowResult {
+  mode: 'round_robin' | 'formula';
+  entries: ShadowEntry[];
+  teamPatientCounts: Record<number, number>;
+  teamAcuityLoad: Record<number, { tier_one: number; tier_two: number; tier_three: number }>;
+  avgRatioPerTeam: Record<number, number>;
+  minRatioPerTeam: Record<number, number>;
+  overwhelmEvents: Record<number, number>;
+}
+
 export interface SimulationState {
   active: boolean;
   baseTime: number;
@@ -86,6 +104,8 @@ export interface SimulationState {
   permanentlyClosedTeams: number[];
   roundRobin?: boolean;
   roundRobinNext?: number;
+  shadow?: ShadowResult;
+  liveShadow?: ShadowResult;  // pre-computed stats for the live mode (same algo as shadow but for live mode)
 }
 
 export interface ShiftState {

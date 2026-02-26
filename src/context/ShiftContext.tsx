@@ -4,7 +4,7 @@ import { STATUS_EXPIRE_MS_MAP, BUFFER_DURATIONS_MS, TEAM_CLOSE_TRANSFER_MS, TEAM
 import { getRecommendation, createBuffer, type ScoringOverrides } from '../engine/recommendation';
 import { uid } from '../uid';
 import type { Provider, Patient, Buffer, TeamId } from '../types';
-import { generateTimeline, takeSnapshot, addSnapshot } from '../engine/simulation';
+import { generateTimeline, takeSnapshot, addSnapshot, runShadowSim } from '../engine/simulation';
 
 function simOverridesToScoring(sim: SimulationState | undefined): ScoringOverrides | undefined {
   if (!sim) return undefined;
@@ -559,6 +559,17 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
     case 'START_SIMULATION': {
       const simNow = Date.now();
       const timeline = generateTimeline(action.seed, action.shiftDurationMs, action.overrides, simNow);
+      const permaClosed = action.closedTeams ? Object.keys(action.closedTeams).map(Number) : [];
+      const shadowMode = action.roundRobin ? 'formula' : 'round_robin';
+      const liveMode = action.roundRobin ? 'round_robin' : 'formula';
+      const shadow = runShadowSim(
+        action.providers, timeline, action.closedTeams ?? {}, permaClosed,
+        action.overrides, simNow, shadowMode as 'round_robin' | 'formula',
+      );
+      const liveShadow = runShadowSim(
+        action.providers, timeline, action.closedTeams ?? {}, permaClosed,
+        action.overrides, simNow, liveMode as 'round_robin' | 'formula',
+      );
       const simState: SimulationState = {
         active: true,
         baseTime: simNow,
@@ -570,9 +581,11 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
         nextArrivalIndex: 0,
         snapshots: [],
         overrides: action.overrides,
-        permanentlyClosedTeams: action.closedTeams ? Object.keys(action.closedTeams).map(Number) : [],
+        permanentlyClosedTeams: permaClosed,
         roundRobin: action.roundRobin ?? false,
         roundRobinNext: 0,
+        shadow,
+        liveShadow,
       };
       return {
         ...state,

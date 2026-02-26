@@ -7,6 +7,7 @@ import AssignPatient from './AssignPatient';
 import HelpSection from './HelpSection';
 import GuidedTour from './GuidedTour';
 import SimulationControls from './SimulationControls';
+import SimSummaryCard from './SimSummaryCard';
 import { buildTourSteps } from '../tourSteps';
 
 const TEAM_IDS: TeamId[] = [1, 2, 3, 4];
@@ -198,6 +199,12 @@ export default function Dashboard({ tourActive, onTourComplete }: { tourActive?:
               })()
           }
         </div>
+      )}
+
+      {/* Simulation summary card */}
+      {state.simulation?.active && state.simulation.shadow && state.simulation.liveShadow &&
+        state.simulation.nextArrivalIndex >= state.simulation.timeline.length && (
+        <SimSummaryCard simulation={state.simulation} />
       )}
 
       {/* Summary */}

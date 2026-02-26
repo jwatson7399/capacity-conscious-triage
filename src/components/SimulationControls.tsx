@@ -1,6 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useShift } from '../context/ShiftContext';
 import SimulationParams from './SimulationParams';
+import type { TeamId } from '../types';
+import { statsFromEntries, computeFairness } from '../engine/fairness';
 
 const SPEEDS = [1, 5, 10, 15, 20, 30, 40, 50, 100, 200];
 
@@ -13,11 +15,88 @@ function formatTime(ms: number): string {
   return `${m}m${String(s).padStart(2, '0')}s`;
 }
 
+function ComparisonPanel({ sim, arrivedCount }: { sim: NonNullable<ReturnType<typeof useShift>['state']['simulation']>; arrivedCount: number }) {
+  const shadow = sim.shadow!;
+  const liveShadow = sim.liveShadow!;
+
+  const liveMode = sim.roundRobin ? 'Round Robin' : 'Formula';
+  const shadowMode = shadow.mode === 'round_robin' ? 'Round Robin' : 'Formula';
+
+  const liveEntries = useMemo(() => liveShadow.entries.slice(0, arrivedCount), [liveShadow, arrivedCount]);
+  const shadowEntries = useMemo(() => shadow.entries.slice(0, arrivedCount), [shadow, arrivedCount]);
+
+  const liveStats = useMemo(() => statsFromEntries(liveEntries), [liveEntries]);
+  const shadowStats = useMemo(() => statsFromEntries(shadowEntries), [shadowEntries]);
+
+  const liveFairness = useMemo(() => computeFairness(liveStats, sim.permanentlyClosedTeams), [liveStats, sim.permanentlyClosedTeams]);
+  const shadowFairness = useMemo(() => computeFairness(shadowStats, sim.permanentlyClosedTeams), [shadowStats, sim.permanentlyClosedTeams]);
+
+  const eligible = ([1, 2, 3, 4] as TeamId[]).filter(
+    t => t !== 4 && !sim.permanentlyClosedTeams.includes(t)
+  );
+
+  const f = (n: number) => !isFinite(n) ? '-' : n.toFixed(1);
+  const hi = (a: number, b: number, higher: boolean) => {
+    if (Math.abs(a - b) < 0.01) return '';
+    return (higher ? a > b : a < b) ? 'text-emerald-400 font-semibold' : '';
+  };
+
+  if (arrivedCount === 0) {
+    return <div className="mt-2 text-center text-[10px] text-slate-500 py-2">Waiting for first arrival...</div>;
+  }
+
+  return (
+    <div className="mt-2 rounded-lg bg-white/5 p-2 text-[10px]">
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-1 items-center mb-1.5">
+        <span className="text-right text-cyan-300 font-semibold">{liveMode}</span>
+        <span className="w-20 text-center text-slate-600">vs</span>
+        <span className="text-left text-amber-300 font-semibold">{shadowMode}</span>
+      </div>
+
+      {/* Patients per team */}
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-1 items-center py-0.5">
+        <span className="text-right font-mono text-slate-300">{eligible.map(t => liveStats.teamCounts[t] ?? 0).join(' | ')}</span>
+        <span className="w-20 text-center text-slate-500">Patients</span>
+        <span className="text-left font-mono text-slate-300">{eligible.map(t => shadowStats.teamCounts[t] ?? 0).join(' | ')}</span>
+      </div>
+
+      {/* Avg Ratio */}
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-1 items-center py-0.5">
+        <span className={`text-right font-mono text-slate-300 ${hi(liveStats.avgRatio, shadowStats.avgRatio, true)}`}>{f(liveStats.avgRatio)}</span>
+        <span className="w-20 text-center text-slate-500">Avg Ratio</span>
+        <span className={`text-left font-mono text-slate-300 ${hi(shadowStats.avgRatio, liveStats.avgRatio, true)}`}>{f(shadowStats.avgRatio)}</span>
+      </div>
+
+      {/* Min Ratio */}
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-1 items-center py-0.5">
+        <span className={`text-right font-mono text-slate-300 ${hi(liveStats.minRatio, shadowStats.minRatio, true)}`}>{f(liveStats.minRatio)}</span>
+        <span className="w-20 text-center text-slate-500">Min Ratio</span>
+        <span className={`text-left font-mono text-slate-300 ${hi(shadowStats.minRatio, liveStats.minRatio, true)}`}>{f(shadowStats.minRatio)}</span>
+      </div>
+
+      {/* Overwhelms */}
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-1 items-center py-0.5">
+        <span className={`text-right font-mono text-slate-300 ${hi(liveStats.overwhelms, shadowStats.overwhelms, false)}`}>{liveStats.overwhelms}</span>
+        <span className="w-20 text-center text-slate-500">Overwhelms</span>
+        <span className={`text-left font-mono text-slate-300 ${hi(shadowStats.overwhelms, liveStats.overwhelms, false)}`}>{shadowStats.overwhelms}</span>
+      </div>
+
+      {/* Fairness */}
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-1 items-center py-0.5">
+        <span className={`text-right font-mono text-slate-300 ${hi(liveFairness, shadowFairness, true)}`}>{liveFairness.toFixed(0)}</span>
+        <span className="w-20 text-center text-slate-500">Fairness</span>
+        <span className={`text-left font-mono text-slate-300 ${hi(shadowFairness, liveFairness, true)}`}>{shadowFairness.toFixed(0)}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function SimulationControls() {
   const { state, dispatch } = useShift();
   const sim = state.simulation;
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [showParams, setShowParams] = useState(false);
+  const [showCompare, setShowCompare] = useState(false);
   const speedBtnRef = useRef<HTMLButtonElement>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
 
@@ -164,8 +243,21 @@ export default function SimulationControls() {
           <span className="flex items-center gap-2">
             {sim.roundRobin && <span className="text-amber-400 font-semibold">ROUND ROBIN</span>}
             Seed: {sim.seed}
+            {sim.shadow && sim.liveShadow && (
+              <button
+                onClick={() => setShowCompare(!showCompare)}
+                className={`px-2 py-0.5 rounded text-[10px] font-semibold ${showCompare ? 'bg-cyan-500/30 text-cyan-300' : 'bg-white/10 text-slate-400'}`}
+              >
+                {showCompare ? '▲ Compare' : '▼ Compare'}
+              </button>
+            )}
           </span>
         </div>
+
+        {/* Comparison panel */}
+        {showCompare && sim.shadow && sim.liveShadow && (
+          <ComparisonPanel sim={sim} arrivedCount={arrivedCount} />
+        )}
       </div>
 
       {/* Floating mini controls */}
