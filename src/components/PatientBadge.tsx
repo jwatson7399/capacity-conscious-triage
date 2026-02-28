@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Patient, TeamId } from '../types';
-import { ACUITY_LABELS, ACUITY_COLORS, ACUITY_DECAY } from '../constants';
+import { ACUITY_LABELS, ACUITY_COLORS, ACUITY_DECAY, QUICK_UNDO_WINDOW_MS } from '../constants';
 import { getDecayedAcuityWeight } from '../engine/recommendation';
 
 function formatDuration(totalMins: number): string {
@@ -18,7 +18,7 @@ function getNextDecayInfo(patient: Patient, now: number, currentWeight: number):
     if (elapsed < step.afterMs) {
       const remainMs = step.afterMs - elapsed;
       const mins = Math.ceil(remainMs / 60000);
-      return { label: `load drops from ${currentWeight} to ${step.weight} in [${formatDuration(mins)}]`, decaying: true };
+      return { label: `demand drops from ${currentWeight} to ${step.weight} in [${formatDuration(mins)}]`, decaying: true };
     }
   }
   return { label: '(stabilized)', decaying: false };
@@ -39,6 +39,11 @@ export default function PatientBadge({ patient, now, canManage, onUpgrade, onRea
   const [reassignTeam, setReassignTeam] = useState<TeamId | null>(null);
   const [reassignReason, setReassignReason] = useState('');
   const [confirmAction, setConfirmAction] = useState<'decease' | 'downgrade' | null>(null);
+  const [downgradeReason, setDowngradeReason] = useState('');
+
+  const withinUndoWindow = (now - patient.assignedAt) < QUICK_UNDO_WINDOW_MS;
+  const undoRemainingMs = Math.max(0, QUICK_UNDO_WINDOW_MS - (now - patient.assignedAt));
+  const undoRemainingSecs = Math.ceil(undoRemainingMs / 1000);
 
   const colors = ACUITY_COLORS[patient.acuity];
   const currentWeight = getDecayedAcuityWeight(patient, now);
@@ -65,7 +70,7 @@ export default function PatientBadge({ patient, now, canManage, onUpgrade, onRea
           <span className="text-xs bg-red-200 text-red-800 px-1.5 rounded">upgraded</span>
         )}
         {!isDeceased && !isStabilized && (
-          <span className="text-xs text-gray-500 dark:text-gray-500 font-medium">(load: {currentWeight})</span>
+          <span className="text-xs text-gray-500 dark:text-gray-500 font-medium">(demand: {currentWeight})</span>
         )}
         {!isDeceased && !isStabilized && (
           <span className="ml-auto text-right text-xs text-gray-500 dark:text-gray-500 leading-tight">
@@ -75,6 +80,9 @@ export default function PatientBadge({ patient, now, canManage, onUpgrade, onRea
         )}
         {isStabilized && (
           <span className="ml-auto text-[10px] text-gray-500 italic">stabilized</span>
+        )}
+        {!isStabilized && !isDeceased && (
+          <span className="text-gray-400 text-xs ml-1 flex-shrink-0">›</span>
         )}
       </button>
 
@@ -112,28 +120,50 @@ export default function PatientBadge({ patient, now, canManage, onUpgrade, onRea
               </button>
             </div>
           )}
-          {onDowngrade && confirmAction !== 'downgrade' && (
+          {onDowngrade && withinUndoWindow && (
+            <button
+              onClick={() => { onDowngrade(); }}
+              className="w-full bg-orange-100 text-orange-800 rounded-lg py-2 text-sm font-medium min-h-[44px] flex items-center justify-center gap-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+              </svg>
+              Undo Assignment
+              <span className="font-mono text-xs opacity-70">({undoRemainingSecs}s)</span>
+            </button>
+          )}
+          {onDowngrade && !withinUndoWindow && confirmAction !== 'downgrade' && (
             <button
               onClick={() => setConfirmAction('downgrade')}
               className="w-full bg-yellow-100 text-yellow-800 rounded-lg py-2 text-sm font-medium min-h-[44px]"
             >
-              Downgrade
+              Remove from A-Side
             </button>
           )}
-          {confirmAction === 'downgrade' && onDowngrade && (
-            <div className="flex gap-2">
-              <button
-                onClick={() => { onDowngrade(); setConfirmAction(null); }}
-                className="flex-1 bg-yellow-600 text-white rounded-lg py-2 text-sm font-medium min-h-[44px]"
-              >
-                Confirm Downgrade
-              </button>
-              <button
-                onClick={() => setConfirmAction(null)}
-                className="flex-1 bg-gray-100 text-gray-700 rounded-lg py-2 text-sm font-medium min-h-[44px]"
-              >
-                Cancel
-              </button>
+          {confirmAction === 'downgrade' && onDowngrade && !withinUndoWindow && (
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={downgradeReason}
+                onChange={e => setDowngradeReason(e.target.value)}
+                placeholder="Reason for removal"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { onDowngrade(); setConfirmAction(null); setDowngradeReason(''); }}
+                  disabled={!downgradeReason.trim()}
+                  className="flex-1 bg-yellow-600 text-white rounded-lg py-2 text-sm font-medium disabled:opacity-50 min-h-[44px]"
+                >
+                  Confirm Removal
+                </button>
+                <button
+                  onClick={() => { setConfirmAction(null); setDowngradeReason(''); }}
+                  className="flex-1 bg-gray-100 text-gray-700 rounded-lg py-2 text-sm font-medium min-h-[44px]"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           )}
           {onReassign && (

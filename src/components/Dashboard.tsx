@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useShift } from '../context/ShiftContext';
 import type { TeamId } from '../types';
 import { ACUITY_COLORS, STATUS_COLORS, ACUITY_LABELS, ACUITY_DESCRIPTORS, STATUS_LABELS, CAPACITY_TERMS, TRAUMA_TEAM_ID } from '../constants';
@@ -8,31 +8,33 @@ import HelpSection from './HelpSection';
 import GuidedTour from './GuidedTour';
 import SimulationControls from './SimulationControls';
 import SimSummaryCard from './SimSummaryCard';
+import BenchmarkReport from './BenchmarkReport';
+import ShiftSetup from './ShiftSetup';
+import Toast from './Toast';
 import { buildTourSteps } from '../tourSteps';
 
 const TEAM_IDS: TeamId[] = [1, 2, 3, 4];
 
-export default function Dashboard({ tourActive, onTourComplete }: { tourActive?: boolean; onTourComplete?: () => void }) {
+export default function Dashboard({ tourActive, onTourComplete, darkMode, onToggleDarkMode }: { tourActive?: boolean; onTourComplete?: () => void; darkMode: boolean; onToggleDarkMode: () => void }) {
   const { state, dispatch, recommendation } = useShift();
   const [showAssign, setShowAssign] = useState(false);
-  const [showUpgrade, setShowUpgrade] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [showBenchmark, setShowBenchmark] = useState(false);
+  const [showShiftSetup, setShowShiftSetup] = useState(false);
+  const [toastTeam, setToastTeam] = useState<TeamId | null>(null);
   const [legendOpen, setLegendOpen] = useState(!!tourActive);
   const steps = useMemo(() => buildTourSteps({
     openHelp: () => setShowHelp(true),
     closeHelp: () => setShowHelp(false),
   }), []);
-  const [darkMode, setDarkMode] = useState(() => {
-    return localStorage.getItem('er-triage-dark') === 'true';
-  });
+  const [globalCollapseProviders, setGlobalCollapseProviders] = useState(false);
+  const [globalCollapsePatients, setGlobalCollapsePatients] = useState(false);
+  const [globalHideStabilized, setGlobalHideStabilized] = useState(false);
+  const [compactMenuOpen, setCompactMenuOpen] = useState(false);
+  const compactMode = globalCollapseProviders && globalCollapsePatients && globalHideStabilized;
 
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', darkMode);
-    localStorage.setItem('er-triage-dark', String(darkMode));
-  }, [darkMode]);
-
-  const roleLabel = state.currentRole === 'triage_nurse' ? 'Triage Nurse'
-    : state.currentRole === 'charge_nurse' ? 'Charge Nurse'
+  const roleLabel = state.currentRole === 'triage_nurse' ? 'Charge / Triage Nurse'
+    : state.currentRole === 'charge_nurse' ? 'Charge / Triage Nurse'
     : 'Attending';
 
   return (
@@ -52,16 +54,81 @@ export default function Dashboard({ tourActive, onTourComplete }: { tourActive?:
             )}
             <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full font-medium">{roleLabel}</span>
             <button
-              onClick={() => dispatch({ type: 'SET_ROLE', role: null })}
+              onClick={() => {
+                if (state.patients.length > 0 && !state.simulation?.active) {
+                  if (!confirm('Return to main menu? Current shift data will be lost.')) return;
+                }
+                dispatch({ type: 'RESET' });
+              }}
               className="text-xs text-blue-400 hover:text-blue-300 font-medium"
             >
-              Change
+              Main Menu
             </button>
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <div className="relative">
+            <button
+              onClick={() => setCompactMenuOpen(!compactMenuOpen)}
+              className={`w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white/70 text-lg ${compactMode ? 'ring-2 ring-blue-400' : ''}`}
+              aria-label="Compact mode"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+              </svg>
+            </button>
+            {compactMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-20" onClick={() => setCompactMenuOpen(false)} />
+                <div className="absolute right-0 top-12 z-30 w-56 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-gray-200 dark:border-slate-700 py-1 text-sm">
+                  <button
+                    onClick={() => {
+                      const next = !compactMode;
+                      setGlobalCollapseProviders(next);
+                      setGlobalCollapsePatients(next);
+                      setGlobalHideStabilized(next);
+                    }}
+                    className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-slate-700 font-semibold text-gray-800 dark:text-gray-200"
+                  >
+                    Compact Mode
+                    <span className={`w-4 h-4 rounded border ${compactMode ? 'bg-blue-500 border-blue-500 text-white' : 'border-gray-400'} flex items-center justify-center text-xs`}>
+                      {compactMode && '✓'}
+                    </span>
+                  </button>
+                  <div className="border-t border-gray-200 dark:border-slate-700 my-1" />
+                  <button
+                    onClick={() => setGlobalCollapseProviders(!globalCollapseProviders)}
+                    className="w-full px-4 py-2 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300"
+                  >
+                    Collapse all providers
+                    <span className={`w-4 h-4 rounded border ${globalCollapseProviders ? 'bg-blue-500 border-blue-500 text-white' : 'border-gray-400'} flex items-center justify-center text-xs`}>
+                      {globalCollapseProviders && '✓'}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setGlobalCollapsePatients(!globalCollapsePatients)}
+                    className="w-full px-4 py-2 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300"
+                  >
+                    Collapse all patients
+                    <span className={`w-4 h-4 rounded border ${globalCollapsePatients ? 'bg-blue-500 border-blue-500 text-white' : 'border-gray-400'} flex items-center justify-center text-xs`}>
+                      {globalCollapsePatients && '✓'}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setGlobalHideStabilized(!globalHideStabilized)}
+                    className="w-full px-4 py-2 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300"
+                  >
+                    Hide all stabilized
+                    <span className={`w-4 h-4 rounded border ${globalHideStabilized ? 'bg-blue-500 border-blue-500 text-white' : 'border-gray-400'} flex items-center justify-center text-xs`}>
+                      {globalHideStabilized && '✓'}
+                    </span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
           <button
-            onClick={() => setDarkMode(!darkMode)}
+            onClick={onToggleDarkMode}
             className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white/70 text-lg"
             aria-label="Toggle dark mode"
           >
@@ -76,11 +143,12 @@ export default function Dashboard({ tourActive, onTourComplete }: { tourActive?:
           </button>
           <button
             onClick={() => setShowHelp(v => !v)}
-            className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white/70 font-bold text-lg"
+            className="h-10 px-3 rounded-full bg-white/20 border border-white/30 flex items-center justify-center gap-1.5 text-white/90 font-medium text-sm"
             aria-label="Help"
             data-tour="help-button"
           >
-            ?
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" /></svg>
+            Help
           </button>
         </div>
       </div>
@@ -88,10 +156,25 @@ export default function Dashboard({ tourActive, onTourComplete }: { tourActive?:
       {/* Simulation Controls */}
       {state.simulation?.active && <SimulationControls />}
 
+      {/* No-providers banner */}
+      {state.shiftStarted && state.providers.length === 0 && !state.simulation?.active && (
+        <button
+          onClick={() => setShowShiftSetup(true)}
+          className="mx-4 mt-3 w-[calc(100%-2rem)] bg-amber-50 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded-xl px-4 py-3 text-left active:bg-amber-100 dark:active:bg-amber-900/50 transition-colors"
+        >
+          <div className="flex items-center justify-between">
+            <div className="font-semibold text-amber-800 dark:text-amber-200 text-sm">No providers added yet</div>
+            <span className="text-amber-600 dark:text-amber-300 text-lg">+</span>
+          </div>
+          <div className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">Tap to add providers and enable scoring.</div>
+          <div className="text-[10px] text-amber-600/70 dark:text-amber-400/60 mt-1 italic">Provider import from AMION / ShiftAdmin coming soon.</div>
+        </button>
+      )}
+
       {/* Help Section (inline) */}
       {showHelp && (
         <div className="mx-4 mt-3">
-          <HelpSection onClose={() => setShowHelp(false)} />
+          <HelpSection onClose={() => setShowHelp(false)} onShowBenchmark={() => { setShowHelp(false); setShowBenchmark(true); }} />
         </div>
       )}
 
@@ -163,7 +246,7 @@ export default function Dashboard({ tourActive, onTourComplete }: { tourActive?:
       {/* Shift not started */}
       {!state.shiftStarted && (
         <div className="mx-4 mt-4 glass-card rounded-xl text-amber-800 dark:text-amber-300 text-center py-4 px-6 border border-amber-200 dark:border-amber-700">
-          Shift not started yet. Waiting for Charge Nurse to set up teams.
+          Shift not started yet. Waiting for nurse to set up teams.
         </div>
       )}
 
@@ -180,14 +263,14 @@ export default function Dashboard({ tourActive, onTourComplete }: { tourActive?:
               : null;
             const isClosed = id in state.closedTeams;
             const closedAt = state.closedTeams[id];
-            return <TeamCard key={id} teamId={id} score={score} recommendationRank={rank} isClosed={isClosed} closedAt={closedAt} allCandidatesBuffered={allCandidatesBuffered} tourActive={tourActive} />;
+            return <TeamCard key={id} teamId={id} score={score} recommendationRank={rank} isClosed={isClosed} closedAt={closedAt} allCandidatesBuffered={allCandidatesBuffered} forceCollapseProviders={globalCollapseProviders} forceCollapsePatients={globalCollapsePatients} forceHideStabilized={globalHideStabilized} />;
           });
         })()}
       </div>
 
       {/* Empty state for simulation */}
       {state.simulation?.active && state.patients.length === 0 && (
-        <div className="mx-4 text-center text-sm text-slate-400/70 py-4">
+        <div className="mx-4 text-center text-sm text-slate-500/70 dark:text-slate-400/70 py-4">
           {state.simulation.paused
             ? 'Simulation paused — press play to begin'
             : (() => {
@@ -208,39 +291,57 @@ export default function Dashboard({ tourActive, onTourComplete }: { tourActive?:
       )}
 
       {/* Summary */}
-      <div className="mx-4 text-center text-sm text-slate-400">
+      <div className="mx-4 text-center text-sm text-slate-500 dark:text-slate-400">
         {state.patients.length} patient{state.patients.length !== 1 ? 's' : ''} assigned this shift
       </div>
 
-      {/* FABs — hidden during simulation since patients are auto-assigned */}
+      {/* FAB — hidden during simulation since patients are auto-assigned */}
       {state.shiftStarted && !state.simulation?.active && (
-        <div className="fixed bottom-6 right-6 z-20 flex flex-col gap-3 items-end">
+        <div className="fixed bottom-6 right-6 z-20">
           <button
-            onClick={() => setShowUpgrade(true)}
-            className="bg-gradient-to-r from-amber-500 to-amber-400 text-white rounded-2xl px-5 py-3 shadow-lg shadow-amber-600/30 font-bold text-sm active:from-amber-600 active:to-amber-500 min-h-[48px]"
-            aria-label="Assign floor patient"
-            data-tour="fab-floor"
+            onClick={() => setShowAssign(true)}
+            className="bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-2xl px-6 py-4 shadow-lg shadow-blue-600/30 font-bold text-base active:from-blue-700 active:to-blue-600 min-h-[56px]"
+            aria-label="Assign Patient"
+            data-tour="fab-assign"
           >
-            {state.currentRole === 'attending' ? '+ Upgrade Patient' : '+ Floor Patient'}
+            {state.currentRole === 'attending' ? (
+              '+ Upgrade Patient'
+            ) : (
+              <span className="flex flex-col items-center leading-tight">
+                <span>+ New Patient</span>
+                <span className="text-[10px] font-normal opacity-80">or upgrade</span>
+              </span>
+            )}
           </button>
-          {state.currentRole !== 'attending' && (
-            <button
-              onClick={() => setShowAssign(true)}
-              className="bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-2xl px-6 py-4 shadow-lg shadow-blue-600/30 font-bold text-base active:from-blue-700 active:to-blue-600 min-h-[56px]"
-              aria-label="Assign Patient"
-              data-tour="fab-assign"
-            >
-              + Assign Patient
-            </button>
-          )}
         </div>
       )}
 
-      {showAssign && <AssignPatient onClose={() => setShowAssign(false)} />}
-      {showUpgrade && <AssignPatient onClose={() => setShowUpgrade(false)} initialSource="floor" />}
+      {showAssign && (
+        <AssignPatient
+          onClose={() => setShowAssign(false)}
+          initialSource={state.currentRole === 'attending' ? 'floor' : undefined}
+          onAssigned={(teamId) => setToastTeam(teamId)}
+        />
+      )}
 
       {tourActive && onTourComplete && (
         <GuidedTour steps={steps} onComplete={onTourComplete} />
+      )}
+
+      {toastTeam !== null && (
+        <Toast message={`Assigned to Team ${toastTeam}`} onDismiss={() => setToastTeam(null)} />
+      )}
+
+      {showShiftSetup && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <ShiftSetup onBack={() => setShowShiftSetup(false)} />
+        </div>
+      )}
+
+      {showBenchmark && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <BenchmarkReport onBack={() => setShowBenchmark(false)} />
+        </div>
       )}
     </div>
   );

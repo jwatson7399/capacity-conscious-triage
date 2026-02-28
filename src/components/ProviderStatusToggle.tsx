@@ -32,7 +32,7 @@ export default function ProviderStatusToggle({ provider, canManage, now, onSwap 
           <div className="font-medium text-gray-900 dark:text-gray-100 truncate">{provider.name}</div>
           <div className="text-xs text-gray-500 dark:text-gray-400">
             {PROVIDER_TYPE_LABELS[provider.type]}
-            {effective > 0 && <span className="ml-1">(capacity: {effective.toFixed(1)})</span>}
+            {effective > 0 && <span className="ml-1">(strength: {effective.toFixed(1)})</span>}
           </div>
         </div>
         {provider.status !== 'active' && (
@@ -76,7 +76,7 @@ export default function ProviderStatusToggle({ provider, canManage, now, onSwap 
                   : 'bg-gray-100 text-gray-700 active:bg-gray-200'
               }`}
             >
-              {STATUS_LABELS[s]} <span className="text-xs opacity-70">({Math.round(STATUS_MULTIPLIERS[s] * 100)}% capacity)</span>
+              {STATUS_LABELS[s]} <span className="text-xs opacity-70">({Math.round(STATUS_MULTIPLIERS[s] * 100)}% strength)</span>
             </button>
           ))}
         </div>

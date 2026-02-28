@@ -96,8 +96,8 @@ export default function SimSummaryCard({ simulation: sim }: Props) {
         </div>
 
         <StatRow label="Patients" liveVal={liveCountStr} shadowVal={shadowCountStr} higherBetter={false} />
-        <StatRow label="Avg Ratio" liveVal={fmt(liveStats.avgRatio)} shadowVal={fmt(shadowStats.avgRatio)} higherBetter={true} />
-        <StatRow label="Min Ratio" liveVal={fmt(liveStats.minRatio)} shadowVal={fmt(shadowStats.minRatio)} higherBetter={true} />
+        <StatRow label="Avg Capacity" liveVal={fmt(liveStats.avgRatio)} shadowVal={fmt(shadowStats.avgRatio)} higherBetter={true} />
+        <StatRow label="Min Capacity" liveVal={fmt(liveStats.minRatio)} shadowVal={fmt(shadowStats.minRatio)} higherBetter={true} />
         <StatRow label="Overwhelms" liveVal={String(liveStats.overwhelms)} shadowVal={String(shadowStats.overwhelms)} higherBetter={false} />
 
         {/* Fairness bars */}

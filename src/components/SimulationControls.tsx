@@ -70,17 +70,17 @@ function ComparisonPanel({ sim, arrivedCount }: { sim: NonNullable<ReturnType<ty
         <span className="text-left font-mono text-slate-300">{eligible.map(t => shadowStats.teamCounts[t] ?? 0).join(' | ')}</span>
       </div>
 
-      {/* Avg Ratio */}
+      {/* Avg Capacity */}
       <div className="grid grid-cols-[1fr_auto_1fr] gap-1 items-center py-0.5">
         <span className={`text-right font-mono text-slate-300 ${hi(liveStats.avgRatio, shadowStats.avgRatio, true)}`}>{f(liveStats.avgRatio)}</span>
-        <span className="w-20 text-center text-slate-500">Avg Ratio</span>
+        <span className="w-20 text-center text-slate-500">Avg Cap</span>
         <span className={`text-left font-mono text-slate-300 ${hi(shadowStats.avgRatio, liveStats.avgRatio, true)}`}>{f(shadowStats.avgRatio)}</span>
       </div>
 
-      {/* Min Ratio */}
+      {/* Min Capacity */}
       <div className="grid grid-cols-[1fr_auto_1fr] gap-1 items-center py-0.5">
         <span className={`text-right font-mono text-slate-300 ${hi(liveStats.minRatio, shadowStats.minRatio, true)}`}>{f(liveStats.minRatio)}</span>
-        <span className="w-20 text-center text-slate-500">Min Ratio</span>
+        <span className="w-20 text-center text-slate-500">Min Cap</span>
         <span className={`text-left font-mono text-slate-300 ${hi(shadowStats.minRatio, liveStats.minRatio, true)}`}>{f(shadowStats.minRatio)}</span>
       </div>
 

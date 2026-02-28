@@ -162,7 +162,7 @@ export type ShiftAction =
   | { type: 'CLOSE_TEAM'; teamId: TeamId }
   | { type: 'SIGNOUT_PATIENTS'; fromTeamId: TeamId; toTeamId: TeamId }
   | { type: 'DECEASE_PATIENT'; patientId: string }
-  | { type: 'DOWNGRADE_PATIENT'; patientId: string }
+  | { type: 'DOWNGRADE_PATIENT'; patientId: string; reason?: string }
   | { type: 'LOAD_DEMO' }
   | { type: 'LOAD_TOUR_DEMO' }
   | { type: 'START_SIMULATION'; providers: Provider[]; seed: number; shiftDurationMs: number; overrides: SimOverrides; closedTeams?: Record<number, number>; roundRobin?: boolean; presetStatusChanges?: SimStatusChangeEntry[] }
@@ -170,4 +170,6 @@ export type ShiftAction =
   | { type: 'TOGGLE_SIM_PAUSE' }
   | { type: 'SIM_REWIND'; snapshotIndex: number }
   | { type: 'SET_SIM_OVERRIDE'; overrides: Partial<SimOverrides> }
-  | { type: 'SIM_SKIP_TO_NEXT' };
+  | { type: 'SIM_SKIP_TO_NEXT' }
+  | { type: 'RESET' }
+  | { type: 'ADD_PROVIDERS'; providers: Provider[] };

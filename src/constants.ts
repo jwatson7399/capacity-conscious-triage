@@ -56,6 +56,8 @@ export const TEAM_CLOSE_TRANSFER_TARGETS: Record<number, TeamId> = { 3: 1, 4: 2 
 
 export const DECEASED_BUFFER_MS = 30 * 60 * 1000;
 
+export const QUICK_UNDO_WINDOW_MS = 30 * 1000;
+
 export const ACUITY_LABELS: Record<AcuityTier, string> = {
   tier_one: 'Red',
   tier_two: 'Yellow',
@@ -114,7 +116,7 @@ export const CAPACITY_TERMS: Array<{ minRatio: number; label: string; color: str
   { minRatio: 5, label: 'Stable', color: 'text-green-500' },
   { minRatio: 3.35, label: 'Manageable', color: 'text-yellow-500' },
   { minRatio: 2, label: 'Very Busy', color: 'text-orange-500' },
-  { minRatio: 0.05, label: 'High Load', color: 'text-red-500' },
+  { minRatio: 0.05, label: 'High Demand', color: 'text-red-500' },
 ];
 
 export function getCapacityTerm(capacityRatio: number): CapacityTerm {

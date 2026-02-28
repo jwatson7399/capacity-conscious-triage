@@ -1,6 +1,6 @@
 import { createContext, useContext, useReducer, useMemo, type ReactNode } from 'react';
 import type { ShiftState, ShiftAction, Recommendation, SimulationState } from '../types';
-import { STATUS_EXPIRE_MS_MAP, BUFFER_DURATIONS_MS, TEAM_CLOSE_TRANSFER_MS, TEAM_CLOSE_TRANSFER_TARGETS, DECEASED_BUFFER_MS, TRAUMA_TEAM_ID } from '../constants';
+import { STATUS_EXPIRE_MS_MAP, BUFFER_DURATIONS_MS, TEAM_CLOSE_TRANSFER_MS, TEAM_CLOSE_TRANSFER_TARGETS, DECEASED_BUFFER_MS, TRAUMA_TEAM_ID, QUICK_UNDO_WINDOW_MS } from '../constants';
 import { getRecommendation, createBuffer, type ScoringOverrides } from '../engine/recommendation';
 import { uid } from '../uid';
 import type { Provider, Patient, Buffer, TeamId } from '../types';
@@ -33,11 +33,17 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
   const now = state.now;
 
   switch (action.type) {
+    case 'RESET':
+      return { ...initialState, now: Date.now() };
+
     case 'SET_ROLE':
       return { ...state, currentRole: action.role };
 
     case 'START_SHIFT':
       return { ...state, providers: action.providers, shiftStarted: true };
+
+    case 'ADD_PROVIDERS':
+      return { ...state, providers: [...state.providers, ...action.providers] };
 
     case 'TICK': {
       const sim = state.simulation;
@@ -393,7 +399,32 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
     }
 
     case 'DOWNGRADE_PATIENT': {
-      return { ...state, patients: state.patients.filter(p => p.id !== action.patientId) };
+      const patient = state.patients.find(p => p.id === action.patientId);
+      const patients = state.patients.filter(p => p.id !== action.patientId);
+      // Quick undo (within 30s): also remove/reduce the buffer this patient created
+      const isQuickUndo = patient && (now - patient.assignedAt) < QUICK_UNDO_WINDOW_MS;
+      let buffers = state.buffers;
+      if (isQuickUndo && patient) {
+        const teamId = patient.assignedTeamId;
+        const teamBuf = buffers.find(b => b.teamId === teamId && b.expiresAt > now && !b.deceasedPatientId);
+        if (teamBuf) {
+          const mergedCount = teamBuf.mergedCount ?? 1;
+          if (mergedCount <= 1) {
+            // Single buffer — remove it entirely
+            buffers = buffers.filter(b => b.id !== teamBuf.id);
+          } else {
+            // Merged buffer — reduce duration by the undone patient's buffer contribution
+            const scoringOv = simOverridesToScoring(state.simulation);
+            const dur = scoringOv?.bufferDurations?.[patient.acuity] ?? BUFFER_DURATIONS_MS[patient.acuity];
+            buffers = buffers.map(b =>
+              b.id === teamBuf.id
+                ? { ...b, expiresAt: Math.max(now, b.expiresAt - dur), mergedCount: mergedCount - 1 }
+                : b
+            );
+          }
+        }
+      }
+      return { ...state, patients, buffers };
     }
 
     case 'LOAD_TOUR_DEMO': {
@@ -501,8 +532,9 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
           // Trauma: attending + 1 resident
           demoProviders.push(makeProvider(4, pick(['senior_resident', 'junior_resident'])));
         } else {
-          // Teams 1-3: 2-4 additional providers
-          const extra = randInt(2, 4);
+          // Teams 1-3: uneven staffing (1-4 additional providers)
+          const extraOptions = [1, 2, 3, 4];
+          const extra = pick(extraOptions);
           const available = [...nonAttendingTypes].sort(() => Math.random() - 0.5);
           for (let i = 0; i < extra; i++) {
             demoProviders.push(makeProvider(teamId, available[i % available.length]));

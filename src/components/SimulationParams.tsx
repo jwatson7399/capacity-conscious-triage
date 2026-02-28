@@ -66,7 +66,7 @@ export default function SimulationParams({ onClose }: { onClose: () => void }) {
         <button onClick={onClose} className="text-slate-400 active:text-white text-lg leading-none">&times;</button>
       </div>
 
-      <SectionHeader title="Capacity Weights" sectionKey="capacityWeights" />
+      <SectionHeader title="Strength Weights" sectionKey="capacityWeights" />
       <div className="space-y-1.5">
         {(Object.entries(ov.capacityWeights) as [string, number][]).map(([key, val]) => (
           <NumberInput key={key} label={key.replace('_', ' ')} value={val} min={0} max={50}

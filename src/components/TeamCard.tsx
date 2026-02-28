@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useShift } from '../context/ShiftContext';
 import type { TeamId, TeamScore, ProviderType } from '../types';
 import { ACUITY_LABELS, ACUITY_COLORS, ACUITY_DECAY, PROVIDER_TYPE_LABELS, PROVIDER_TYPE_SHORT, TRAUMA_TEAM_ID, TEAM_CLOSE_TRANSFER_MS, TEAM_CLOSE_TRANSFER_TARGETS, getCapacityTerm } from '../constants';
@@ -13,16 +13,18 @@ interface Props {
   isClosed?: boolean;
   closedAt?: number;
   allCandidatesBuffered?: boolean;
-  tourActive?: boolean;
+  forceCollapseProviders?: boolean;
+  forceCollapsePatients?: boolean;
+  forceHideStabilized?: boolean;
 }
 
 const PROVIDER_TYPES: ProviderType[] = ['attending', 'senior_resident', 'junior_resident', 'pa', 'rotator'];
 
-export default function TeamCard({ teamId, score, recommendationRank, isClosed, closedAt, allCandidatesBuffered, tourActive }: Props) {
+export default function TeamCard({ teamId, score, recommendationRank, isClosed, closedAt, allCandidatesBuffered, forceCollapseProviders, forceCollapsePatients, forceHideStabilized }: Props) {
   const { state, dispatch } = useShift();
   const { providers, patients, buffers, now, currentRole } = state;
   const isTrauma = teamId === TRAUMA_TEAM_ID;
-  const canManage = currentRole === 'charge_nurse' || currentRole === 'attending';
+  const canManage = currentRole === 'charge_nurse' || currentRole === 'triage_nurse' || currentRole === 'attending';
   const transferTarget = TEAM_CLOSE_TRANSFER_TARGETS[teamId];
 
   const teamProviders = providers.filter(p => p.teamId === teamId);
@@ -33,9 +35,21 @@ export default function TeamCard({ teamId, score, recommendationRank, isClosed, 
   const [swapping, setSwapping] = useState<string | null>(null);
   const [swapName, setSwapName] = useState('');
   const [swapType, setSwapType] = useState<ProviderType>('senior_resident');
-  const [providersOpen, setProvidersOpen] = useState(!!tourActive);
+  const [providersOpen, setProvidersOpen] = useState(true);
   const [patientsOpen, setPatientsOpen] = useState(true);
   const [hideStabilized, setHideStabilized] = useState(false);
+
+  useEffect(() => {
+    if (forceCollapseProviders) setProvidersOpen(false);
+  }, [forceCollapseProviders]);
+
+  useEffect(() => {
+    if (forceCollapsePatients) setPatientsOpen(false);
+  }, [forceCollapsePatients]);
+
+  useEffect(() => {
+    if (forceHideStabilized) setHideStabilized(true);
+  }, [forceHideStabilized]);
 
   const isPatientStabilized = (p: typeof teamPatients[0]) => {
     if (p.deceased) return false;
@@ -44,7 +58,10 @@ export default function TeamCard({ teamId, score, recommendationRank, isClosed, 
     return steps.length === 0 || elapsed >= steps[steps.length - 1].afterMs;
   };
   const stabilizedCount = teamPatients.filter(isPatientStabilized).length;
-  const visiblePatients = hideStabilized ? teamPatients.filter(p => !isPatientStabilized(p)) : teamPatients;
+  const effectiveHideStabilized = hideStabilized;
+  const visiblePatients = effectiveHideStabilized ? teamPatients.filter(p => !isPatientStabilized(p)) : teamPatients;
+  const showProviders = providersOpen;
+  const showPatients = patientsOpen;
 
   const borderClass = recommendationRank === 'first'
     ? 'recommendation-first'
@@ -122,17 +139,19 @@ export default function TeamCard({ teamId, score, recommendationRank, isClosed, 
           })()}
         </div>
         <div className="text-right" {...(recommendationRank === 'first' ? { 'data-tour': 'capacity-ratio' } : {})}>
-          <div className={`text-2xl font-bold ${capacityTerm.color}`}>{score.capacityRatio === Infinity ? '∞' : score.capacityRatio.toFixed(1)}</div>
-          <div className={`text-lg font-bold ${activeBuffers.length > 0 ? (allCandidatesBuffered && recommendationRank === 'first' ? 'text-blue-500' : 'text-slate-400 dark:text-slate-500') : capacityTerm.color}`}>
-            {activeBuffers.length > 0
-              ? (allCandidatesBuffered && recommendationRank === 'first' ? 'Next Up' : 'Buffered')
-              : capacityTerm.label}
+          <div className={`text-2xl font-bold ${teamProviders.length === 0 ? 'text-slate-300 dark:text-slate-600' : capacityTerm.color}`}>{teamProviders.length === 0 ? '—' : score.capacityRatio === Infinity ? '∞' : score.capacityRatio.toFixed(1)}</div>
+          <div className={`text-lg font-bold ${teamProviders.length === 0 ? 'text-amber-500 dark:text-amber-400' : activeBuffers.length > 0 ? (allCandidatesBuffered && recommendationRank === 'first' ? 'text-blue-500' : 'text-slate-400 dark:text-slate-500') : capacityTerm.color}`}>
+            {teamProviders.length === 0
+              ? 'Add Providers'
+              : activeBuffers.length > 0
+                ? (allCandidatesBuffered && recommendationRank === 'first' ? 'Next Up' : 'Buffered')
+                : capacityTerm.label}
           </div>
           {allCandidatesBuffered && recommendationRank === 'first' && activeBuffers.length > 0 && (
             <div className="text-[10px] text-slate-400 dark:text-slate-500">(all teams buffered)</div>
           )}
-          <div className="text-xs text-gray-400">Capacity: {score.capacity.toFixed(1)}</div>
-          <div className="text-xs text-gray-400">Load: {score.load.toFixed(1)}</div>
+          <div className="text-xs text-gray-400">Strength: {score.capacity.toFixed(1)}</div>
+          <div className="text-xs text-gray-400">Demand: {score.load.toFixed(1)}</div>
         </div>
       </div>
 
@@ -191,7 +210,7 @@ export default function TeamCard({ teamId, score, recommendationRank, isClosed, 
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            className={`w-3.5 h-3.5 text-gray-400 transition-transform ${providersOpen ? 'rotate-90' : ''}`}
+            className={`w-3.5 h-3.5 text-gray-400 transition-transform ${showProviders ? 'rotate-90' : ''}`}
             fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -199,11 +218,11 @@ export default function TeamCard({ teamId, score, recommendationRank, isClosed, 
           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
             Providers ({teamProviders.length})
           </span>
-          {!providersOpen && providerSummary && (
+          {!showProviders && providerSummary && (
             <span className="text-xs text-gray-400 ml-1">— {providerSummary}</span>
           )}
         </button>
-        {providersOpen && (
+        {showProviders && (
           <>
             {teamProviders.length === 0 && (
               <p className="text-sm text-gray-400 py-1">None assigned</p>
@@ -276,7 +295,7 @@ export default function TeamCard({ teamId, score, recommendationRank, isClosed, 
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            className={`w-3.5 h-3.5 text-gray-400 transition-transform ${patientsOpen ? 'rotate-90' : ''}`}
+            className={`w-3.5 h-3.5 text-gray-400 transition-transform ${showPatients ? 'rotate-90' : ''}`}
             fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -284,7 +303,7 @@ export default function TeamCard({ teamId, score, recommendationRank, isClosed, 
           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
             Patients ({teamPatients.length})
           </span>
-          {!patientsOpen && (
+          {!showPatients && (
             <span className="flex items-center gap-1 ml-1">
               {tierCounts.tier_one > 0 && (
                 <span className="text-xs bg-red-100 text-red-800 px-1.5 py-0.5 rounded font-medium">{tierCounts.tier_one}R</span>
@@ -298,27 +317,27 @@ export default function TeamCard({ teamId, score, recommendationRank, isClosed, 
             </span>
           )}
         </button>
-        {patientsOpen && (
+        {showPatients && (
           <>
             {stabilizedCount > 0 && (
               <div className="flex items-center justify-between mb-1">
                 <button
                   onClick={() => setHideStabilized(!hideStabilized)}
                   className={`text-[11px] px-2 py-0.5 rounded-full font-medium transition-colors ${
-                    hideStabilized
+                    effectiveHideStabilized
                       ? 'bg-slate-200 text-slate-600 dark:bg-slate-600 dark:text-slate-300'
                       : 'bg-slate-100 text-slate-400 dark:bg-slate-700 dark:text-slate-500'
                   }`}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 inline-block mr-0.5 -mt-px" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    {hideStabilized
+                    {effectiveHideStabilized
                       ? <><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></>
                       : <><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12c1.292 4.338 5.31 7.5 10.066 7.5.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" /></>
                     }
                   </svg>
-                  {hideStabilized ? `Show ${stabilizedCount} stabilized` : 'Hide stabilized'}
+                  {effectiveHideStabilized ? `Show ${stabilizedCount} stabilized` : 'Hide stabilized'}
                 </button>
-                {hideStabilized && (
+                {effectiveHideStabilized && (
                   <span className="text-[10px] text-gray-400 italic">{stabilizedCount} stabilized</span>
                 )}
               </div>

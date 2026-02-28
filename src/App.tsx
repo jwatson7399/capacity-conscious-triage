@@ -1,7 +1,6 @@
 import { useState, useEffect, Component, type ReactNode } from 'react';
 import { ShiftProvider, useShift } from './context/ShiftContext';
 import RoleSelection from './components/RoleSelection';
-import ShiftSetup from './components/ShiftSetup';
 import Dashboard from './components/Dashboard';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -31,6 +30,14 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 function AppInner() {
   const { state, dispatch } = useShift();
   const [tourActive, setTourActive] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem('er-triage-dark') === 'true';
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', darkMode);
+    localStorage.setItem('er-triage-dark', String(darkMode));
+  }, [darkMode]);
 
   // Global 1-second ticker
   useEffect(() => {
@@ -57,9 +64,16 @@ function AppInner() {
     setTourActive(true);
   };
 
-  if (!state.currentRole) return <RoleSelection onStartTour={handleStartTour} />;
-  if (!state.shiftStarted && state.currentRole === 'charge_nurse') return <ShiftSetup />;
-  return <Dashboard tourActive={tourActive} onTourComplete={handleTourComplete} />;
+  // Auto-start shift with no providers for nurse roles (skip ShiftSetup)
+  useEffect(() => {
+    if ((state.currentRole === 'charge_nurse' || state.currentRole === 'triage_nurse') && !state.shiftStarted) {
+      dispatch({ type: 'START_SHIFT', providers: [] });
+    }
+  }, [state.currentRole, state.shiftStarted, dispatch]);
+
+  if (!state.currentRole) return <RoleSelection onStartTour={handleStartTour} darkMode={darkMode} onToggleDarkMode={() => setDarkMode(d => !d)} />;
+  if (!state.shiftStarted) return null; // brief flash while auto-starting
+  return <Dashboard tourActive={tourActive} onTourComplete={handleTourComplete} darkMode={darkMode} onToggleDarkMode={() => setDarkMode(d => !d)} />;
 }
 
 export default function App() {

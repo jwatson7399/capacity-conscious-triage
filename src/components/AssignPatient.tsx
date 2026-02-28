@@ -15,9 +15,10 @@ const TIER_DESCRIPTIONS: Record<AcuityTier, string> = {
 interface Props {
   onClose: () => void;
   initialSource?: 'floor';
+  onAssigned?: (teamId: TeamId) => void;
 }
 
-export default function AssignPatient({ onClose, initialSource }: Props) {
+export default function AssignPatient({ onClose, initialSource, onAssigned }: Props) {
   const { recommendation, dispatch, state } = useShift();
   const [tier, setTier] = useState<AcuityTier | null>(null);
   const [source, setSource] = useState<'critical' | 'floor'>(initialSource ?? 'critical');
@@ -36,6 +37,7 @@ export default function AssignPatient({ onClose, initialSource }: Props) {
         teamId,
         source,
       });
+      onAssigned?.(teamId);
       onClose();
     } else {
       setShowOverride(true);
@@ -52,6 +54,7 @@ export default function AssignPatient({ onClose, initialSource }: Props) {
       overrideReason,
       recommendedTeamId: overrideReason ? (recommendation.first ?? undefined) : undefined,
     });
+    onAssigned?.(selectedTeam);
     onClose();
   };
 

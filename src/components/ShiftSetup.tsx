@@ -15,7 +15,7 @@ interface DraftProvider {
   teamId: TeamId;
 }
 
-export default function ShiftSetup() {
+export default function ShiftSetup({ onBack }: { onBack?: () => void } = {}) {
   const { dispatch } = useShift();
   const [drafts, setDrafts] = useState<DraftProvider[]>([]);
   const [expandedTeam, setExpandedTeam] = useState<TeamId>(1);
@@ -35,28 +35,39 @@ export default function ShiftSetup() {
     setDrafts(d => d.filter(p => p.id !== id));
   };
 
-  const canStart = () => {
-    // At least one general team (1-3) needs a provider
-    return [1, 2, 3].some(t => drafts.some(d => d.teamId === t));
-  };
+  const toProviders = (): Provider[] => drafts.map(d => ({
+    id: d.id,
+    name: d.name,
+    type: d.type,
+    status: 'active',
+    statusExpiresAt: null,
+    teamId: d.teamId,
+  }));
 
-  const startShift = () => {
-    const providers: Provider[] = drafts.map(d => ({
-      id: d.id,
-      name: d.name,
-      type: d.type,
-      status: 'active',
-      statusExpiresAt: null,
-      teamId: d.teamId,
-    }));
-    dispatch({ type: 'START_SHIFT', providers });
+  const handleDone = () => {
+    const providers = toProviders();
+    if (onBack) {
+      if (providers.length > 0) dispatch({ type: 'ADD_PROVIDERS', providers });
+      onBack();
+    } else {
+      dispatch({ type: 'START_SHIFT', providers });
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
-      <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 z-10">
-        <h1 className="text-xl font-bold text-gray-900">Shift Setup</h1>
-        <p className="text-sm text-gray-500">Add providers to each team</p>
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-900 pb-24">
+      <div className="sticky top-0 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-4 py-3 z-10 flex items-center gap-3">
+        {onBack && (
+          <button onClick={onBack} className="text-blue-600 dark:text-blue-400 font-medium text-sm min-h-[44px] pr-2">
+            ← Back
+          </button>
+        )}
+        <div>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+            {onBack ? 'Add Providers' : 'Shift Setup'}
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Add providers to each team</p>
+        </div>
       </div>
 
       <div className="p-4 space-y-3">
@@ -65,25 +76,25 @@ export default function ShiftSetup() {
           const isExpanded = expandedTeam === teamId;
 
           return (
-            <div key={teamId} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div key={teamId} className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden">
               <button
                 className="w-full px-4 py-3 flex justify-between items-center text-left"
                 onClick={() => setExpandedTeam(isExpanded ? (null as unknown as TeamId) : teamId)}
               >
-                <span className="font-semibold text-gray-900">{TEAM_LABELS[teamId]}</span>
-                <span className="text-sm text-gray-500">{teamDrafts.length} provider{teamDrafts.length !== 1 ? 's' : ''}</span>
+                <span className="font-semibold text-gray-900 dark:text-gray-100">{TEAM_LABELS[teamId]}</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">{teamDrafts.length} provider{teamDrafts.length !== 1 ? 's' : ''}</span>
               </button>
 
               {isExpanded && (
-                <div className="px-4 pb-4 border-t border-gray-100">
+                <div className="px-4 pb-4 border-t border-gray-100 dark:border-slate-700">
                   {teamDrafts.length === 0 && (
-                    <p className="text-sm text-gray-400 py-2">No providers added</p>
+                    <p className="text-sm text-gray-400 dark:text-gray-500 py-2">No providers added</p>
                   )}
                   {teamDrafts.map(d => (
-                    <div key={d.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                    <div key={d.id} className="flex items-center justify-between py-2 border-b border-gray-50 dark:border-slate-700 last:border-0">
                       <div>
-                        <span className="font-medium text-gray-900">{d.name}</span>
-                        <span className="text-sm text-gray-500 ml-2">{PROVIDER_TYPE_LABELS[d.type]}</span>
+                        <span className="font-medium text-gray-900 dark:text-gray-100">{d.name}</span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">{PROVIDER_TYPE_LABELS[d.type]}</span>
                       </div>
                       <button
                         onClick={() => removeProvider(d.id)}
@@ -102,13 +113,13 @@ export default function ShiftSetup() {
                         value={newName}
                         onChange={e => setNewName(e.target.value)}
                         placeholder="Provider name"
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base"
+                        className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 text-base bg-white dark:bg-slate-700 dark:text-white"
                         autoFocus
                       />
                       <select
                         value={newType}
                         onChange={e => setNewType(e.target.value as ProviderType)}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-base bg-white"
+                        className="w-full border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-2 text-base bg-white dark:bg-slate-700 dark:text-white"
                       >
                         {PROVIDER_TYPES.map(t => (
                           <option key={t} value={t}>{PROVIDER_TYPE_LABELS[t]}</option>
@@ -124,7 +135,7 @@ export default function ShiftSetup() {
                         </button>
                         <button
                           onClick={() => { setAddingTo(null); setNewName(''); }}
-                          className="flex-1 bg-gray-100 text-gray-700 rounded-lg py-2 font-medium min-h-[44px]"
+                          className="flex-1 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-lg py-2 font-medium min-h-[44px]"
                         >
                           Cancel
                         </button>
@@ -133,7 +144,7 @@ export default function ShiftSetup() {
                   ) : (
                     <button
                       onClick={() => setAddingTo(teamId)}
-                      className="mt-2 w-full text-blue-600 font-medium py-2 min-h-[44px]"
+                      className="mt-2 w-full text-blue-600 dark:text-blue-400 font-medium py-2 min-h-[44px]"
                     >
                       + Add Provider
                     </button>
@@ -145,13 +156,12 @@ export default function ShiftSetup() {
         })}
       </div>
 
-      <div className="fixed bottom-0 inset-x-0 p-4 bg-white border-t border-gray-200">
+      <div className="fixed bottom-0 inset-x-0 p-4 bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700">
         <button
-          onClick={startShift}
-          disabled={!canStart()}
-          className="w-full bg-blue-600 text-white rounded-xl py-4 font-bold text-lg disabled:opacity-50 min-h-[56px]"
+          onClick={handleDone}
+          className="w-full bg-blue-600 text-white rounded-xl py-4 font-bold text-lg min-h-[56px]"
         >
-          Start Shift
+          {onBack ? (drafts.length > 0 ? `Add ${drafts.length} Provider${drafts.length !== 1 ? 's' : ''}` : 'Back to Dashboard') : 'Start Shift'}
         </button>
       </div>
     </div>
