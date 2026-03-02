@@ -3,6 +3,7 @@ import { useShift } from '../context/ShiftContext';
 import type { Role } from '../types';
 import SimulationSetup from './SimulationSetup';
 import BenchmarkReport from './BenchmarkReport';
+import DelphiSurvey from './DelphiSurvey';
 
 const roles: { role: Role; label: string; desc: string }[] = [
   { role: 'charge_nurse', label: 'Charge / Triage Nurse', desc: 'Set up shift, manage providers, assign patients' },
@@ -13,9 +14,11 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
   const { dispatch } = useShift();
   const [showSimSetup, setShowSimSetup] = useState(false);
   const [showBenchmark, setShowBenchmark] = useState(false);
+  const [showDelphi, setShowDelphi] = useState(false);
 
   if (showSimSetup) return <SimulationSetup onCancel={() => setShowSimSetup(false)} />;
   if (showBenchmark) return <BenchmarkReport onBack={() => setShowBenchmark(false)} />;
+  if (showDelphi) return <DelphiSurvey onCancel={() => setShowDelphi(false)} />;
 
   return (
     <div className="dashboard-bg flex flex-col items-center justify-center p-6">
@@ -59,6 +62,13 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
         >
           <div>Start Simulation</div>
           <div className="text-xs font-normal text-slate-500 dark:text-slate-400 mt-0.5">Tune weighted parameters in a simulated shift</div>
+        </button>
+        <button
+          onClick={() => setShowDelphi(true)}
+          className="w-full min-h-[48px] bg-slate-200 dark:bg-white/10 text-slate-700 dark:text-slate-300 rounded-xl px-5 py-3 font-semibold text-sm active:bg-slate-300 dark:active:bg-white/20 border border-slate-300 dark:border-white/10"
+        >
+          <div>Provider Strength Survey</div>
+          <div className="text-xs font-normal text-slate-500 dark:text-slate-400 mt-0.5">Rate provider independence — Round 1 Delphi</div>
         </button>
         <div className="text-center pt-2">
           <button
