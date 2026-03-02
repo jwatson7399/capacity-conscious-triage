@@ -18,7 +18,7 @@ interface Props {
   forceHideStabilized?: boolean;
 }
 
-const PROVIDER_TYPES: ProviderType[] = ['attending', 'senior_resident', 'junior_resident', 'pa', 'rotator'];
+const PROVIDER_TYPES: ProviderType[] = ['attending', 'senior_resident', 'junior_resident', 'intern', 'pa', 'rotator'];
 
 export default function TeamCard({ teamId, score, recommendationRank, isClosed, closedAt, allCandidatesBuffered, forceCollapseProviders, forceCollapsePatients, forceHideStabilized }: Props) {
   const { state, dispatch } = useShift();

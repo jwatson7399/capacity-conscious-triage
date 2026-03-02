@@ -1,6 +1,6 @@
 export type Role = 'triage_nurse' | 'charge_nurse' | 'attending';
 
-export type ProviderType = 'attending' | 'senior_resident' | 'junior_resident' | 'pa' | 'rotator';
+export type ProviderType = 'attending' | 'senior_resident' | 'junior_resident' | 'intern' | 'pa' | 'rotator';
 
 export type ProviderStatus = 'active' | 'in_procedure' | 'taking_signout' | 'off_floor';
 

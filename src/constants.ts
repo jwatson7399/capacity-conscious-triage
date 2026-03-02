@@ -4,6 +4,7 @@ export const CAPACITY_WEIGHTS: Record<ProviderType, number> = {
   attending: 17.5,
   senior_resident: 15,
   junior_resident: 7.5,
+  intern: 5,
   pa: 10,
   rotator: 1,
 };
@@ -73,7 +74,8 @@ export const ACUITY_DESCRIPTORS: Record<AcuityTier, string> = {
 export const PROVIDER_TYPE_LABELS: Record<ProviderType, string> = {
   attending: 'Attending',
   senior_resident: 'Resident (PGY 3-4)',
-  junior_resident: 'Resident (PGY 1-2)',
+  junior_resident: 'Resident (PGY-2)',
+  intern: 'Intern (PGY-1)',
   pa: 'PA',
   rotator: 'Rotator',
 };
@@ -82,6 +84,7 @@ export const PROVIDER_TYPE_SHORT: Record<ProviderType, string> = {
   attending: 'ATT',
   senior_resident: 'SR',
   junior_resident: 'JR',
+  intern: 'INT',
   pa: 'PA',
   rotator: 'ROT',
 };

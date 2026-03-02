@@ -6,7 +6,7 @@ import { uid } from '../uid';
 
 const TEAM_IDS: TeamId[] = [1, 2, 3, 4];
 const TEAM_LABELS: Record<TeamId, string> = { 1: 'Team 1', 2: 'Team 2', 3: 'Team 3', 4: 'Trauma (Team 4)' };
-const PROVIDER_TYPES: ProviderType[] = ['attending', 'senior_resident', 'junior_resident', 'pa', 'rotator'];
+const PROVIDER_TYPES: ProviderType[] = ['attending', 'senior_resident', 'junior_resident', 'intern', 'pa', 'rotator'];
 
 interface DraftProvider {
   id: string;

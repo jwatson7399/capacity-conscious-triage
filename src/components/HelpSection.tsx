@@ -173,7 +173,8 @@ export default function HelpSection({ onClose, onShowBenchmark }: Props) {
               <tr><td className="py-1">Attending</td><td>17.5</td></tr>
               <tr><td className="py-1">Senior Resident (PGY 3-4)</td><td>15.0</td></tr>
               <tr><td className="py-1">PA</td><td>10.0</td></tr>
-              <tr><td className="py-1">Junior Resident (PGY 1-2)</td><td>7.5</td></tr>
+              <tr><td className="py-1">Resident (PGY-2)</td><td>7.5</td></tr>
+              <tr><td className="py-1">Intern (PGY-1)</td><td>5.0</td></tr>
               <tr><td className="py-1">Rotator</td><td>1.0</td></tr>
             </tbody>
           </table>

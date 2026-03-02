@@ -4,13 +4,14 @@ type DelphiRole = { key: string; label: string; color: string; accent: string };
 
 const ROLES: DelphiRole[] = [
   { key: 'senior_resident', label: 'PGY 3–4 (Senior Resident)', color: 'bg-emerald-500', accent: '#10b981' },
-  { key: 'junior_resident', label: 'PGY 1–2 (Junior Resident)', color: 'bg-amber-500', accent: '#f59e0b' },
+  { key: 'junior_resident', label: 'PGY-2 (Junior Resident)', color: 'bg-amber-500', accent: '#f59e0b' },
+  { key: 'intern', label: 'PGY-1 (Intern)', color: 'bg-orange-500', accent: '#f97316' },
   { key: 'pa', label: 'PA / NP', color: 'bg-violet-500', accent: '#8b5cf6' },
   { key: 'rotator', label: 'Off-Service Rotator', color: 'bg-rose-500', accent: '#f43f5e' },
 ];
 
-const CSV_HEADERS = ['Timestamp', 'Senior Resident', 'Junior Resident', 'PA', 'Rotator'];
-const ROLE_KEYS = ['senior_resident', 'junior_resident', 'pa', 'rotator'];
+const CSV_HEADERS = ['Timestamp', 'Senior Resident', 'Junior Resident', 'Intern', 'PA', 'Rotator'];
+const ROLE_KEYS = ['senior_resident', 'junior_resident', 'intern', 'pa', 'rotator'];
 
 const SHEETS_API = import.meta.env.VITE_DELPHI_SHEETS_URL || '';
 
@@ -26,6 +27,7 @@ async function fetchSheetResponses(): Promise<ResponseEntry[] | null> {
       responses: {
         senior_resident: Number(row['Senior Resident'] ?? 0),
         junior_resident: Number(row['Junior Resident'] ?? 0),
+        intern: Number(row['Intern'] ?? 0),
         pa: Number(row['PA'] ?? 0),
         rotator: Number(row['Rotator'] ?? 0),
       },
@@ -43,9 +45,10 @@ async function submitToSheet(entry: ResponseEntry): Promise<void> {
       mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        timestamp: entry.timestamp,
+        timestamp: new Date(entry.timestamp).toLocaleString(),
         senior_resident: entry.responses.senior_resident,
         junior_resident: entry.responses.junior_resident,
+        intern: entry.responses.intern,
         pa: entry.responses.pa,
         rotator: entry.responses.rotator,
       }),
@@ -96,13 +99,11 @@ export default function DelphiSurvey({ onCancel }: { onCancel: () => void }) {
   const [submitted, setSubmitted] = useState(false);
   // TODO: re-add per-browser duplicate prevention (localStorage 'delphi-submitted' flag)
   // Removed temporarily so multiple people can submit from the same device
-  const [loading, setLoading] = useState(!!SHEETS_API);
 
   useEffect(() => {
     if (!SHEETS_API) return;
     const poll = () => fetchSheetResponses().then(rows => {
       if (rows) setAllResponses(rows);
-      setLoading(false);
     });
     poll();
     const id = setInterval(poll, 30_000);
@@ -123,16 +124,6 @@ export default function DelphiSurvey({ onCancel }: { onCancel: () => void }) {
     const fresh = await fetchSheetResponses();
     if (fresh) setAllResponses(fresh);
   };
-
-  if (loading) {
-    return (
-      <div className="dashboard-bg flex flex-col items-center justify-center p-6">
-        <div className="glass-card rounded-xl p-8 max-w-sm w-full text-center">
-          <p className="text-sm text-slate-500 dark:text-slate-400">Loading responses...</p>
-        </div>
-      </div>
-    );
-  }
 
   // Results view — shown after submit or when viewing results from already-submitted screen
   const ResultsView = () => (

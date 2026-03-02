@@ -17,7 +17,7 @@ The Delphi provider-strength survey can optionally store responses in a shared G
 
 ### Setup
 
-1. Create a Google Sheet with columns: `Timestamp | Senior Resident | Junior Resident | PA | Rotator` (name the sheet tab `Responses`)
+1. Create a Google Sheet with columns: `Timestamp | Senior Resident | Junior Resident | Intern | PA | Rotator` (name the sheet tab `Responses`)
 2. Open **Extensions → Apps Script** and paste:
 
 ```javascript
@@ -43,6 +43,7 @@ function doPost(e) {
     body.timestamp,
     body.senior_resident,
     body.junior_resident,
+    body.intern,
     body.pa,
     body.rotator
   ]);
@@ -90,13 +91,14 @@ Highest ratio (among non-buffered teams) = recommended. Team 4 (Trauma) excluded
 
 ### Capacity Weights (provider type × status multiplier)
 
-| Provider        | Weight |
-|-----------------|--------|
-| Attending       | 17.5   |
-| Senior Resident | 15.0   |
-| PA              | 10.0   |
-| Junior Resident | 7.5    |
-| Rotator         | 1.0    |
+| Provider             | Weight |
+|----------------------|--------|
+| Attending            | 17.5   |
+| Senior Resident      | 15.0   |
+| PA                   | 10.0   |
+| Junior Resident (PGY-2) | 7.5 |
+| Intern (PGY-1)       | 5.0    |
+| Rotator              | 1.0    |
 
 | Status          | Multiplier |
 |-----------------|------------|

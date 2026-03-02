@@ -513,7 +513,7 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
       // Build providers per team with randomized compositions
       type PType = Provider['type'];
       type PStatus = Provider['status'];
-      const nonAttendingTypes: PType[] = ['senior_resident', 'junior_resident', 'pa', 'rotator'];
+      const nonAttendingTypes: PType[] = ['senior_resident', 'junior_resident', 'intern', 'pa', 'rotator'];
       const nonActiveStatuses: PStatus[] = ['in_procedure', 'taking_signout', 'off_floor'];
       let pId = 0;
 

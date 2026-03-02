@@ -37,11 +37,11 @@ const PRESETS: Record<Exclude<Preset, 'custom'>, TeamPreset> = {
       // Team 1: ATT + SR + JR + PA (50.0) — strong
       { type: 'attending', teamId: 1 }, { type: 'senior_resident', teamId: 1 },
       { type: 'junior_resident', teamId: 1 }, { type: 'pa', teamId: 1 },
-      // Team 2: ATT + SR + PA (42.5) — medium-strong
+      // Team 2: ATT + SR + INT + PA (47.5) — medium-strong
       { type: 'attending', teamId: 2 }, { type: 'senior_resident', teamId: 2 },
-      { type: 'pa', teamId: 2 },
-      // Team 3: ATT + JR + Rotator (26.0) — weak
-      { type: 'attending', teamId: 3 }, { type: 'junior_resident', teamId: 3 },
+      { type: 'intern', teamId: 2 }, { type: 'pa', teamId: 2 },
+      // Team 3: ATT + INT + Rotator (23.5) — weak
+      { type: 'attending', teamId: 3 }, { type: 'intern', teamId: 3 },
       { type: 'rotator', teamId: 3 },
       // Team 4 (trauma): ATT + JR
       { type: 'attending', teamId: 4 }, { type: 'junior_resident', teamId: 4 },
@@ -54,10 +54,10 @@ const PRESETS: Record<Exclude<Preset, 'custom'>, TeamPreset> = {
       // Team 1: ATT + SR + PA + JR (50.0) — powerhouse
       { type: 'attending', teamId: 1 }, { type: 'senior_resident', teamId: 1 },
       { type: 'pa', teamId: 1 }, { type: 'junior_resident', teamId: 1 },
-      // Team 2: ATT + SR + JR(off_floor, joins at 7h)
-      // Hours 0-6: ATT+SR (32.5), Hour 6-7: ATT solo (17.5), Hour 7+: ATT+JR (25.0)
+      // Team 2: ATT + SR + INT(off_floor, joins at 7h)
+      // Hours 0-6: ATT+SR (32.5), Hour 6-7: ATT solo (17.5), Hour 7+: ATT+INT (22.5)
       { type: 'attending', teamId: 2 }, { type: 'senior_resident', teamId: 2 },
-      { type: 'junior_resident', teamId: 2, status: 'off_floor', statusMinutes: 420 },
+      { type: 'intern', teamId: 2, status: 'off_floor', statusMinutes: 420 },
       // Team 3: ATT + Rotator (18.5) — barely above solo
       { type: 'attending', teamId: 3 }, { type: 'rotator', teamId: 3 },
       // Team 4 (trauma): ATT + JR
@@ -80,9 +80,9 @@ const PRESETS: Record<Exclude<Preset, 'custom'>, TeamPreset> = {
       // Team 2: ATT + SR + PA
       { type: 'attending', teamId: 2 }, { type: 'senior_resident', teamId: 2 },
       { type: 'pa', teamId: 2 },
-      // Team 3: ATT (off_floor) + JR + Rotator
+      // Team 3: ATT (off_floor) + INT + Rotator
       { type: 'attending', teamId: 3, status: 'off_floor', statusMinutes: 10 },
-      { type: 'junior_resident', teamId: 3 },
+      { type: 'intern', teamId: 3 },
       { type: 'rotator', teamId: 3 },
       // Team 4 (trauma): ATT + JR
       { type: 'attending', teamId: 4 }, { type: 'junior_resident', teamId: 4 },
@@ -93,7 +93,7 @@ const PRESETS: Record<Exclude<Preset, 'custom'>, TeamPreset> = {
     label: 'Night Shift',
     description: '2 teams, skeleton crew, lower volume',
     providers: [
-      { type: 'attending', teamId: 1 }, { type: 'junior_resident', teamId: 1 }, { type: 'pa', teamId: 1 },
+      { type: 'attending', teamId: 1 }, { type: 'intern', teamId: 1 }, { type: 'pa', teamId: 1 },
       { type: 'attending', teamId: 2 }, { type: 'senior_resident', teamId: 2 },
     ],
     arrivalRate: 2,
@@ -109,8 +109,8 @@ const PRESETS: Record<Exclude<Preset, 'custom'>, TeamPreset> = {
       // Team 2: ATT + SR + PA (42.5) — medium
       { type: 'attending', teamId: 2 }, { type: 'senior_resident', teamId: 2 },
       { type: 'pa', teamId: 2 },
-      // Team 3: ATT + JR (25.0) — light
-      { type: 'attending', teamId: 3 }, { type: 'junior_resident', teamId: 3 },
+      // Team 3: ATT + INT (22.5) — light
+      { type: 'attending', teamId: 3 }, { type: 'intern', teamId: 3 },
       // Team 4 (trauma): ATT + SR
       { type: 'attending', teamId: 4 }, { type: 'senior_resident', teamId: 4 },
     ],
