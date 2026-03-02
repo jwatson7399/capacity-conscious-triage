@@ -11,6 +11,55 @@ npm run dev              # dev server (Vite)
 npm run build            # type-check + production build → dist/
 ```
 
+## Delphi Survey — Google Sheets Backend
+
+The Delphi provider-strength survey can optionally store responses in a shared Google Sheet so all users see the same totals.
+
+### Setup
+
+1. Create a Google Sheet with columns: `Timestamp | Senior Resident | Junior Resident | PA | Rotator` (name the sheet tab `Responses`)
+2. Open **Extensions → Apps Script** and paste:
+
+```javascript
+const SHEET_NAME = 'Responses';
+
+function doGet() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const rows = data.slice(1).map(row => {
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = row[i]);
+    return obj;
+  });
+  return ContentService.createTextOutput(JSON.stringify(rows))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const body = JSON.parse(e.postData.contents);
+  sheet.appendRow([
+    body.timestamp,
+    body.senior_resident,
+    body.junior_resident,
+    body.pa,
+    body.rotator
+  ]);
+  return ContentService.createTextOutput(JSON.stringify({ status: 'ok' }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+```
+
+3. **Deploy → New deployment → Web app** → set access to "Anyone" → copy the URL
+4. Paste the URL into `.env`:
+
+```
+VITE_DELPHI_SHEETS_URL=https://script.google.com/macros/s/XXXXX/exec
+```
+
+If the env var is unset, the survey falls back to localStorage-only mode.
+
 ## Architecture
 
 - `src/types.ts` — all TypeScript types: `Provider`, `Patient`, `Buffer`, `TeamScore`, `Recommendation`, `ShiftState`, `ShiftAction`

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 type DelphiRole = { key: string; label: string; color: string; accent: string };
 
@@ -12,7 +12,48 @@ const ROLES: DelphiRole[] = [
 const CSV_HEADERS = ['Timestamp', 'Senior Resident', 'Junior Resident', 'PA', 'Rotator'];
 const ROLE_KEYS = ['senior_resident', 'junior_resident', 'pa', 'rotator'];
 
+const SHEETS_API = import.meta.env.VITE_DELPHI_SHEETS_URL || '';
+
 type ResponseEntry = { timestamp: string; responses: Record<string, number> };
+
+async function fetchSheetResponses(): Promise<ResponseEntry[] | null> {
+  if (!SHEETS_API) return null;
+  try {
+    const res = await fetch(SHEETS_API);
+    const rows: Record<string, string | number>[] = await res.json();
+    return rows.map(row => ({
+      timestamp: String(row['Timestamp'] ?? ''),
+      responses: {
+        senior_resident: Number(row['Senior Resident'] ?? 0),
+        junior_resident: Number(row['Junior Resident'] ?? 0),
+        pa: Number(row['PA'] ?? 0),
+        rotator: Number(row['Rotator'] ?? 0),
+      },
+    }));
+  } catch {
+    return null;
+  }
+}
+
+async function submitToSheet(entry: ResponseEntry): Promise<void> {
+  if (!SHEETS_API) return;
+  try {
+    await fetch(SHEETS_API, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        timestamp: entry.timestamp,
+        senior_resident: entry.responses.senior_resident,
+        junior_resident: entry.responses.junior_resident,
+        pa: entry.responses.pa,
+        rotator: entry.responses.rotator,
+      }),
+    });
+  } catch {
+    // silent fail — localStorage is the backup
+  }
+}
 
 function downloadCSV(responses: ResponseEntry[]) {
   const rows = [CSV_HEADERS.join(',')];
@@ -55,18 +96,44 @@ export default function DelphiSurvey({ onCancel }: { onCancel: () => void }) {
   const [submitted, setSubmitted] = useState(false);
   const [hasAlreadySubmitted] = useState(() => localStorage.getItem('delphi-submitted') === 'true');
   const [showResults, setShowResults] = useState(false);
+  const [loading, setLoading] = useState(!!SHEETS_API);
+
+  useEffect(() => {
+    if (!SHEETS_API) return;
+    const poll = () => fetchSheetResponses().then(rows => {
+      if (rows) setAllResponses(rows);
+      setLoading(false);
+    });
+    poll();
+    const id = setInterval(poll, 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   const submissionCount = allResponses.length;
   const averages = computeAverages(allResponses);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const entry: ResponseEntry = { timestamp: new Date().toISOString(), responses: { ...ratings } };
     const updated = [...allResponses, entry];
     localStorage.setItem('delphi-responses', JSON.stringify(updated));
     localStorage.setItem('delphi-submitted', 'true');
     setAllResponses(updated);
     setSubmitted(true);
+    await submitToSheet(entry);
+    // Re-fetch to get other people's submissions
+    const fresh = await fetchSheetResponses();
+    if (fresh) setAllResponses(fresh);
   };
+
+  if (loading) {
+    return (
+      <div className="dashboard-bg flex flex-col items-center justify-center p-6">
+        <div className="glass-card rounded-xl p-8 max-w-sm w-full text-center">
+          <p className="text-sm text-slate-500 dark:text-slate-400">Loading responses...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Results view — shown after submit or when viewing results from already-submitted screen
   const ResultsView = () => (
