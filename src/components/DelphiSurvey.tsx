@@ -94,8 +94,8 @@ export default function DelphiSurvey({ onCancel }: { onCancel: () => void }) {
     Object.fromEntries(ROLES.map(r => [r.key, 10]))
   );
   const [submitted, setSubmitted] = useState(false);
-  const [hasAlreadySubmitted] = useState(() => localStorage.getItem('delphi-submitted') === 'true');
-  const [showResults, setShowResults] = useState(false);
+  // TODO: re-add per-browser duplicate prevention (localStorage 'delphi-submitted' flag)
+  // Removed temporarily so multiple people can submit from the same device
   const [loading, setLoading] = useState(!!SHEETS_API);
 
   useEffect(() => {
@@ -116,7 +116,6 @@ export default function DelphiSurvey({ onCancel }: { onCancel: () => void }) {
     const entry: ResponseEntry = { timestamp: new Date().toISOString(), responses: { ...ratings } };
     const updated = [...allResponses, entry];
     localStorage.setItem('delphi-responses', JSON.stringify(updated));
-    localStorage.setItem('delphi-submitted', 'true');
     setAllResponses(updated);
     setSubmitted(true);
     await submitToSheet(entry);
@@ -168,6 +167,15 @@ export default function DelphiSurvey({ onCancel }: { onCancel: () => void }) {
         )}
 
         <button
+          onClick={() => {
+            setSubmitted(false);
+            setRatings(Object.fromEntries(ROLES.map(r => [r.key, 10])));
+          }}
+          className="w-full min-h-[44px] bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl px-4 py-2.5 font-semibold text-sm mb-3 active:from-blue-700 active:to-indigo-700 transition-colors"
+        >
+          Submit Another Response
+        </button>
+        <button
           onClick={() => downloadCSV(allResponses)}
           className="w-full min-h-[44px] bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl px-4 py-2.5 font-semibold text-sm mb-3 active:bg-slate-200 dark:active:bg-slate-600 transition-colors"
         >
@@ -175,7 +183,7 @@ export default function DelphiSurvey({ onCancel }: { onCancel: () => void }) {
         </button>
         <button
           onClick={onCancel}
-          className="w-full min-h-[44px] bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl px-4 py-2.5 font-semibold text-sm active:from-blue-700 active:to-indigo-700 transition-colors"
+          className="w-full min-h-[44px] text-slate-500 dark:text-slate-400 text-sm active:text-slate-700 transition-colors"
         >
           Back to Menu
         </button>
@@ -185,65 +193,6 @@ export default function DelphiSurvey({ onCancel }: { onCancel: () => void }) {
 
   // Post-submission results
   if (submitted) return <ResultsView />;
-
-  // Already submitted — show block screen
-  if (hasAlreadySubmitted) {
-    return (
-      <div className="dashboard-bg flex flex-col items-center justify-center p-6">
-        <div className="glass-card rounded-xl p-8 max-w-sm w-full text-center">
-          <div className="text-3xl mb-3">📋</div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Already Submitted</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-            You've already submitted your ratings.
-          </p>
-          <p className="text-xs text-slate-400 dark:text-slate-500 mb-5">
-            {submissionCount} response{submissionCount !== 1 ? 's' : ''} collected
-          </p>
-          {!showResults ? (
-            <button
-              onClick={() => setShowResults(true)}
-              className="w-full min-h-[44px] bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl px-4 py-2.5 font-semibold text-sm mb-3 active:from-blue-700 active:to-indigo-700 transition-colors"
-            >
-              View Results
-            </button>
-          ) : (
-            submissionCount > 0 && (
-              <div className="text-left mb-5 space-y-2">
-                <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Average Scores</h3>
-                {ROLES.map(r => (
-                  <div key={r.key} className="flex items-center gap-2">
-                    <span className={`w-2.5 h-2.5 rounded-full ${r.color} shrink-0`} />
-                    <span className="text-sm text-slate-700 dark:text-slate-300 flex-1">{r.label}</span>
-                    <span className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">
-                      {averages[r.key]?.toFixed(1)}
-                    </span>
-                    <div className="w-16 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full"
-                        style={{ width: `${((averages[r.key] ?? 0) / 20) * 100}%`, backgroundColor: r.accent }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )
-          )}
-          <button
-            onClick={() => downloadCSV(allResponses)}
-            className="w-full min-h-[44px] bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl px-4 py-2.5 font-semibold text-sm mb-3 active:bg-slate-200 dark:active:bg-slate-600 transition-colors"
-          >
-            Download CSV
-          </button>
-          <button
-            onClick={onCancel}
-            className="w-full min-h-[44px] text-slate-500 dark:text-slate-400 text-sm active:text-slate-700 transition-colors"
-          >
-            Back to Menu
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   // Survey form
   return (
