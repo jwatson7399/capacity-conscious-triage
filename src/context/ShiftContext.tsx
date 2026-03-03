@@ -1,11 +1,13 @@
 import { createContext, useContext, useReducer, useMemo, type ReactNode } from 'react';
 import type { ShiftState, ShiftAction, Recommendation, SimulationState } from '../types';
+import type { ProviderType } from '../types';
 import { STATUS_EXPIRE_MS_MAP, BUFFER_DURATIONS_MS, TEAM_CLOSE_TRANSFER_MS, TEAM_CLOSE_TRANSFER_TARGETS, DECEASED_BUFFER_MS, TRAUMA_TEAM_ID, QUICK_UNDO_WINDOW_MS } from '../constants';
 import { getRecommendation, createBuffer, type ScoringOverrides } from '../engine/recommendation';
 import { uid } from '../uid';
 import type { Provider, Patient, Buffer, TeamId } from '../types';
 import { generateTimeline, generateStatusChanges, takeSnapshot, addSnapshot, runShadowSim, replayToTime } from '../engine/simulation';
 import { getProvidersForShift } from '../utils/scheduleParser';
+import { useSurveyWeights } from '../hooks/useSurveyWeights';
 
 function simOverridesToScoring(sim: SimulationState | undefined): ScoringOverrides | undefined {
   if (!sim) return undefined;
@@ -922,22 +924,29 @@ interface ShiftContextValue {
   state: ShiftState;
   dispatch: React.Dispatch<ShiftAction>;
   recommendation: Recommendation;
+  capacityWeights: Record<ProviderType, number>;
 }
 
 const ShiftContext = createContext<ShiftContextValue | null>(null);
 
 export function ShiftProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(shiftReducer, initialState);
+  const capacityWeights = useSurveyWeights();
 
-  const scoringOverrides = useMemo(() => simOverridesToScoring(state.simulation), [state.simulation]);
+  const scoringOverrides = useMemo((): ScoringOverrides | undefined => {
+    const simOv = simOverridesToScoring(state.simulation);
+    // Merge survey weights as base, let simulation overrides take precedence
+    return { capacityWeights, ...simOv };
+  }, [state.simulation, capacityWeights]);
+
   const recommendation = useMemo(
     () => getRecommendation(state.providers, state.patients, state.buffers, state.now, state.closedTeams, scoringOverrides),
     [state.providers, state.patients, state.buffers, state.now, state.closedTeams, scoringOverrides],
   );
 
   const value = useMemo(
-    () => ({ state, dispatch, recommendation }),
-    [state, dispatch, recommendation],
+    () => ({ state, dispatch, recommendation, capacityWeights }),
+    [state, dispatch, recommendation, capacityWeights],
   );
 
   return <ShiftContext.Provider value={value}>{children}</ShiftContext.Provider>;

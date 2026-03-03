@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useShift } from '../context/ShiftContext';
 import type { Provider, ProviderStatus } from '../types';
-import { STATUS_LABELS, STATUS_COLORS, PROVIDER_TYPE_LABELS, CAPACITY_WEIGHTS, STATUS_MULTIPLIERS } from '../constants';
+import { STATUS_LABELS, STATUS_COLORS, PROVIDER_TYPE_LABELS, STATUS_MULTIPLIERS } from '../constants';
 
 const STATUSES: ProviderStatus[] = ['active', 'in_procedure', 'taking_signout', 'off_floor'];
 
@@ -20,9 +20,9 @@ interface Props {
 }
 
 export default function ProviderStatusToggle({ provider, canManage, now, onSwap }: Props) {
-  const { dispatch } = useShift();
+  const { dispatch, capacityWeights } = useShift();
   const [showStatuses, setShowStatuses] = useState(false);
-  const effective = CAPACITY_WEIGHTS[provider.type] * STATUS_MULTIPLIERS[provider.status];
+  const effective = capacityWeights[provider.type] * STATUS_MULTIPLIERS[provider.status];
 
   return (
     <div className="py-2 border-b border-gray-50 dark:border-slate-700 last:border-0">

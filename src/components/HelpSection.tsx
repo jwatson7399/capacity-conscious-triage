@@ -1,3 +1,5 @@
+import { useShift } from '../context/ShiftContext';
+
 interface Props {
   onClose: () => void;
   onShowBenchmark?: () => void;
@@ -18,6 +20,7 @@ function Section({ title, children, dataTour }: { title: string; children: React
 }
 
 export default function HelpSection({ onClose, onShowBenchmark }: Props) {
+  const { capacityWeights } = useShift();
   return (
     <div className="glass-card rounded-xl overflow-hidden">
       <div className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-4 py-3 flex items-center justify-between">
@@ -166,16 +169,16 @@ export default function HelpSection({ onClose, onShowBenchmark }: Props) {
       {/* 5. Weights & Reference */}
       <Section title="Weights & Reference" dataTour="help-team-capacity">
         <div data-tour="help-team-capacity-weights">
-          <p className="font-semibold text-gray-700 dark:text-gray-200">Provider Weights</p>
+          <p className="font-semibold text-gray-700 dark:text-gray-200">Provider Weights <span className="font-normal text-xs text-gray-400">(live from Delphi survey)</span></p>
           <table className="w-full text-left">
             <thead><tr className="border-b"><th className="py-1">Type</th><th>Weight</th></tr></thead>
             <tbody>
-              <tr><td className="py-1">Attending</td><td>17.5</td></tr>
-              <tr><td className="py-1">Senior Resident (PGY 3-4)</td><td>15.0</td></tr>
-              <tr><td className="py-1">PA</td><td>10.0</td></tr>
-              <tr><td className="py-1">Resident (PGY-2)</td><td>7.5</td></tr>
-              <tr><td className="py-1">Intern (PGY-1)</td><td>5.0</td></tr>
-              <tr><td className="py-1">Rotator</td><td>1.0</td></tr>
+              <tr><td className="py-1">Attending</td><td>{capacityWeights.attending}</td></tr>
+              <tr><td className="py-1">Senior Resident (PGY 3-4)</td><td>{capacityWeights.senior_resident}</td></tr>
+              <tr><td className="py-1">PA</td><td>{capacityWeights.pa}</td></tr>
+              <tr><td className="py-1">Resident (PGY-2)</td><td>{capacityWeights.junior_resident}</td></tr>
+              <tr><td className="py-1">Intern (PGY-1)</td><td>{capacityWeights.intern}</td></tr>
+              <tr><td className="py-1">Rotator</td><td>{capacityWeights.rotator}</td></tr>
             </tbody>
           </table>
         </div>

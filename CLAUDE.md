@@ -91,14 +91,16 @@ Highest ratio (among non-buffered teams) = recommended. Team 4 (Trauma) excluded
 
 ### Capacity Weights (provider type × status multiplier)
 
-| Provider             | Weight |
-|----------------------|--------|
-| Attending            | 17.5   |
-| Senior Resident      | 15.0   |
-| PA                   | 10.0   |
-| Junior Resident (PGY-2) | 7.5 |
-| Intern (PGY-1)       | 5.0    |
-| Rotator              | 1.0    |
+Weights are fetched live from the Delphi survey sheet (polled every 5 min via `useSurveyWeights` hook). Fallback defaults in `constants.ts` are used when the sheet is unavailable.
+
+| Provider             | Fallback | Survey Avg (6 responses) |
+|----------------------|----------|--------------------------|
+| Attending            | 20       | 20 (fixed reference)     |
+| Senior Resident      | 15.0     | 15.2                     |
+| PA                   | 10.0     | 10.8                     |
+| Junior Resident (PGY-2) | 7.5  | 10.8                     |
+| Intern (PGY-1)       | 5.0      | 5.7                      |
+| Rotator              | 1.0      | 1.0                      |
 
 | Status          | Multiplier |
 |-----------------|------------|

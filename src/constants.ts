@@ -1,7 +1,8 @@
 import type { ProviderType, ProviderStatus, AcuityTier, TeamId, FloatModifier } from './types';
 
+// Fallback defaults — overridden at runtime by Delphi survey averages (see useSurveyWeights)
 export const CAPACITY_WEIGHTS: Record<ProviderType, number> = {
-  attending: 17.5,
+  attending: 20,
   senior_resident: 15,
   junior_resident: 7.5,
   intern: 5,
