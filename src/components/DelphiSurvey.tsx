@@ -97,6 +97,7 @@ export default function DelphiSurvey({ onCancel, startOnResults }: { onCancel: (
     Object.fromEntries(ROLES.map(r => [r.key, 10]))
   );
   const [submitted, setSubmitted] = useState(startOnResults ?? false);
+  const [delphiInfoOpen, setDelphiInfoOpen] = useState(false);
   // TODO: re-add per-browser duplicate prevention (localStorage 'delphi-submitted' flag)
   // Removed temporarily so multiple people can submit from the same device
 
@@ -156,6 +157,37 @@ export default function DelphiSurvey({ onCancel, startOnResults }: { onCancel: (
             ))}
           </div>
         )}
+
+        {/* Delphi Method explainer */}
+        <details
+          className="text-left mb-5 glass-card rounded-lg p-3"
+          open={delphiInfoOpen}
+          onToggle={(e) => setDelphiInfoOpen((e.target as HTMLDetailsElement).open)}
+        >
+          <summary className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide cursor-pointer select-none">
+            About the Delphi Method
+          </summary>
+          <div className="mt-3 space-y-3 text-xs text-slate-600 dark:text-slate-400">
+            <div>
+              <p className="font-semibold text-slate-700 dark:text-slate-300 mb-1">What is the Delphi Method?</p>
+              <p>A structured expert consensus technique that uses iterative anonymous rounds to converge on agreement. Participants independently provide ratings, then refine their responses after seeing aggregate results.</p>
+            </div>
+            <div>
+              <p className="font-semibold text-slate-700 dark:text-slate-300 mb-1">Why it works here</p>
+              <p>By showing running averages, each subsequent respondent can calibrate their ratings against the group, driving convergence toward shared consensus.</p>
+            </div>
+            <div>
+              <p className="font-semibold text-slate-700 dark:text-slate-300 mb-1">Delphi products you already use in the ED</p>
+              <ul className="list-disc list-inside space-y-1.5 mt-1">
+                <li><span className="font-medium text-slate-700 dark:text-slate-300">ESI & CTAS triage scales</span> — the 5-level Emergency Severity Index and Canadian Triage and Acuity Scale were both developed and validated through Delphi consensus</li>
+                <li><span className="font-medium text-slate-700 dark:text-slate-300">Wells Criteria & HEART Score</span> — clinical prediction rules for PE/DVT and chest pain risk stratification derived from structured expert consensus panels</li>
+                <li><span className="font-medium text-slate-700 dark:text-slate-300">Surviving Sepsis Campaign</span> — the sepsis bundles every ED follows are produced using modified Delphi (GRADE + expert panel voting)</li>
+                <li><span className="font-medium text-slate-700 dark:text-slate-300">ACLS/BLS protocols</span> — ILCOR/AHA resuscitation guidelines are updated every 5 years using systematic review + Delphi consensus among international experts</li>
+                <li><span className="font-medium text-slate-700 dark:text-slate-300">ACGME EM Milestones</span> — the competency framework used to evaluate EM residents was built entirely through Delphi consensus among educators</li>
+              </ul>
+            </div>
+          </div>
+        </details>
 
         <button
           onClick={() => {

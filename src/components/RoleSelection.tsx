@@ -60,7 +60,7 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
               className="flex-1 min-h-[48px] px-4 py-3 font-semibold text-sm text-slate-800 dark:text-white active:bg-slate-300 dark:active:bg-white/20 transition-colors"
             >
               <div>Snapshot</div>
-              <div className="text-[11px] font-normal text-slate-500 dark:text-slate-400 mt-0.5">Random teams, simulated pts</div>
+              <div className="text-[11px] font-normal text-slate-500 dark:text-slate-400 mt-0.5">Generated teams, algorithm sandbox</div>
             </button>
             <div className="w-px bg-slate-300 dark:bg-white/10" />
             <button
@@ -107,7 +107,7 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
               className="flex-1 min-h-[48px] px-4 py-3 font-semibold text-sm text-slate-800 dark:text-white active:bg-slate-300 dark:active:bg-white/20 transition-colors disabled:opacity-50"
             >
               <div>{scheduleLoading ? 'Loading...' : 'Real Schedule'}</div>
-              <div className="text-[11px] font-normal text-slate-500 dark:text-slate-400 mt-0.5">Familiar teams, simulated pts</div>
+              <div className="text-[11px] font-normal text-slate-500 dark:text-slate-400 mt-0.5">Your providers, realistic patient flow</div>
             </button>
           </div>
         </div>
