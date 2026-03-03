@@ -91,12 +91,12 @@ function loadResponses(): ResponseEntry[] {
   catch { return []; }
 }
 
-export default function DelphiSurvey({ onCancel }: { onCancel: () => void }) {
+export default function DelphiSurvey({ onCancel, startOnResults }: { onCancel: () => void; startOnResults?: boolean }) {
   const [allResponses, setAllResponses] = useState<ResponseEntry[]>(loadResponses);
   const [ratings, setRatings] = useState<Record<string, number>>(
     Object.fromEntries(ROLES.map(r => [r.key, 10]))
   );
-  const [submitted, setSubmitted] = useState(false);
+  const [submitted, setSubmitted] = useState(startOnResults ?? false);
   // TODO: re-add per-browser duplicate prevention (localStorage 'delphi-submitted' flag)
   // Removed temporarily so multiple people can submit from the same device
 
