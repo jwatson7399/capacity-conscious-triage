@@ -215,26 +215,28 @@ describe('scheduleParser — real xlsx (Feb 23 week)', () => {
       expect(la).toBeUndefined();
     });
 
-    it('Monday midnight: OVN PAs mapped to correct teams (N-side=T1, Swing=T1+T2)', () => {
+    it('Monday midnight: OVN PAs mapped to correct teams (N-side=T1+T3, B-side=T2+T4, Swing=all)', () => {
       const buf = fs.readFileSync(REAL_FILE);
       result = parseWeeklySchedule(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
       const monday = result.days[0];
       const { providers } = getProvidersForShift(monday, 0);
-      // B-side 7P-7A Moskowitz → Team 2
-      const moskowitz = providers.find(p => p.name === 'Moskowitz');
-      expect(moskowitz?.teamId).toBe(2);
-      expect(moskowitz?.type).toBe('pa');
-      // N-side 7P-7A Mohamed → Team 1
-      const mohamed = providers.find(p => p.name === 'Mohamed');
-      expect(mohamed?.teamId).toBe(1);
-      expect(mohamed?.type).toBe('pa');
-      // Swing 7P-7A Thaung → both teams
+      // B-side 7P-7A Moskowitz → Teams 2 & 4
+      const moskowitz = providers.filter(p => p.name === 'Moskowitz');
+      expect(moskowitz.length).toBe(2);
+      expect(moskowitz.map(p => p.teamId).sort()).toEqual([2, 4]);
+      expect(moskowitz[0]?.type).toBe('pa');
+      // N-side 7P-7A Mohamed → Teams 1 & 3
+      const mohamed = providers.filter(p => p.name === 'Mohamed');
+      expect(mohamed.length).toBe(2);
+      expect(mohamed.map(p => p.teamId).sort()).toEqual([1, 3]);
+      expect(mohamed[0]?.type).toBe('pa');
+      // Swing 7P-7A Thaung → all teams
       const thaung = providers.filter(p => p.name === 'Thaung');
-      expect(thaung.length).toBe(2);
-      expect(thaung.map(p => p.teamId).sort()).toEqual([1, 2]);
-      // Swing 7P-7A ZURICA → both teams
+      expect(thaung.length).toBe(4);
+      expect(thaung.map(p => p.teamId).sort()).toEqual([1, 2, 3, 4]);
+      // Swing 7P-7A ZURICA → all teams
       const zurica = providers.filter(p => p.name === 'ZURICA');
-      expect(zurica.length).toBe(2);
+      expect(zurica.length).toBe(4);
     });
 
     it('Monday 9 AM: OVN providers should NOT appear', () => {
@@ -248,14 +250,14 @@ describe('scheduleParser — real xlsx (Feb 23 week)', () => {
       expect(names).not.toContain('Moskowitz');
     });
 
-    it('Thursday midnight: OVN resident FRIEND on B-Side (Team 2)', () => {
+    it('Thursday midnight: OVN resident FRIEND on B-Side (Teams 2 & 4)', () => {
       const buf = fs.readFileSync(REAL_FILE);
       result = parseWeeklySchedule(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
       const thursday = result.days.find(d => d.dayOfWeek === 'Thursday')!;
       const { providers } = getProvidersForShift(thursday, 0);
-      const friend = providers.find(p => p.name === 'FRIEND' && p.shiftStart === '8P');
-      expect(friend).toBeDefined();
-      expect(friend?.teamId).toBe(2); // B-Side = Team 2
+      const friend = providers.filter(p => p.name === 'FRIEND' && p.shiftStart === '8P');
+      expect(friend.length).toBe(2);
+      expect(friend.map(p => p.teamId).sort()).toEqual([2, 4]); // B-Side = Teams 2 & 4
     });
 
     it('each day has at least 4 providers at 9 AM', () => {

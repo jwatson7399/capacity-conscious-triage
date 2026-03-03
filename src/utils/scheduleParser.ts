@@ -463,7 +463,7 @@ function extractDayProviders(
       if (/^(OVN|AOC|EM|PEM|NAOC)/i.test(timeVal)) continue;
 
       // Track side labels — can appear in time col, name col, or col before time col
-      // N-side = Team 1, B-side = Team 2, Swing = both
+      // N-side = Teams 1 & 3, B-side = Teams 2 & 4, Swing = all teams
       const prevColVal = ovnTimeCol > 0 ? cellStr(sheet, r, ovnTimeCol - 1) : '';
       const sideVals = [timeVal, nameVal, prevColVal];
       for (const sv of sideVals) {
@@ -525,10 +525,10 @@ function extractDayProviders(
           type = 'attending';
         }
 
-        // Map side to team: N-side=Team 1, B-side=Team 2, Swing=both
-        const teams: TeamId[] = currentSide === 'n-side' ? [1]
-          : currentSide === 'b-side' ? [2]
-          : currentSide === 'swing' ? [1, 2]
+        // Map side to team: N-side=Teams 1&3, B-side=Teams 2&4, Swing=all
+        const teams: TeamId[] = currentSide === 'n-side' ? [1, 3]
+          : currentSide === 'b-side' ? [2, 4]
+          : currentSide === 'swing' ? [1, 2, 3, 4]
           : [1]; // default to team 1 if no side specified
 
         for (const tid of teams) {
