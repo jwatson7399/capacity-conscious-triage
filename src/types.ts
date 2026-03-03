@@ -1,5 +1,7 @@
 export type Role = 'triage_nurse' | 'charge_nurse' | 'attending';
 
+export type FloatModifier = 'none' | 'float_supervising' | 'float_primary';
+
 export type ProviderType = 'attending' | 'senior_resident' | 'junior_resident' | 'intern' | 'pa' | 'rotator';
 
 export type ProviderStatus = 'active' | 'in_procedure' | 'taking_signout' | 'off_floor';
@@ -25,6 +27,8 @@ export interface Patient {
   upgradedAt?: number;
   originalAcuity?: AcuityTier;
   deceased?: boolean;
+  floatModifier?: FloatModifier;
+  floatAttendingName?: string;
 }
 
 export interface Buffer {
@@ -121,6 +125,12 @@ export interface SimulationState {
   initialProviders: Provider[];
 }
 
+export interface ScheduleDemoData {
+  days: { date: string; dayOfWeek: string; providers: import('./utils/scheduleParser').ScheduleProvider[]; floatAttendings: import('./utils/scheduleParser').FloatAttending[] }[];
+  selectedDayIdx: number;
+  currentHour: number;
+}
+
 export interface ShiftState {
   providers: Provider[];
   patients: Patient[];
@@ -132,6 +142,8 @@ export interface ShiftState {
   now: number;
   closedTeams: Record<number, number>;
   simulation?: SimulationState;
+  floatAttendings: string[];
+  scheduleData?: ScheduleDemoData;
 }
 
 export interface TeamScore {
@@ -164,6 +176,7 @@ export type ShiftAction =
   | { type: 'DECEASE_PATIENT'; patientId: string }
   | { type: 'DOWNGRADE_PATIENT'; patientId: string; reason?: string }
   | { type: 'LOAD_DEMO' }
+  | { type: 'LOAD_SCHEDULE_DEMO'; providers: Provider[]; floatAttendings: string[]; scheduleData: ScheduleDemoData; seed: number; shiftDurationMs: number; overrides: SimOverrides }
   | { type: 'LOAD_TOUR_DEMO' }
   | { type: 'START_SIMULATION'; providers: Provider[]; seed: number; shiftDurationMs: number; overrides: SimOverrides; closedTeams?: Record<number, number>; roundRobin?: boolean; presetStatusChanges?: SimStatusChangeEntry[] }
   | { type: 'SET_SIM_SPEED'; speed: number }
@@ -172,4 +185,7 @@ export type ShiftAction =
   | { type: 'SET_SIM_OVERRIDE'; overrides: Partial<SimOverrides> }
   | { type: 'SIM_SKIP_TO_NEXT' }
   | { type: 'RESET' }
-  | { type: 'ADD_PROVIDERS'; providers: Provider[] };
+  | { type: 'ADD_PROVIDERS'; providers: Provider[] }
+  | { type: 'SET_FLOAT_MODIFIER'; patientId: string; modifier: FloatModifier; floatName?: string }
+  | { type: 'SET_FLOAT_ATTENDINGS'; names: string[] }
+  | { type: 'SCHEDULE_CHANGE_HOUR'; hour: number };

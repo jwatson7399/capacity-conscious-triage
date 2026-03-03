@@ -111,9 +111,9 @@ Highest ratio (among non-buffered teams) = recommended. Team 4 (Trauma) excluded
 
 | Tier      | Initial | Decay                          |
 |-----------|---------|--------------------------------|
-| Tier One  | 5       | → 3 at 60m → 1 at 120m        |
-| Tier Two  | 3       | → 1 at 90m                     |
-| Tier Three| 1       | → 0 at 120m                    |
+| Tier One  | 5       | → 3 at 60m → 1 at 120m → 0 at 240m |
+| Tier Two  | 3       | → 1 at 90m → 0 at 240m              |
+| Tier Three| 1       | → 0 at 120m                          |
 
 ### Buffer Durations
 

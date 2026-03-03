@@ -84,8 +84,8 @@ export default function HelpSection({ onClose, onShowBenchmark }: Props) {
         <table className="w-full text-left">
           <thead><tr className="border-b"><th className="py-1">Color</th><th>Weight</th><th>Decay</th></tr></thead>
           <tbody>
-            <tr><td className="py-1"><span className="text-red-600 font-semibold">Red</span></td><td>5</td><td>→ 3 at 60m → 1 at 120m</td></tr>
-            <tr><td className="py-1"><span className="text-amber-600 font-semibold">Yellow</span></td><td>3</td><td>→ 1 at 90m</td></tr>
+            <tr><td className="py-1"><span className="text-red-600 font-semibold">Red</span></td><td>5</td><td>→ 3 at 60m → 1 at 120m → 0 at 240m</td></tr>
+            <tr><td className="py-1"><span className="text-amber-600 font-semibold">Yellow</span></td><td>3</td><td>→ 1 at 90m → 0 at 240m</td></tr>
             <tr><td className="py-1"><span className="text-violet-600 font-semibold">Purple</span></td><td>1</td><td>→ 0 at 120m</td></tr>
           </tbody>
         </table>

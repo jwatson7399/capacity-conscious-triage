@@ -7,6 +7,7 @@ import {
   ACUITY_DECAY,
   BUFFER_DURATIONS_MS,
   TRAUMA_TEAM_ID,
+  FLOAT_MODIFIER_MULTIPLIERS,
 } from '../constants';
 
 export interface ScoringOverrides {
@@ -44,7 +45,11 @@ export function getDecayedAcuityWeight(patient: Patient, now: number, overrides?
 export function getCurrentLoad(patients: Patient[], teamId: TeamId, now: number, overrides?: ScoringOverrides): number {
   return patients
     .filter(p => p.assignedTeamId === teamId)
-    .reduce((sum, p) => sum + getDecayedAcuityWeight(p, now, overrides), 0);
+    .reduce((sum, p) => {
+      const decayed = getDecayedAcuityWeight(p, now, overrides);
+      const floatMult = FLOAT_MODIFIER_MULTIPLIERS[p.floatModifier ?? 'none'];
+      return sum + decayed * floatMult;
+    }, 0);
 }
 
 export function getActiveBuffers(buffers: Buffer[], teamId: TeamId, now: number): Buffer[] {

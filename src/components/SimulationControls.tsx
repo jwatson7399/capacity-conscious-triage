@@ -7,6 +7,7 @@ import { getEffectiveCapacity } from '../engine/recommendation';
 
 const SPEEDS = [1, 5, 10, 15, 20, 30, 40, 50, 100, 200, 400];
 
+
 function formatTime(ms: number): string {
   const totalSec = Math.floor(ms / 1000);
   const h = Math.floor(totalSec / 3600);
@@ -129,28 +130,6 @@ export default function SimulationControls() {
   const arrivedCount = sim.nextArrivalIndex;
   const totalArrivals = sim.timeline.length;
 
-  // Furthest time we've ever reached (last snapshot)
-  const maxReachedTime = sim.snapshots.length > 0
-    ? sim.snapshots[sim.snapshots.length - 1].simTime
-    : sim.baseTime;
-  const maxReachedProgress = Math.min(1, (maxReachedTime - sim.baseTime) / total);
-
-  const handleScrub = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (sim.snapshots.length === 0) return;
-    const targetProgress = Number(e.target.value) / 1000;
-    // Clamp to furthest reached snapshot
-    const clampedProgress = Math.min(targetProgress, maxReachedProgress);
-    const targetTime = sim.baseTime + clampedProgress * total;
-    // Find closest snapshot to target time
-    let bestIdx = 0;
-    let bestDist = Infinity;
-    for (let i = 0; i < sim.snapshots.length; i++) {
-      const dist = Math.abs(sim.snapshots[i].simTime - targetTime);
-      if (dist < bestDist) { bestDist = dist; bestIdx = i; }
-    }
-    dispatch({ type: 'SIM_REWIND', snapshotIndex: bestIdx });
-  };
-
   return (
     <>
       <div className="bg-slate-800/90 backdrop-blur border-b border-white/10 px-3 py-2 overflow-visible">
@@ -201,17 +180,9 @@ export default function SimulationControls() {
             {sim.speed}x &#9662;
           </button>
 
-          {/* Timeline scrubber */}
-          <input
-            type="range" min={0} max={1000}
-            value={Math.round(progress * 1000)}
-            onChange={handleScrub}
-            className="flex-1 accent-blue-500 h-1.5"
-          />
-
-          {/* Time display */}
+          {/* Elapsed */}
           <span className="text-xs text-slate-400 font-mono whitespace-nowrap">
-            {formatTime(elapsed)} / {formatTime(total)}
+            {formatTime(elapsed)}
           </span>
 
           {/* Params */}

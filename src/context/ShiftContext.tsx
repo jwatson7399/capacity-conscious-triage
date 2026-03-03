@@ -4,7 +4,8 @@ import { STATUS_EXPIRE_MS_MAP, BUFFER_DURATIONS_MS, TEAM_CLOSE_TRANSFER_MS, TEAM
 import { getRecommendation, createBuffer, type ScoringOverrides } from '../engine/recommendation';
 import { uid } from '../uid';
 import type { Provider, Patient, Buffer, TeamId } from '../types';
-import { generateTimeline, generateStatusChanges, takeSnapshot, addSnapshot, runShadowSim } from '../engine/simulation';
+import { generateTimeline, generateStatusChanges, takeSnapshot, addSnapshot, runShadowSim, replayToTime } from '../engine/simulation';
+import { getProvidersForShift } from '../utils/scheduleParser';
 
 function simOverridesToScoring(sim: SimulationState | undefined): ScoringOverrides | undefined {
   if (!sim) return undefined;
@@ -27,6 +28,7 @@ const initialState: ShiftState = {
   shiftStarted: false,
   now: Date.now(),
   closedTeams: {},
+  floatAttendings: [],
 };
 
 function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
@@ -34,7 +36,7 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
 
   switch (action.type) {
     case 'RESET':
-      return { ...initialState, now: Date.now() };
+      return { ...initialState, now: Date.now(), scheduleData: undefined };
 
     case 'SET_ROLE':
       return { ...state, currentRole: action.role };
@@ -602,6 +604,60 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
       };
     }
 
+    case 'LOAD_SCHEDULE_DEMO': {
+      const simNow = Date.now();
+      // Shift baseTime back by currentHour so the sim starts with that many hours already elapsed
+      const startHour = action.scheduleData.currentHour ?? 0;
+      const baseTime = simNow - startHour * 3600000;
+      const timeline = generateTimeline(action.seed, action.shiftDurationMs, action.overrides, baseTime);
+      const generatedChanges = generateStatusChanges(action.seed, action.shiftDurationMs, action.overrides, baseTime, action.providers);
+      const shadow = runShadowSim(
+        action.providers, timeline, {}, [],
+        action.overrides, baseTime, 'round_robin',
+        generatedChanges,
+      );
+      const liveShadow = runShadowSim(
+        action.providers, timeline, {}, [],
+        action.overrides, baseTime, 'formula',
+        generatedChanges,
+      );
+      const simState: SimulationState = {
+        active: true,
+        baseTime,
+        speed: 100,
+        paused: false,
+        seed: action.seed,
+        shiftDurationMs: action.shiftDurationMs,
+        timeline,
+        statusChanges: generatedChanges,
+        nextArrivalIndex: 0,
+        nextStatusChangeIndex: 0,
+        snapshots: [],
+        overrides: action.overrides,
+        permanentlyClosedTeams: [],
+        roundRobin: false,
+        roundRobinNext: 0,
+        shadow,
+        liveShadow,
+        initialProviders: action.providers.map(p => ({ ...p })),
+      };
+      return {
+        ...state,
+        providers: action.providers,
+        patients: [],
+        buffers: [],
+        overrides: [],
+        patientCounter: { C: 0, F: 0 },
+        currentRole: 'charge_nurse',
+        shiftStarted: true,
+        now: simNow,
+        closedTeams: {},
+        simulation: simState,
+        floatAttendings: action.floatAttendings,
+        scheduleData: action.scheduleData,
+      };
+    }
+
     case 'START_SIMULATION': {
       const simNow = Date.now();
       const timeline = generateTimeline(action.seed, action.shiftDurationMs, action.overrides, simNow);
@@ -774,6 +830,86 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
           ...state.simulation,
           overrides: { ...state.simulation.overrides, ...action.overrides },
         },
+      };
+    }
+
+    case 'SET_FLOAT_MODIFIER': {
+      const patients = state.patients.map(p => {
+        if (p.id !== action.patientId) return p;
+        return {
+          ...p,
+          floatModifier: action.modifier === 'none' ? undefined : action.modifier,
+          floatAttendingName: action.modifier === 'none' ? undefined : action.floatName,
+        };
+      });
+      return { ...state, patients };
+    }
+
+    case 'SET_FLOAT_ATTENDINGS':
+      return { ...state, floatAttendings: action.names };
+
+    case 'SCHEDULE_CHANGE_HOUR': {
+      if (!state.scheduleData || !state.simulation) return state;
+      const sd = state.scheduleData;
+      const day = sd.days[sd.selectedDayIdx];
+      if (!day) return state;
+      const { providers: schedProviders, floatAttendings } = getProvidersForShift(day, action.hour);
+      const newProviders: Provider[] = schedProviders.map(sp => ({
+        id: uid(),
+        name: sp.name.replace(/\w\S*/g, w => w[0].toUpperCase() + w.slice(1).toLowerCase()),
+        type: sp.type,
+        status: 'active' as const,
+        statusExpiresAt: null,
+        teamId: sp.teamId,
+      }));
+      if (newProviders.length === 0) return { ...state, scheduleData: { ...sd, currentHour: action.hour } };
+      const sim = state.simulation;
+      // Keep same baseTime so the sim clock is continuous
+      const baseTime = sim.baseTime;
+      const elapsedMs = action.hour * 60 * 60 * 1000;
+      const targetTime = baseTime + elapsedMs;
+      const timeline = generateTimeline(sim.seed, sim.shiftDurationMs, sim.overrides, baseTime);
+      const generatedChanges = generateStatusChanges(sim.seed, sim.shiftDurationMs, sim.overrides, baseTime, newProviders);
+      const shadow = runShadowSim(newProviders, timeline, {}, [], sim.overrides, baseTime, 'round_robin', generatedChanges);
+      const liveShadow = runShadowSim(newProviders, timeline, {}, [], sim.overrides, baseTime, 'formula', generatedChanges);
+      // Fast-forward: replay all arrivals up to the current elapsed time
+      const replay = replayToTime(
+        newProviders, timeline, generatedChanges,
+        {}, [], sim.overrides, baseTime, targetTime,
+        sim.roundRobin ?? false,
+      );
+      const newSim: SimulationState = {
+        active: true,
+        baseTime,
+        speed: sim.speed,
+        paused: sim.paused,
+        seed: sim.seed,
+        shiftDurationMs: sim.shiftDurationMs,
+        timeline,
+        statusChanges: generatedChanges,
+        nextArrivalIndex: replay.nextArrivalIndex,
+        nextStatusChangeIndex: replay.nextStatusChangeIndex,
+        snapshots: [],
+        overrides: sim.overrides,
+        permanentlyClosedTeams: [],
+        roundRobin: sim.roundRobin ?? false,
+        roundRobinNext: replay.roundRobinNext,
+        shadow,
+        liveShadow,
+        initialProviders: newProviders.map(p => ({ ...p })),
+      };
+      return {
+        ...state,
+        providers: replay.providers,
+        patients: replay.patients,
+        buffers: replay.buffers,
+        overrides: [],
+        patientCounter: replay.patientCounter,
+        now: targetTime,
+        closedTeams: {},
+        simulation: newSim,
+        floatAttendings,
+        scheduleData: { ...sd, currentHour: action.hour },
       };
     }
 

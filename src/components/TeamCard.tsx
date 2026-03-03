@@ -41,14 +41,17 @@ export default function TeamCard({ teamId, score, recommendationRank, isClosed, 
 
   useEffect(() => {
     if (forceCollapseProviders) setProvidersOpen(false);
+    else setProvidersOpen(true);
   }, [forceCollapseProviders]);
 
   useEffect(() => {
     if (forceCollapsePatients) setPatientsOpen(false);
+    else setPatientsOpen(true);
   }, [forceCollapsePatients]);
 
   useEffect(() => {
     if (forceHideStabilized) setHideStabilized(true);
+    else setHideStabilized(false);
   }, [forceHideStabilized]);
 
   const isPatientStabilized = (p: typeof teamPatients[0]) => {
@@ -358,6 +361,8 @@ export default function TeamCard({ teamId, score, recommendationRank, isClosed, 
                 onReassign={(toTeamId, reason) => dispatch({ type: 'REASSIGN_PATIENT', patientId: p.id, toTeamId, reason })}
                 onDecease={() => dispatch({ type: 'DECEASE_PATIENT', patientId: p.id })}
                 onDowngrade={() => dispatch({ type: 'DOWNGRADE_PATIENT', patientId: p.id })}
+                onSetFloatModifier={(modifier, floatName) => dispatch({ type: 'SET_FLOAT_MODIFIER', patientId: p.id, modifier, floatName })}
+                floatAttendings={state.floatAttendings}
               />
               </div>
             ))}

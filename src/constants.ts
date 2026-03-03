@@ -1,4 +1,4 @@
-import type { ProviderType, ProviderStatus, AcuityTier, TeamId } from './types';
+import type { ProviderType, ProviderStatus, AcuityTier, TeamId, FloatModifier } from './types';
 
 export const CAPACITY_WEIGHTS: Record<ProviderType, number> = {
   attending: 17.5,
@@ -32,9 +32,11 @@ export const ACUITY_DECAY: Record<AcuityTier, Array<{ afterMs: number; weight: n
   tier_one: [
     { afterMs: 60 * 60 * 1000, weight: 3 },
     { afterMs: 120 * 60 * 1000, weight: 1 },
+    { afterMs: 240 * 60 * 1000, weight: 0 },
   ],
   tier_two: [
     { afterMs: 90 * 60 * 1000, weight: 1 },
+    { afterMs: 240 * 60 * 1000, weight: 0 },
   ],
   tier_three: [
     { afterMs: 120 * 60 * 1000, weight: 0 },
@@ -58,6 +60,18 @@ export const TEAM_CLOSE_TRANSFER_TARGETS: Record<number, TeamId> = { 3: 1, 4: 2 
 export const DECEASED_BUFFER_MS = 30 * 60 * 1000;
 
 export const QUICK_UNDO_WINDOW_MS = 30 * 1000;
+
+export const FLOAT_MODIFIER_MULTIPLIERS: Record<FloatModifier, number> = {
+  none: 1.0,
+  float_supervising: 0.65,
+  float_primary: 0.0,
+};
+
+export const FLOAT_MODIFIER_LABELS: Record<FloatModifier, string> = {
+  none: 'None',
+  float_supervising: 'Float Supervising',
+  float_primary: 'Float Primary',
+};
 
 export const ACUITY_LABELS: Record<AcuityTier, string> = {
   tier_one: 'Red',

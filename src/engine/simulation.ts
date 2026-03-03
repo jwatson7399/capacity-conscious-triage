@@ -53,6 +53,20 @@ export function getDefaultOverrides(): SimOverrides {
 
 // --- Timeline generation ---
 
+/**
+ * Realistic hourly arrival-rate multipliers (fraction of peak).
+ * Index = hour of day (0 = midnight). Peak (~1.0) is late morning/afternoon.
+ * Overnight is ~0.25× peak; ramps up through early morning.
+ */
+const HOUR_RATE_MULTIPLIER: number[] = [
+  // 12A   1A    2A    3A    4A    5A    6A    7A
+  0.25, 0.20, 0.15, 0.15, 0.15, 0.20, 0.30, 0.45,
+  // 8A    9A   10A   11A   12P    1P    2P    3P
+  0.65, 0.85, 1.00, 1.00, 0.95, 0.90, 0.90, 0.85,
+  // 4P    5P    6P    7P    8P    9P   10P   11P
+  0.80, 0.80, 0.75, 0.65, 0.55, 0.45, 0.35, 0.30,
+];
+
 export function generateTimeline(
   seed: number,
   shiftDurationMs: number,
@@ -61,13 +75,18 @@ export function generateTimeline(
 ): SimTimelineEntry[] {
   const rng = mulberry32(seed);
   const timeline: SimTimelineEntry[] = [];
-  const ratePerMs = overrides.arrivalRatePerHour / (60 * 60 * 1000);
+  const baseRatePerMs = overrides.arrivalRatePerHour / (60 * 60 * 1000);
 
-  // Generate arrivals using exponential inter-arrival times
+  // Generate arrivals using exponential inter-arrival times with time-varying rate
   let t = startTime;
   const endTime = startTime + shiftDurationMs;
 
   while (t < endTime) {
+    // Determine current hour-of-day for rate scaling
+    const elapsedHours = (t - startTime) / 3600000;
+    const hourOfDay = Math.floor(elapsedHours) % 24;
+    const ratePerMs = baseRatePerMs * HOUR_RATE_MULTIPLIER[hourOfDay];
+
     // Exponential inter-arrival: -ln(U) / rate
     const u = rng();
     const interval = -Math.log(u === 0 ? 1e-10 : u) / ratePerMs;
@@ -209,6 +228,152 @@ export function addSnapshot(snapshots: SimSnapshot[], snapshot: SimSnapshot): Si
     return next.filter((_, i) => i === 0 || i === next.length - 1 || i % 2 === 0).slice(0, MAX_SNAPSHOTS);
   }
   return next;
+}
+
+// --- Replay to time (fast-forward for schedule changes) ---
+
+export interface ReplayResult {
+  patients: Patient[];
+  buffers: Buffer[];
+  providers: Provider[];
+  patientCounter: { C: number; F: number };
+  nextArrivalIndex: number;
+  nextStatusChangeIndex: number;
+  roundRobinNext: number;
+}
+
+export function replayToTime(
+  providers: Provider[],
+  timeline: SimTimelineEntry[],
+  statusChanges: SimStatusChangeEntry[],
+  closedTeams: Record<number, number>,
+  permanentlyClosedTeams: number[],
+  overrides: SimOverrides,
+  _baseTime: number,
+  targetTime: number,
+  useRoundRobin: boolean,
+): ReplayResult {
+  const scoringOv: ScoringOverrides = {
+    capacityWeights: overrides.capacityWeights,
+    statusMultipliers: overrides.statusMultipliers,
+    acuityWeights: overrides.acuityWeights,
+    decaySteps: overrides.decaySteps,
+    bufferDurations: overrides.bufferDurations,
+  };
+
+  let simProviders = providers.map(p => ({ ...p }));
+  let simPatients: Patient[] = [];
+  let simBuffers: Buffer[] = [];
+  let rrNext = 0;
+  let nextStatusChangeIndex = 0;
+  let nextArrivalIndex = 0;
+  const patientCounter = { C: 0, F: 0 };
+
+  for (let i = 0; i < timeline.length; i++) {
+    const entry = timeline[i];
+    if (entry.arrivalTime > targetTime) break;
+    nextArrivalIndex = i + 1;
+    const now = entry.arrivalTime;
+
+    // Drain pending status changes up to this time
+    while (nextStatusChangeIndex < statusChanges.length && statusChanges[nextStatusChangeIndex].time <= now) {
+      const change = statusChanges[nextStatusChangeIndex];
+      nextStatusChangeIndex++;
+      simProviders = simProviders.map(p => {
+        if (p.id !== change.providerId) return p;
+        if (p.status !== 'active') return p;
+        return { ...p, status: change.status, statusExpiresAt: change.time + change.durationMs };
+      });
+    }
+
+    // Auto-expire provider statuses
+    simProviders = simProviders.map(p => {
+      if (p.statusExpiresAt !== null && p.statusExpiresAt <= now) {
+        return { ...p, status: 'active' as const, statusExpiresAt: null };
+      }
+      return p;
+    });
+
+    // Filter expired buffers
+    simBuffers = simBuffers.filter(b => b.expiresAt > now);
+
+    // Assign team
+    const prefix = entry.isFloor ? 'F' : 'C';
+    let teamId: TeamId;
+    if (useRoundRobin) {
+      const eligible = ([1, 2, 3, 4] as TeamId[]).filter(
+        t => t !== TRAUMA_TEAM_ID && !(t in closedTeams) && !permanentlyClosedTeams.includes(t)
+      );
+      teamId = eligible[rrNext % eligible.length];
+      rrNext++;
+    } else {
+      const rec = getRecommendation(simProviders, simPatients, simBuffers, now, closedTeams, scoringOv);
+      teamId = rec.first ?? (1 as TeamId);
+    }
+
+    // Create patient
+    const count = patientCounter[prefix] + 1;
+    patientCounter[prefix] = count;
+    const patient: Patient = {
+      id: `${prefix}-${String(count).padStart(3, '0')}`,
+      acuity: entry.acuity,
+      assignedTeamId: teamId,
+      assignedAt: now,
+    };
+
+    // Create and merge buffer
+    const newBuffer = createBuffer(teamId, entry.acuity, now, scoringOv);
+    const existingTeamBuffers = simBuffers.filter(b => b.teamId === teamId && b.expiresAt > now && !b.deceasedPatientId);
+    const otherBuffers = simBuffers.filter(b => !(b.teamId === teamId && b.expiresAt > now && !b.deceasedPatientId));
+    if (existingTeamBuffers.length > 0) {
+      const allBufs = [...existingTeamBuffers, newBuffer];
+      const currentExpiry = Math.max(...existingTeamBuffers.map(b => b.expiresAt));
+      const newDuration = newBuffer.expiresAt - newBuffer.createdAt;
+      const latestExpiry = Math.max(currentExpiry, now) + newDuration;
+      const tierRank = { tier_one: 0, tier_two: 1, tier_three: 2 } as const;
+      const bestTier = allBufs.reduce((best, b) => tierRank[b.tier] < tierRank[best.tier] ? b : best).tier;
+      const totalCount = allBufs.reduce((sum, b) => sum + (b.mergedCount ?? 1), 0);
+      simBuffers = [...otherBuffers, {
+        id: newBuffer.id, teamId, tier: bestTier,
+        createdAt: Math.min(...allBufs.map(b => b.createdAt)),
+        expiresAt: latestExpiry, mergedCount: totalCount,
+      }];
+    } else {
+      simBuffers = [...simBuffers, newBuffer];
+    }
+
+    simPatients = [...simPatients, patient];
+  }
+
+  // Drain any remaining status changes up to targetTime
+  while (nextStatusChangeIndex < statusChanges.length && statusChanges[nextStatusChangeIndex].time <= targetTime) {
+    const change = statusChanges[nextStatusChangeIndex];
+    nextStatusChangeIndex++;
+    simProviders = simProviders.map(p => {
+      if (p.id !== change.providerId) return p;
+      if (p.status !== 'active') return p;
+      return { ...p, status: change.status, statusExpiresAt: change.time + change.durationMs };
+    });
+  }
+
+  // Final expiry check at targetTime
+  simProviders = simProviders.map(p => {
+    if (p.statusExpiresAt !== null && p.statusExpiresAt <= targetTime) {
+      return { ...p, status: 'active' as const, statusExpiresAt: null };
+    }
+    return p;
+  });
+  simBuffers = simBuffers.filter(b => b.expiresAt > targetTime);
+
+  return {
+    patients: simPatients,
+    buffers: simBuffers,
+    providers: simProviders,
+    patientCounter,
+    nextArrivalIndex,
+    nextStatusChangeIndex,
+    roundRobinNext: rrNext,
+  };
 }
 
 // --- Shadow simulation ---

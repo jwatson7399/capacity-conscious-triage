@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { useShift } from '../context/ShiftContext';
-import type { Role } from '../types';
+import type { Role, Provider } from '../types';
+import { parseWeeklySchedule, getProvidersForShift } from '../utils/scheduleParser';
+import { randomSeed, getDefaultOverrides } from '../engine/simulation';
+import { uid } from '../uid';
 import SimulationSetup from './SimulationSetup';
 import BenchmarkReport from './BenchmarkReport';
 import DelphiSurvey from './DelphiSurvey';
@@ -16,6 +19,8 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
   const [showBenchmark, setShowBenchmark] = useState(false);
   const [showDelphi, setShowDelphi] = useState<false | 'survey' | 'results'>(false);
   const [showDelphiPrompt, setShowDelphiPrompt] = useState(false);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
 
   if (showSimSetup) return <SimulationSetup onCancel={() => setShowSimSetup(false)} />;
   if (showBenchmark) return <BenchmarkReport onBack={() => setShowBenchmark(false)} />;
@@ -23,10 +28,7 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
 
   return (
     <div className="dashboard-bg flex flex-col items-center justify-center p-6">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">ER Triage</h1>
-      <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm text-center">
-        Not sure? Most users start as <strong className="text-slate-700 dark:text-slate-300">Charge / Triage Nurse</strong>. Pick <strong className="text-slate-700 dark:text-slate-300">Attending</strong> if you only need to view teams and manage acuity.
-      </p>
+      <h1 className="text-4xl font-bold text-slate-900 dark:text-white mb-4">ER Triage</h1>
       <div className="w-full max-w-sm space-y-4">
         {roles.map(r => (
           <button
@@ -50,13 +52,66 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
             <div className="text-xs font-normal opacity-80 mt-0.5">New here? Start with a walkthrough</div>
           </button>
         )}
-        <button
-          onClick={() => dispatch({ type: 'LOAD_DEMO' })}
-          className="w-full min-h-[48px] bg-slate-200 dark:bg-white/10 text-slate-800 dark:text-white rounded-xl px-5 py-3 font-semibold text-base active:bg-slate-300 dark:active:bg-white/20 transition-colors border border-slate-300 dark:border-white/10"
-        >
-          <div>Quick Demo</div>
-          <div className="text-xs font-normal text-slate-500 dark:text-slate-400 mt-0.5">See a pre-loaded shift dashboard</div>
-        </button>
+        <div className="bg-slate-200 dark:bg-white/10 rounded-xl border border-slate-300 dark:border-white/10 overflow-hidden">
+          <div className="text-center text-base font-semibold text-slate-800 dark:text-white py-2">Demo</div>
+          <div className="flex border-t border-slate-300 dark:border-white/10">
+            <button
+              onClick={() => dispatch({ type: 'LOAD_DEMO' })}
+              className="flex-1 min-h-[48px] px-4 py-3 font-semibold text-sm text-slate-800 dark:text-white active:bg-slate-300 dark:active:bg-white/20 transition-colors"
+            >
+              <div>Snapshot</div>
+              <div className="text-[11px] font-normal text-slate-500 dark:text-slate-400 mt-0.5">Random teams, simulated pts</div>
+            </button>
+            <div className="w-px bg-slate-300 dark:bg-white/10" />
+            <button
+              disabled={scheduleLoading}
+              onClick={async () => {
+                setScheduleError(null);
+                setScheduleLoading(true);
+                try {
+                  const resp = await fetch(`${import.meta.env.BASE_URL}demo-schedule.xlsx`);
+                  if (!resp.ok) throw new Error('Failed to fetch schedule');
+                  const buf = await resp.arrayBuffer();
+                  const parsed = parseWeeklySchedule(buf);
+                  if (parsed.days.length === 0) throw new Error('No days found in schedule');
+                  const dayIdx = Math.floor(Math.random() * parsed.days.length);
+                  const day = parsed.days[dayIdx];
+                  const currentHour = 7;
+                  const { providers: schedProviders, floatAttendings } = getProvidersForShift(day, currentHour);
+                  const providers: Provider[] = schedProviders.map(sp => ({
+                    id: uid(),
+                    name: sp.name.replace(/\w\S*/g, w => w[0].toUpperCase() + w.slice(1).toLowerCase()),
+                    type: sp.type,
+                    status: 'active' as const,
+                    statusExpiresAt: null,
+                    teamId: sp.teamId,
+                  }));
+                  if (providers.length === 0) throw new Error('No providers active at current hour');
+                  const overrides = getDefaultOverrides();
+                  overrides.arrivalRatePerHour = 2;
+                  dispatch({
+                    type: 'LOAD_SCHEDULE_DEMO',
+                    providers,
+                    floatAttendings,
+                    scheduleData: { days: parsed.days, selectedDayIdx: dayIdx, currentHour },
+                    seed: randomSeed(),
+                    shiftDurationMs: 24 * 60 * 60 * 1000,
+                    overrides,
+                  });
+                } catch (e) {
+                  setScheduleError(e instanceof Error ? e.message : 'Failed to load schedule');
+                } finally {
+                  setScheduleLoading(false);
+                }
+              }}
+              className="flex-1 min-h-[48px] px-4 py-3 font-semibold text-sm text-slate-800 dark:text-white active:bg-slate-300 dark:active:bg-white/20 transition-colors disabled:opacity-50"
+            >
+              <div>{scheduleLoading ? 'Loading...' : 'Real Schedule'}</div>
+              <div className="text-[11px] font-normal text-slate-500 dark:text-slate-400 mt-0.5">Familiar teams, simulated pts</div>
+            </button>
+          </div>
+        </div>
+        {scheduleError && <div className="text-xs text-red-500 text-center">{scheduleError}</div>}
         <button
           onClick={() => setShowSimSetup(true)}
           className="w-full min-h-[48px] bg-slate-200 dark:bg-white/10 text-slate-700 dark:text-slate-300 rounded-xl px-5 py-3 font-semibold text-sm active:bg-slate-300 dark:active:bg-white/20 border border-slate-300 dark:border-white/10"

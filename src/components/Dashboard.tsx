@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useShift } from '../context/ShiftContext';
 import type { TeamId } from '../types';
+import type { FloatAttending } from '../utils/scheduleParser';
 import { ACUITY_COLORS, STATUS_COLORS, ACUITY_LABELS, ACUITY_DESCRIPTORS, STATUS_LABELS, CAPACITY_TERMS, TRAUMA_TEAM_ID } from '../constants';
 import TeamCard from './TeamCard';
 import AssignPatient from './AssignPatient';
@@ -8,6 +9,7 @@ import HelpSection from './HelpSection';
 import GuidedTour from './GuidedTour';
 import SimulationControls from './SimulationControls';
 import SimSummaryCard from './SimSummaryCard';
+import TimelineSlider, { TimelineBar } from './TimelineSlider';
 import BenchmarkReport from './BenchmarkReport';
 import ShiftSetup from './ShiftSetup';
 import Toast from './Toast';
@@ -27,10 +29,11 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
     openHelp: () => setShowHelp(true),
     closeHelp: () => setShowHelp(false),
   }), []);
-  const [globalCollapseProviders, setGlobalCollapseProviders] = useState(false);
-  const [globalCollapsePatients, setGlobalCollapsePatients] = useState(false);
-  const [globalHideStabilized, setGlobalHideStabilized] = useState(false);
+  const [globalCollapseProviders, setGlobalCollapseProviders] = useState(true);
+  const [globalCollapsePatients, setGlobalCollapsePatients] = useState(true);
+  const [globalHideStabilized, setGlobalHideStabilized] = useState(true);
   const [compactMenuOpen, setCompactMenuOpen] = useState(false);
+  const [scheduleHour, setScheduleHour] = useState(() => state.scheduleData?.currentHour ?? new Date().getHours());
   const compactMode = globalCollapseProviders && globalCollapsePatients && globalHideStabilized;
 
   const roleLabel = state.currentRole === 'triage_nurse' ? 'Charge / Triage Nurse'
@@ -46,7 +49,7 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
       <div data-tour="header" className={`sticky ${state.simulation?.active ? 'top-1' : 'top-0'} header-bar px-4 py-3 z-10 flex items-center justify-between`}>
         <div>
           <h1 className="text-xl font-bold text-white">
-            ER Triage{state.simulation?.active ? ' Simulator' : ''}
+            {state.scheduleData ? 'Real Schedule Demo' : state.simulation?.active ? 'ER Triage Simulator' : 'ER Triage'}
           </h1>
           <div className="flex items-center gap-2">
             {state.simulation?.active && (
@@ -79,8 +82,8 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
             </button>
             {compactMenuOpen && (
               <>
-                <div className="fixed inset-0 z-20" onClick={() => setCompactMenuOpen(false)} />
-                <div className="absolute right-0 top-12 z-30 w-56 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-gray-200 dark:border-slate-700 py-1 text-sm">
+                <div className="fixed inset-0 z-40" onClick={() => setCompactMenuOpen(false)} />
+                <div className="absolute right-0 top-12 z-40 w-56 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-gray-200 dark:border-slate-700 py-1 text-sm">
                   <button
                     onClick={() => {
                       const next = !compactMode;
@@ -167,7 +170,6 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
             <span className="text-amber-600 dark:text-amber-300 text-lg">+</span>
           </div>
           <div className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">Tap to add providers and enable scoring.</div>
-          <div className="text-[10px] text-amber-600/70 dark:text-amber-400/60 mt-1 italic">Provider import from AMION / ShiftAdmin coming soon.</div>
         </button>
       )}
 
@@ -249,6 +251,42 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
           Shift not started yet. Waiting for nurse to set up teams.
         </div>
       )}
+
+      {/* Schedule Timeline */}
+      {state.scheduleData && (() => {
+        const day = state.scheduleData.days[state.scheduleData.selectedDayIdx];
+        if (!day) return null;
+        const allProviders = day.providers as Array<{ shiftStart?: string; shiftEnd?: string }>;
+        const teams = ([1, 2, 3, 4] as TeamId[]).map(teamId => ({
+          teamId,
+          providers: day.providers.filter(p => p.teamId === teamId),
+        }));
+        const floats: FloatAttending[] = day.floatAttendings;
+        const onHourChange = (h: number) => {
+          setScheduleHour(h);
+          dispatch({ type: 'SCHEDULE_CHANGE_HOUR', hour: h });
+        };
+        return (
+          <>
+            {/* Master timeline bar — always visible */}
+            <div className="mx-4 mt-3 pt-5">
+              <TimelineBar providers={allProviders} currentHour={scheduleHour} onHourChange={onHourChange} solidColor="bg-blue-500" />
+            </div>
+
+            <details className="mx-4 mt-3">
+              <summary className="cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                Schedule Timeline — {day.dayOfWeek} {day.date}
+              </summary>
+              <TimelineSlider
+                teams={teams}
+                floatAttendings={floats}
+                currentHour={scheduleHour}
+                onHourChange={onHourChange}
+              />
+            </details>
+          </>
+        );
+      })()}
 
       {/* Team Cards */}
       <div className="p-4 grid gap-4 md:grid-cols-2">

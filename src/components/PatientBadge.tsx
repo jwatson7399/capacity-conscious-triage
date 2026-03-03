@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { Patient, TeamId } from '../types';
-import { ACUITY_LABELS, ACUITY_COLORS, ACUITY_DECAY, QUICK_UNDO_WINDOW_MS } from '../constants';
+import type { Patient, TeamId, FloatModifier } from '../types';
+import { ACUITY_LABELS, ACUITY_COLORS, ACUITY_DECAY, QUICK_UNDO_WINDOW_MS, FLOAT_MODIFIER_LABELS } from '../constants';
 import { getDecayedAcuityWeight } from '../engine/recommendation';
 
 function formatDuration(totalMins: number): string {
@@ -32,9 +32,11 @@ interface Props {
   onReassign?: (toTeamId: TeamId, reason: string) => void;
   onDecease?: () => void;
   onDowngrade?: () => void;
+  onSetFloatModifier?: (modifier: FloatModifier, floatName?: string) => void;
+  floatAttendings?: string[];
 }
 
-export default function PatientBadge({ patient, now, canManage, onUpgrade, onReassign, onDecease, onDowngrade }: Props) {
+export default function PatientBadge({ patient, now, canManage, onUpgrade, onReassign, onDecease, onDowngrade, onSetFloatModifier, floatAttendings }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [reassignTeam, setReassignTeam] = useState<TeamId | null>(null);
   const [reassignReason, setReassignReason] = useState('');
@@ -68,6 +70,11 @@ export default function PatientBadge({ patient, now, canManage, onUpgrade, onRea
         </span>
         {patient.originalAcuity && !isDeceased && (
           <span className="text-xs bg-red-200 text-red-800 px-1.5 rounded">upgraded</span>
+        )}
+        {patient.floatModifier && patient.floatModifier !== 'none' && !isDeceased && (
+          <span className={`text-xs px-1.5 rounded ${patient.floatModifier === 'float_primary' ? 'bg-purple-200 text-purple-800' : 'bg-teal-200 text-teal-800'}`}>
+            F{patient.floatAttendingName ? ` ${patient.floatAttendingName}` : ''}
+          </span>
         )}
         {!isDeceased && !isStabilized && (
           <span className="text-xs text-gray-500 dark:text-gray-500 font-medium">(demand: {currentWeight})</span>
@@ -164,6 +171,43 @@ export default function PatientBadge({ patient, now, canManage, onUpgrade, onRea
                   Cancel
                 </button>
               </div>
+            </div>
+          )}
+          {onSetFloatModifier && (
+            <div className="space-y-1">
+              <div className="text-xs font-medium text-gray-500 dark:text-gray-400">Float Coverage</div>
+              <div className="flex gap-1">
+                {(['none', 'float_supervising', 'float_primary'] as FloatModifier[]).map(mod => {
+                  const isActive = (patient.floatModifier ?? 'none') === mod;
+                  return (
+                    <button
+                      key={mod}
+                      onClick={() => onSetFloatModifier(mod)}
+                      className={`flex-1 text-xs rounded-lg py-2 font-medium min-h-[36px] ${
+                        isActive
+                          ? mod === 'float_primary' ? 'bg-purple-600 text-white'
+                            : mod === 'float_supervising' ? 'bg-teal-600 text-white'
+                            : 'bg-gray-300 dark:bg-slate-500 text-gray-700 dark:text-white'
+                          : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300'
+                      }`}
+                    >
+                      {FLOAT_MODIFIER_LABELS[mod]}
+                    </button>
+                  );
+                })}
+              </div>
+              {floatAttendings && floatAttendings.length > 0 && patient.floatModifier && patient.floatModifier !== 'none' && (
+                <select
+                  value={patient.floatAttendingName ?? ''}
+                  onChange={e => onSetFloatModifier(patient.floatModifier!, e.target.value || undefined)}
+                  className="w-full border border-gray-300 dark:border-slate-500 rounded px-2 py-1 text-sm bg-white dark:bg-slate-700 dark:text-white"
+                >
+                  <option value="">Select float attending...</option>
+                  {floatAttendings.map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              )}
             </div>
           )}
           {onReassign && (
