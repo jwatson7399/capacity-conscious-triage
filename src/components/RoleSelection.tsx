@@ -62,8 +62,8 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
               onClick={() => dispatch({ type: 'LOAD_DEMO' })}
               className="flex-1 min-h-[48px] px-4 py-3 font-semibold text-sm text-slate-800 dark:text-white active:bg-slate-300 dark:active:bg-white/20 transition-colors"
             >
-              <div>Snapshot</div>
-              <div className="text-[11px] font-normal text-slate-500 dark:text-slate-400 mt-0.5">Generated teams, algorithm sandbox</div>
+              <div>Sandbox</div>
+              <div className="text-[11px] font-normal text-slate-500 dark:text-slate-400 mt-0.5">Fake providers & patients,<br />Explore the UI</div>
             </button>
             <div className="w-px bg-slate-300 dark:bg-white/10" />
             <button

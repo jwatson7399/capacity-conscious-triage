@@ -138,7 +138,7 @@ export default function HelpSection({ onClose, onShowBenchmark, onShowBacktest }
                 <ul className="list-disc ml-4 space-y-0.5">
                   <li><strong>≥ 21 (Ready)</strong> — top ~25% of observed ratios; team has significant slack.</li>
                   <li><strong>≥ 10 (Stable)</strong> — above median; comfortable headroom.</li>
-                  <li><strong>≥ 6 (Manageable)</strong> — p25–p50 range; busy but coping.</li>
+                  <li><strong>≥ 6 (Manageable)</strong> — 25%–50% range; busy but coping.</li>
                   <li><strong>≥ 4 (Very Busy)</strong> — bottom ~10%; limited slack.</li>
                   <li><strong>≥ 2 (High Demand)</strong> — bottom ~2%; near saturation.</li>
                   <li><strong>0 (Overwhelmed)</strong> — demand meets or exceeds capacity.</li>
