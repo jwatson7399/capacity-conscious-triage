@@ -179,6 +179,38 @@ export default function BenchmarkReport({ onBack }: Props) {
           </div>
         </Section>
 
+        {/* How Metrics Are Calculated */}
+        <Section title="How These Metrics Are Calculated" defaultOpen={false}>
+          <ul className="space-y-4 text-sm text-slate-600 dark:text-slate-300">
+            <li>
+              <strong>Fairness Score (0–100)</strong> — Weighted composite of 5 sub-scores:
+              <ul className="mt-1 ml-4 space-y-1 list-disc text-xs text-slate-500 dark:text-slate-400">
+                <li>Capacity-Proportional Balance (25%): <code className="text-xs">1 − CV(patients/capacity per team)</code></li>
+                <li>Acuity Balance (15%): <code className="text-xs">1 − CV(acuity-weighted load per team)</code></li>
+                <li>Overwhelm Avoidance (30%): <code className="text-xs">1 − (overwhelm events / total assignments)</code></li>
+                <li>Min Safety Margin (15%): <code className="text-xs">min(lowest capacity ratio / 3.35, 1)</code></li>
+                <li>Stress Equity (15%): <code className="text-xs">1 − CV(avg capacity ratio per team)</code></li>
+              </ul>
+              <span className="text-xs text-slate-400 dark:text-slate-500">p &lt; 0.001 (paired t-test, 1 000 runs)</span>
+            </li>
+            <li>
+              <strong>Overwhelm Events</strong> — Count of assignments where the receiving team's capacity ratio fell below 3.5. Fewer = safer.
+              <br /><span className="text-xs text-slate-400 dark:text-slate-500">p &lt; 0.001</span>
+            </li>
+            <li>
+              <strong>Min Safety Margin</strong> — Lowest capacity ratio observed across all assignments, as % of the 3.35 overwhelm boundary. Higher = more cushion above crisis.
+              <br /><span className="text-xs text-slate-400 dark:text-slate-500">p &lt; 0.001</span>
+            </li>
+            <li>
+              <strong>Demand Spread</strong> — <code className="text-xs">1 − CV(stress per team)</code> where stress = patients / capacity. 100% = perfectly even distribution.
+              <br /><span className="text-xs text-slate-400 dark:text-slate-500">p &lt; 0.001</span>
+            </li>
+            <li>
+              <strong>Win / Loss / Tie</strong> — Per-seed comparison: formula's fairness score vs round-robin's. A seed is a "win" if formula scores &gt; 0.01 points higher, "loss" if lower, "tie" otherwise.
+            </li>
+          </ul>
+        </Section>
+
         {/* Preset Breakdown */}
         <Section title="Preset Breakdown" defaultOpen={false}>
           <div className="space-y-2">
