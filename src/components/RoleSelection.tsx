@@ -6,6 +6,7 @@ import { randomSeed, getDefaultOverrides } from '../engine/simulation';
 import { uid } from '../uid';
 import SimulationSetup from './SimulationSetup';
 import BenchmarkReport from './BenchmarkReport';
+import RealScheduleBenchmarkReport from './RealScheduleBenchmarkReport';
 import DelphiSurvey from './DelphiSurvey';
 
 const roles: { role: Role; label: string; desc: string }[] = [
@@ -17,6 +18,7 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
   const { dispatch } = useShift();
   const [showSimSetup, setShowSimSetup] = useState(false);
   const [showBenchmark, setShowBenchmark] = useState(false);
+  const [showRealBenchmark, setShowRealBenchmark] = useState(false);
   const [showDelphi, setShowDelphi] = useState<false | 'survey' | 'results'>(false);
   const [showDelphiPrompt, setShowDelphiPrompt] = useState(false);
   const [scheduleLoading, setScheduleLoading] = useState(false);
@@ -24,6 +26,7 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
 
   if (showSimSetup) return <SimulationSetup onCancel={() => setShowSimSetup(false)} />;
   if (showBenchmark) return <BenchmarkReport onBack={() => setShowBenchmark(false)} />;
+  if (showRealBenchmark) return <RealScheduleBenchmarkReport onBack={() => setShowRealBenchmark(false)} />;
   if (showDelphi) return <DelphiSurvey onCancel={() => setShowDelphi(false)} startOnResults={showDelphi === 'results'} />;
 
   return (
@@ -69,7 +72,7 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
                 setScheduleError(null);
                 setScheduleLoading(true);
                 try {
-                  const resp = await fetch(`${import.meta.env.BASE_URL}demo-schedule.xlsx`);
+                  const resp = await fetch(`${import.meta.env.BASE_URL}schedules/January 26_Weekly Schedule (1).xlsx`);
                   if (!resp.ok) throw new Error('Failed to fetch schedule');
                   const buf = await resp.arrayBuffer();
                   const parsed = parseWeeklySchedule(buf);
@@ -107,7 +110,8 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
               className="flex-1 min-h-[48px] px-4 py-3 font-semibold text-sm text-slate-800 dark:text-white active:bg-slate-300 dark:active:bg-white/20 transition-colors disabled:opacity-50"
             >
               <div>{scheduleLoading ? 'Loading...' : 'Real Schedule'}</div>
-              <div className="text-[11px] font-normal text-slate-500 dark:text-slate-400 mt-0.5">Your providers, realistic patient flow</div>
+              <div className="text-[11px] font-normal text-slate-500 dark:text-slate-400 mt-0.5">Actual NYU BK schedule</div>
+              <div className="text-[11px] font-normal text-slate-500 dark:text-slate-400">Simulated patients</div>
             </button>
           </div>
         </div>
@@ -156,13 +160,19 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
             </div>
           </div>
         )}
-        <div className="text-center pt-2">
+        <div className="flex items-center justify-center pt-2 text-xs text-slate-500">
           <button
             onClick={() => setShowBenchmark(true)}
-            className="text-xs text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
+            className="flex-1 text-right hover:text-slate-600 dark:hover:text-slate-400"
           >
-            Formula vs Round-Robin: 1,000-Run Review →
-            <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">See how they compare</div>
+            Formula vs Round-Robin
+          </button>
+          <span className="mx-1.5">|</span>
+          <button
+            onClick={() => setShowRealBenchmark(true)}
+            className="flex-1 text-left hover:text-slate-600 dark:hover:text-slate-400"
+          >
+            Real Week Backtest
           </button>
         </div>
         <div className="flex items-center justify-center gap-3 pt-4">

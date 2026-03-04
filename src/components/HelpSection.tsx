@@ -3,6 +3,7 @@ import { useShift } from '../context/ShiftContext';
 interface Props {
   onClose: () => void;
   onShowBenchmark?: () => void;
+  onShowBacktest?: () => void;
 }
 
 function Section({ title, children, dataTour }: { title: string; children: React.ReactNode; dataTour?: string }) {
@@ -19,7 +20,7 @@ function Section({ title, children, dataTour }: { title: string; children: React
   );
 }
 
-export default function HelpSection({ onClose, onShowBenchmark }: Props) {
+export default function HelpSection({ onClose, onShowBenchmark, onShowBacktest }: Props) {
   const { capacityWeights } = useShift();
   return (
     <div className="glass-card rounded-xl overflow-hidden">
@@ -45,13 +46,21 @@ export default function HelpSection({ onClose, onShowBenchmark }: Props) {
           Every recommendation can be overridden. The final call is always yours. No new workflow — same assign flow, smarter suggestions.
         </p>
         {onShowBenchmark && (
-          <div className="p-3 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-lg">
+          <div className="p-3 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-lg space-y-2">
             <p className="text-gray-800 dark:text-gray-200">
-              In 1,000 simulated shifts, the formula produced fairer workload distribution 75% of the time.{' '}
+              We tested this formula vs round-robin across 1,000 random shifts — it distributed workload more fairly 75% of the time.{' '}
               <button onClick={onShowBenchmark} className="text-blue-600 dark:text-blue-400 font-medium">
-                See full benchmark →
+                Benchmark →
               </button>
             </p>
+            {onShowBacktest && (
+              <p className="text-gray-800 dark:text-gray-200">
+                Then we replayed a real week of NYU BK schedules — still fairer 72% of the time.{' '}
+                <button onClick={onShowBacktest} className="text-blue-600 dark:text-blue-400 font-medium">
+                  Backtest →
+                </button>
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -70,11 +79,73 @@ export default function HelpSection({ onClose, onShowBenchmark }: Props) {
           <p>
             Below the big number, <strong>Strength</strong> shows raw provider weight for reference.
           </p>
-          <p className="text-gray-700 dark:text-gray-300">
-            Example: Team A has strength <strong>32.5</strong> with demand <strong>6.0</strong> → capacity <strong>≈ 5</strong> (high → recommended).
-            Team B has strength <strong>11.3</strong> with demand <strong>6.0</strong> → capacity <strong>≈ 2</strong> (low → not recommended).
-          </p>
-          <p className="text-gray-700 dark:text-gray-300">Capacity colors: <span className="text-emerald-600 font-semibold">Ready</span> (≥10) → <span className="text-green-600 font-semibold">Stable</span> (≥5) → <span className="text-yellow-600 font-semibold">Manageable</span> (≥3.35) → <span className="text-orange-600 font-semibold">Very Busy</span> (≥2) → <span className="text-red-600 font-semibold">High Load</span> (≥0.05) → <span className="text-red-900 dark:text-red-400 font-semibold">Overwhelmed</span> (0).</p>
+          <p className="text-gray-700 dark:text-gray-300 mb-1">Example: both teams face demand <strong>3.0</strong></p>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div className="p-2 rounded border border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-950/30">
+              <p className="font-semibold text-gray-800 dark:text-gray-200">Team A</p>
+              <p className="text-gray-600 dark:text-gray-400">Strength <strong>32.5</strong></p>
+              <p className="text-gray-600 dark:text-gray-400">32.5 ÷ 3.0 = <strong>10.8</strong></p>
+              <p className="text-gray-600 dark:text-gray-400">Capacity <strong>≈ 11</strong></p>
+              <p className="text-green-700 dark:text-green-400 font-medium">Stable → recommended</p>
+            </div>
+            <div className="p-2 rounded border border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/30">
+              <p className="font-semibold text-gray-800 dark:text-gray-200">Team B</p>
+              <p className="text-gray-600 dark:text-gray-400">Strength <strong>11.3</strong></p>
+              <p className="text-gray-600 dark:text-gray-400">11.3 ÷ 3.0 = <strong>3.8</strong></p>
+              <p className="text-gray-600 dark:text-gray-400">Capacity <strong>≈ 4</strong></p>
+              <p className="text-orange-700 dark:text-orange-400 font-medium">Very Busy → not recommended</p>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex rounded overflow-hidden h-5">
+              <div className="flex-1 bg-red-700/70 flex items-center justify-center"><span className="text-[9px] font-semibold text-white/90">0</span></div>
+              <div className="flex-1 bg-red-500/70 flex items-center justify-center"><span className="text-[9px] font-semibold text-white/90">2+</span></div>
+              <div className="flex-1 bg-orange-500/70 flex items-center justify-center"><span className="text-[9px] font-semibold text-white/90">4+</span></div>
+              <div className="flex-1 bg-yellow-400/70 flex items-center justify-center"><span className="text-[9px] font-semibold text-white/90">6+</span></div>
+              <div className="flex-1 bg-green-500/70 flex items-center justify-center"><span className="text-[9px] font-semibold text-white/90">10+</span></div>
+              <div className="flex-1 bg-emerald-500/70 flex items-center justify-center"><span className="text-[9px] font-semibold text-white/90">21+</span></div>
+            </div>
+            <div className="flex text-[9px] font-medium">
+              <div className="flex-1 text-center text-red-700 dark:text-red-400">Overwhelmed</div>
+              <div className="flex-1 text-center text-red-600 dark:text-red-400">High Demand</div>
+              <div className="flex-1 text-center text-orange-600 dark:text-orange-400">Very Busy</div>
+              <div className="flex-1 text-center text-yellow-600 dark:text-yellow-400">Manageable</div>
+              <div className="flex-1 text-center text-green-600 dark:text-green-400">Stable</div>
+              <div className="flex-1 text-center text-emerald-600 dark:text-emerald-400">Ready</div>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Cutoffs calibrated from 1,000 simulated shifts run against 3 months of real NYU BK provider schedules — "Stable" means more capacity than the median simulated shift.</p>
+            <details className="mt-1">
+              <summary className="text-xs text-blue-600 dark:text-blue-400 cursor-pointer">
+                How were these cutoffs derived?
+              </summary>
+              <div className="mt-2 text-xs text-gray-600 dark:text-gray-400 space-y-2">
+                <p>
+                  <strong>Simulation setup.</strong> 1,000 eight-hour shifts were generated against 12 real NYU BK
+                  provider schedule files (Oct–Dec 2024), covering 7 days × 4 shift windows (7A–3P, 9A–5P, 3P–11P, 5P–1A).
+                  Each run sampled a date's actual roster — real team compositions, provider types, and scheduled hours —
+                  then simulated patients arriving randomly at rates that match real-world patterns — busier in the
+                  morning, quieter at night — with a realistic mix of Red, Yellow, and Purple acuities.
+                </p>
+                <p>
+                  <strong>Capacity ratio distribution.</strong> At every simulated arrival, each team's capacity ratio
+                  (Strength ÷ Demand) was recorded — 23,000+ team-level observations total. The distribution is right-skewed
+                  — typically single-digits during busy stretches, but can exceed 30 when census is low.
+                </p>
+                <p>
+                  <strong>Bucket boundaries.</strong> Thresholds were placed at percentiles of that distribution, then
+                  rounded to integers for readability:
+                </p>
+                <ul className="list-disc ml-4 space-y-0.5">
+                  <li><strong>≥ 21 (Ready)</strong> — top ~25% of observed ratios; team has significant slack.</li>
+                  <li><strong>≥ 10 (Stable)</strong> — above median; comfortable headroom.</li>
+                  <li><strong>≥ 6 (Manageable)</strong> — p25–p50 range; busy but coping.</li>
+                  <li><strong>≥ 4 (Very Busy)</strong> — bottom ~10%; limited slack.</li>
+                  <li><strong>≥ 2 (High Demand)</strong> — bottom ~2%; near saturation.</li>
+                  <li><strong>0 (Overwhelmed)</strong> — demand meets or exceeds capacity.</li>
+                </ul>
+              </div>
+            </details>
+          </div>
         </div>
       </Section>
 
@@ -210,11 +281,18 @@ export default function HelpSection({ onClose, onShowBenchmark }: Props) {
         </div>
       </Section>
 
-      {onShowBenchmark && (
-        <div className="px-4 py-3 border-t border-gray-200 dark:border-slate-700">
-          <button onClick={onShowBenchmark} className="text-sm text-blue-600 dark:text-blue-400 font-medium">
-            See how formula compares to round-robin →
-          </button>
+      {(onShowBenchmark || onShowBacktest) && (
+        <div className="px-4 py-3 border-t border-gray-200 dark:border-slate-700 flex flex-wrap gap-x-4 gap-y-1">
+          {onShowBenchmark && (
+            <button onClick={onShowBenchmark} className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+              See how formula compares to round-robin →
+            </button>
+          )}
+          {onShowBacktest && (
+            <button onClick={onShowBacktest} className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+              See real-week backtest →
+            </button>
+          )}
         </div>
       )}
     </div>

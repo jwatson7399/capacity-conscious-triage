@@ -498,7 +498,7 @@ export function runShadowSim(
     ratioSums[teamId] += ratio;
     ratioCounts[teamId]++;
     if (ratio < minRatioPerTeam[teamId]) minRatioPerTeam[teamId] = ratio;
-    if (ratio < 2.0) overwhelmEvents[teamId]++;
+    if (ratio < 3.5) overwhelmEvents[teamId]++;
   }
 
   const avgRatioPerTeam: Record<number, number> = {};

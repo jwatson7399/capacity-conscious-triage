@@ -30,7 +30,7 @@ export function statsFromEntries(entries: ShadowEntry[]): ModeStats {
     teamAcuityLoad[e.teamId][e.acuity]++;
     totalRatio += e.ratioAtAssignment;
     if (e.ratioAtAssignment < minRatio) minRatio = e.ratioAtAssignment;
-    if (e.ratioAtAssignment < 2.0) overwhelms++;
+    if (e.ratioAtAssignment < 3.5) overwhelms++;
     ratioSums[e.teamId] += e.ratioAtAssignment;
     ratioCounts[e.teamId]++;
   }

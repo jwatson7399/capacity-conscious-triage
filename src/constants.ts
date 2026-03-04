@@ -130,11 +130,11 @@ export interface CapacityTerm {
 }
 
 export const CAPACITY_TERMS: Array<{ minRatio: number; label: string; color: string }> = [
-  { minRatio: 10, label: 'Ready', color: 'text-emerald-500' },
-  { minRatio: 5, label: 'Stable', color: 'text-green-500' },
-  { minRatio: 3.35, label: 'Manageable', color: 'text-yellow-500' },
-  { minRatio: 2, label: 'Very Busy', color: 'text-orange-500' },
-  { minRatio: 0.05, label: 'High Demand', color: 'text-red-500' },
+  { minRatio: 21, label: 'Ready', color: 'text-emerald-500' },      // top ~25% of real ratios
+  { minRatio: 10, label: 'Stable', color: 'text-green-500' },       // above median
+  { minRatio: 6, label: 'Manageable', color: 'text-yellow-500' },   // around median / p25
+  { minRatio: 4, label: 'Very Busy', color: 'text-orange-500' },    // bottom ~10%
+  { minRatio: 2, label: 'High Demand', color: 'text-red-500' },     // bottom ~2% — genuinely bad
 ];
 
 export function getCapacityTerm(capacityRatio: number): CapacityTerm {

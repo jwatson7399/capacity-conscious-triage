@@ -131,11 +131,11 @@ Buffer stacking is **additive** — 3 rapid assignments = ~3× duration, not max
 
 | Ratio    | Label        | Color   |
 |----------|--------------|---------|
-| ≥ 10     | Ready        | emerald |
-| ≥ 5      | Stable       | green   |
-| ≥ 3.35   | Manageable   | yellow  |
-| ≥ 2      | Very Busy    | orange  |
-| ≥ 0.05   | High Load    | red     |
+| ≥ 21     | Ready        | emerald |
+| ≥ 10     | Stable       | green   |
+| ≥ 6      | Manageable   | yellow  |
+| ≥ 4      | Very Busy    | orange  |
+| ≥ 2      | High Demand  | red     |
 | 0        | Overwhelmed  | dark red|
 
 ## Key Design Decisions
