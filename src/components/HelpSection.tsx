@@ -120,8 +120,8 @@ export default function HelpSection({ onClose, onShowBenchmark, onShowBacktest }
               </summary>
               <div className="mt-2 text-xs text-gray-600 dark:text-gray-400 space-y-2">
                 <p>
-                  <strong>Simulation setup.</strong> 1,000 eight-hour shifts were generated against 12 real NYU BK
-                  provider schedule files (Oct–Dec 2024), covering 7 days × 4 shift windows (7A–3P, 9A–5P, 3P–11P, 5P–1A).
+                  <strong>Simulation setup.</strong> 1,000 eight-hour shifts were generated against 11 real NYU BK
+                  provider schedule files (Dec 2025 – Mar 2026), covering 7 days × 4 shift windows (7A–3P, 9A–5P, 3P–11P, 5P–1A).
                   Each run sampled a date's actual roster — real team compositions, provider types, and scheduled hours —
                   then simulated patients arriving randomly at rates that match real-world patterns — busier in the
                   morning, quieter at night — with a realistic mix of Red, Yellow, and Purple acuities.
