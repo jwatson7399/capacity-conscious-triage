@@ -174,7 +174,7 @@ export default function DelphiSurvey({ onCancel, startOnResults }: { onCancel: (
             </div>
             <div>
               <p className="font-semibold text-slate-700 dark:text-slate-300 mb-1">Why it works here</p>
-              <p>By showing running averages, each subsequent respondent can calibrate their ratings against the group, driving convergence toward shared consensus.</p>
+              <p>In Round 1 you rate each role blind — running averages are revealed only after you submit. In Round 2 you can calibrate your ratings against the group, driving convergence toward shared consensus.</p>
             </div>
             <div>
               <p className="font-semibold text-slate-700 dark:text-slate-300 mb-1">Delphi products you already use in the ED</p>
