@@ -83,8 +83,7 @@ export function generateTimeline(
 
   while (t < endTime) {
     // Determine current hour-of-day for rate scaling
-    const elapsedHours = (t - startTime) / 3600000;
-    const hourOfDay = Math.floor(elapsedHours) % 24;
+    const hourOfDay = new Date(t).getHours();
     const ratePerMs = baseRatePerMs * HOUR_RATE_MULTIPLIER[hourOfDay];
 
     // Exponential inter-arrival: -ln(U) / rate
