@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useShift } from '../context/ShiftContext';
 import type { TeamId } from '../types';
 import type { FloatAttending } from '../utils/scheduleParser';
-import { ACUITY_COLORS, STATUS_COLORS, ACUITY_LABELS, ACUITY_DESCRIPTORS, STATUS_LABELS, CAPACITY_TERMS, TRAUMA_TEAM_ID } from '../constants';
+import { ACUITY_COLORS, STATUS_COLORS, ACUITY_LABELS, ACUITY_DESCRIPTORS, STATUS_LABELS, CAPACITY_TERMS, TRAUMA_TEAM_ID, CAPACITY_GRADIENT_CSS } from '../constants';
 import TeamCard from './TeamCard';
 import AssignPatient from './AssignPatient';
 import HelpSection from './HelpSection';
@@ -219,21 +219,14 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
           </div>
           <div>
             <div className="font-semibold text-gray-700 dark:text-gray-200 mb-2">Capacity Scale</div>
-            <div className="flex rounded-lg overflow-hidden h-7">
-              <div className="flex-1 bg-red-700 flex items-center justify-center">
-                <span className="text-[10px] font-bold text-white leading-none">0</span>
+            <div className="relative rounded-lg overflow-hidden h-7" style={{ background: CAPACITY_GRADIENT_CSS }}>
+              <div className="absolute inset-0 flex">
+                {['<3.75', '3.75', '5', '7.5', '10', '21.25'].map((label) => (
+                  <div key={label} className="flex-1 flex items-center justify-center">
+                    <span className="text-[10px] font-bold text-white leading-none drop-shadow-sm">{label}</span>
+                  </div>
+                ))}
               </div>
-              {[...CAPACITY_TERMS].reverse().map(term => (
-                <div key={term.label} className={`flex-1 flex items-center justify-center ${
-                  term.label === 'Ready' ? 'bg-emerald-500' :
-                  term.label === 'Stable' ? 'bg-green-500' :
-                  term.label === 'Manageable' ? 'bg-yellow-400' :
-                  term.label === 'Very Busy' ? 'bg-orange-500' :
-                  'bg-red-500'
-                }`}>
-                  <span className="text-[10px] font-bold text-white leading-none">{term.minRatio}+</span>
-                </div>
-              ))}
             </div>
             <div className="flex mt-0.5">
               <div className="flex-1 text-center text-[10px] font-semibold text-red-700">Overwhelmed</div>

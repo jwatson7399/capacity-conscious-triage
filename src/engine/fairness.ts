@@ -1,5 +1,5 @@
 import type { TeamId, AcuityTier, ShadowEntry } from '../types';
-import { TRAUMA_TEAM_ID } from '../constants';
+import { TRAUMA_TEAM_ID, OVERWHELM_THRESHOLD } from '../constants';
 
 export interface ModeStats {
   teamCounts: Record<number, number>;
@@ -30,7 +30,7 @@ export function statsFromEntries(entries: ShadowEntry[]): ModeStats {
     teamAcuityLoad[e.teamId][e.acuity]++;
     totalRatio += e.ratioAtAssignment;
     if (e.ratioAtAssignment < minRatio) minRatio = e.ratioAtAssignment;
-    if (e.ratioAtAssignment < 3.5) overwhelms++;
+    if (e.ratioAtAssignment < OVERWHELM_THRESHOLD) overwhelms++;
     ratioSums[e.teamId] += e.ratioAtAssignment;
     ratioCounts[e.teamId]++;
   }
@@ -102,8 +102,8 @@ export function computeFairness(
   // Overwhelm Avoidance (30%): 1 - (overwhelmEvents / totalAssignments)
   const overwhelmScore = Math.max(0, Math.min(1, 1 - stats.overwhelms / totalAssignments));
 
-  // Min Ratio (15%): min(minRatio / 3.35, 1)
-  const minRatioScore = stats.minRatio === Infinity ? 1 : Math.min(stats.minRatio / 3.35, 1);
+  // Min Ratio (15%): min(minRatio / OVERWHELM_THRESHOLD, 1)
+  const minRatioScore = stats.minRatio === Infinity ? 1 : Math.min(stats.minRatio / OVERWHELM_THRESHOLD, 1);
 
   // Stress Equity (15%): 1 - stdDev(avgRatioPerTeam) / mean(avgRatioPerTeam)
   let stressEquity = 1;

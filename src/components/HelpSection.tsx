@@ -1,4 +1,5 @@
 import { useShift } from '../context/ShiftContext';
+import { CAPACITY_GRADIENT_CSS } from '../constants';
 
 interface Props {
   onClose: () => void;
@@ -86,62 +87,63 @@ export default function HelpSection({ onClose, onShowBenchmark, onShowBacktest }
               <p className="text-gray-600 dark:text-gray-400">Strength <strong>32.5</strong></p>
               <p className="text-gray-600 dark:text-gray-400">32.5 ÷ 3.0 = <strong>10.8</strong></p>
               <p className="text-gray-600 dark:text-gray-400">Capacity <strong>≈ 11</strong></p>
-              <p className="text-green-700 dark:text-green-400 font-medium">Stable → recommended</p>
+              <p className="text-green-700 dark:text-green-400 font-medium">Manageable → recommended</p>
             </div>
             <div className="p-2 rounded border border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/30">
               <p className="font-semibold text-gray-800 dark:text-gray-200">Team B</p>
               <p className="text-gray-600 dark:text-gray-400">Strength <strong>11.3</strong></p>
               <p className="text-gray-600 dark:text-gray-400">11.3 ÷ 3.0 = <strong>3.8</strong></p>
               <p className="text-gray-600 dark:text-gray-400">Capacity <strong>≈ 4</strong></p>
-              <p className="text-orange-700 dark:text-orange-400 font-medium">Very Busy → not recommended</p>
+              <p className="text-orange-700 dark:text-orange-400 font-medium">High Demand → not recommended</p>
             </div>
           </div>
           <div className="space-y-1.5">
-            <div className="flex rounded overflow-hidden h-5">
-              <div className="flex-1 bg-red-700/70 flex items-center justify-center"><span className="text-[9px] font-semibold text-white/90">0</span></div>
-              <div className="flex-1 bg-red-500/70 flex items-center justify-center"><span className="text-[9px] font-semibold text-white/90">2+</span></div>
-              <div className="flex-1 bg-orange-500/70 flex items-center justify-center"><span className="text-[9px] font-semibold text-white/90">4+</span></div>
-              <div className="flex-1 bg-yellow-400/70 flex items-center justify-center"><span className="text-[9px] font-semibold text-white/90">6+</span></div>
-              <div className="flex-1 bg-green-500/70 flex items-center justify-center"><span className="text-[9px] font-semibold text-white/90">10+</span></div>
-              <div className="flex-1 bg-emerald-500/70 flex items-center justify-center"><span className="text-[9px] font-semibold text-white/90">21+</span></div>
+            <div className="relative rounded overflow-hidden h-5" style={{ background: CAPACITY_GRADIENT_CSS, opacity: 0.7 }}>
+              <div className="absolute inset-0 flex">
+                {['<3.75', '3.75+', '5+', '7.5+', '10+', '21.25+'].map(label => (
+                  <div key={label} className="flex-1 flex items-center justify-center">
+                    <span className="text-[9px] font-semibold text-white/90 leading-none drop-shadow-sm">{label}</span>
+                  </div>
+                ))}
+              </div>
             </div>
             <div className="flex text-[9px] font-medium">
               <div className="flex-1 text-center text-red-700 dark:text-red-400">Overwhelmed</div>
               <div className="flex-1 text-center text-red-600 dark:text-red-400">High Demand</div>
               <div className="flex-1 text-center text-orange-600 dark:text-orange-400">Very Busy</div>
-              <div className="flex-1 text-center text-yellow-600 dark:text-yellow-400">Manageable</div>
-              <div className="flex-1 text-center text-green-600 dark:text-green-400">Stable</div>
-              <div className="flex-1 text-center text-emerald-600 dark:text-emerald-400">Ready</div>
+              <div className="flex-1 text-center text-yellow-600 dark:text-yellow-400">Busy</div>
+              <div className="flex-1 text-center text-green-600 dark:text-green-400">Manageable</div>
+              <div className="flex-1 text-center text-emerald-600 dark:text-emerald-400">Comfortable</div>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Cutoffs calibrated from 1,000 simulated shifts run against 3 months of real NYU BK provider schedules — "Stable" means more capacity than the median simulated shift.</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Cutoffs calibrated from 1,000 simulated shifts run against 3 months of real NYU BK provider schedules. Boundaries placed at percentiles of the empirical distribution (23,193 observations), with granularity concentrated in the dense 4–10 range where teams spend most of their time.</p>
             <details className="mt-1">
               <summary className="text-xs text-blue-600 dark:text-blue-400 cursor-pointer">
                 How were these cutoffs derived?
               </summary>
               <div className="mt-2 text-xs text-gray-600 dark:text-gray-400 space-y-2">
                 <p>
-                  <strong>Simulation setup.</strong> 1,000 eight-hour shifts were generated against 11 real NYU BK
+                  <strong>Simulation setup.</strong> 1,000 eight-hour shifts were generated against 12 real NYU BK
                   provider schedule files (Dec 2025 – Mar 2026), covering 7 days × 4 shift windows (7A–3P, 9A–5P, 3P–11P, 5P–1A).
                   Each run sampled a date's actual roster — real team compositions, provider types, and scheduled hours —
                   then simulated patients arriving randomly at rates that match real-world patterns — busier in the
                   morning, quieter at night — with a realistic mix of Red, Yellow, and Purple acuities.
                 </p>
                 <p>
-                  <strong>Capacity ratio distribution.</strong> At every simulated arrival, each team's capacity ratio
-                  (Strength ÷ Demand) was recorded — 23,000+ team-level observations total. The distribution is right-skewed
-                  — typically single-digits during busy stretches, but can exceed 30 when census is low.
+                  <strong>Capacity ratio distribution.</strong> At every simulated arrival, the receiving team's capacity ratio
+                  (Strength ÷ Demand) was recorded — 23,193 team-level observations total. The distribution is right-skewed
+                  with a mode at 5–6 and a secondary peak at 7–8. The bulk of observations fall between 3 and 15.
                 </p>
                 <p>
-                  <strong>Bucket boundaries.</strong> Thresholds were placed at percentiles of that distribution, then
-                  rounded to integers for readability:
+                  <strong>Percentile boundaries.</strong> Thresholds were placed at empirical percentiles, with three tiers
+                  concentrated in the dense 3.75–10 plateau where teams spend 60%+ of their time:
                 </p>
                 <ul className="list-disc ml-4 space-y-0.5">
-                  <li><strong>≥ 21 (Ready)</strong> — top ~25% of observed ratios; team has significant slack.</li>
-                  <li><strong>≥ 10 (Stable)</strong> — above median; comfortable headroom.</li>
-                  <li><strong>≥ 6 (Manageable)</strong> — 25%–50% range; busy but coping.</li>
-                  <li><strong>≥ 4 (Very Busy)</strong> — bottom ~10%; limited slack.</li>
-                  <li><strong>≥ 2 (High Demand)</strong> — bottom ~2%; near saturation.</li>
-                  <li><strong>0 (Overwhelmed)</strong> — demand meets or exceeds capacity.</li>
+                  <li><strong>≥ 21.25 (Comfortable)</strong> — top 25% (≥ p75); significant slack.</li>
+                  <li><strong>≥ 10 (Manageable)</strong> — p50–p75; above median, comfortable headroom.</li>
+                  <li><strong>≥ 7.5 (Busy)</strong> — p33–p50; secondary density peak, below median.</li>
+                  <li><strong>≥ 5 (Very Busy)</strong> — p15–p33; modal plateau, peak typical workload.</li>
+                  <li><strong>≥ 3.75 (High Demand)</strong> — p5–p15; approaching danger zone.</li>
+                  <li><strong>&lt; 3.75 (Overwhelmed)</strong> — bottom 5% (p5); demand approaching or exceeding capacity.</li>
                 </ul>
               </div>
             </details>

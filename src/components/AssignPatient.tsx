@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useShift } from '../context/ShiftContext';
 import type { AcuityTier, TeamId } from '../types';
-import { ACUITY_LABELS, ACUITY_COLORS, TRAUMA_TEAM_ID, getCapacityTerm } from '../constants';
+import { ACUITY_LABELS, ACUITY_COLORS, TRAUMA_TEAM_ID, getCapacityColor } from '../constants';
 import OverrideModal from './OverrideModal';
 
 const TIERS: AcuityTier[] = ['tier_one', 'tier_two', 'tier_three'];
@@ -163,7 +163,7 @@ export default function AssignPatient({ onClose, initialSource, onAssigned }: Pr
                           {isSecond && <span className="ml-2 text-xs text-blue-500 font-medium">2nd Choice</span>}
                         </div>
                         {score && !isClosed && (
-                          <span className={`text-sm font-medium ${getCapacityTerm(score.capacityRatio).color}`}>
+                          <span className="text-sm font-medium" style={{ color: getCapacityColor(score.capacityRatio) }}>
                             {score.capacityRatio === Infinity ? '∞' : score.capacityRatio.toFixed(1)}
                           </span>
                         )}

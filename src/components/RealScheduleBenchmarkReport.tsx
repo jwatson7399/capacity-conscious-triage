@@ -89,7 +89,7 @@ export default function RealScheduleBenchmarkReport({ onBack }: Props) {
             <StatRow label="Rolling Fairness" subtitle="measured at every patient arrival" formula="86.2" roundRobin="83.9" winner="formula" />
             <StatRow label="Avg Capacity Ratio" subtitle="higher = more headroom" formula="27.1" roundRobin="26.2" winner="formula" />
             <StatRow label="Min Capacity Ratio" subtitle="worst moment of the shift" formula="5.6" roundRobin="4.6" winner="formula" />
-            <StatRow label="Overwhelm Events" subtitle="ratio < 3.5, fewer = safer" formula="0.8" roundRobin="1.1" winner="formula" />
+            <StatRow label="Overwhelm Events" subtitle="ratio < 3.75, fewer = safer" formula="0.8" roundRobin="1.1" winner="formula" />
           </div>
           <div className="mt-4 bg-slate-100 dark:bg-white/5 rounded-lg p-3 text-center">
             <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">Win / Loss / Tie</div>
@@ -156,7 +156,7 @@ export default function RealScheduleBenchmarkReport({ onBack }: Props) {
             <li><strong className="text-slate-600 dark:text-slate-300">Source:</strong> Week of 1/26 schedule — 7 days with real provider assignments, shift times, and team compositions.</li>
             <li><strong className="text-slate-600 dark:text-slate-300">1,000 runs:</strong> Each run randomly selects a day and shift window, then generates a full 8-hour patient stream. Both formula and round-robin see identical inputs.</li>
             <li><strong className="text-slate-600 dark:text-slate-300">Dynamic rosters:</strong> Providers appear and disappear during the 8-hour window based on their scheduled hours — not a static snapshot.</li>
-            <li><strong className="text-slate-600 dark:text-slate-300">Empirically calibrated scale:</strong> Capacity terms (Ready, Stable, Manageable, etc.) are calibrated from the percentile distribution of 23,000+ ratio observations across all 12 schedule files.</li>
+            <li><strong className="text-slate-600 dark:text-slate-300">Empirically calibrated scale:</strong> Capacity terms (Comfortable, Manageable, Busy, etc.) are calibrated from the percentile distribution of 23,193 ratio observations across all 12 schedule files.</li>
             <li><strong className="text-slate-600 dark:text-slate-300">Statistical testing:</strong> Paired t-test for significance, Cohen's d for effect size. All metrics significant at p &lt; 0.001.</li>
             <li><strong className="text-slate-600 dark:text-slate-300">Rolling fairness:</strong> Fairness is measured at every patient arrival, not just at the end of the shift — so mid-shift imbalances count.</li>
           </ul>

@@ -75,31 +75,73 @@ export default function BenchmarkReport({ onBack }: Props) {
           </p>
         </div>
 
-        {/* What is Fairness Score */}
-        <Section title="What is the Fairness Score?" defaultOpen>
-          <p className="text-center">Each shift is scored 0–100 across five weighted components:</p>
-          <div className="space-y-2 mt-2 text-center">
-            <div className="bg-slate-100 dark:bg-white/5 rounded-lg p-3">
-              <div className="font-medium text-slate-900 dark:text-white">Overwhelm Avoidance <span className="text-blue-500 dark:text-blue-400 text-xs ml-1">30%</span></div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">How often does any team's patient demand exceed its provider strength? Even one overwhelm event can compromise care. Fewer = higher score.</p>
-            </div>
-            <div className="bg-slate-100 dark:bg-white/5 rounded-lg p-3">
-              <div className="font-medium text-slate-900 dark:text-white">Balanced Workload <span className="text-blue-500 dark:text-blue-400 text-xs ml-1">25%</span></div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">A team with an attending + senior resident has more strength than one with a single junior. This measures whether patient volume matches each team's ability to handle it.</p>
-            </div>
-            <div className="bg-slate-100 dark:bg-white/5 rounded-lg p-3">
-              <div className="font-medium text-slate-900 dark:text-white">Acuity Balance <span className="text-blue-500 dark:text-blue-400 text-xs ml-1">15%</span></div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Are the sickest patients (Red) distributed evenly rather than piling onto one team?</p>
-            </div>
-            <div className="bg-slate-100 dark:bg-white/5 rounded-lg p-3">
-              <div className="font-medium text-slate-900 dark:text-white">Minimum Safety Margin <span className="text-blue-500 dark:text-blue-400 text-xs ml-1">15%</span></div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Did any team hit "Overwhelmed" during the shift? This tracks the closest any team got to drowning — even one bottoming out tanks the score.</p>
-            </div>
-            <div className="bg-slate-100 dark:bg-white/5 rounded-lg p-3">
-              <div className="font-medium text-slate-900 dark:text-white">Stress Equity <span className="text-blue-500 dark:text-blue-400 text-xs ml-1">15%</span></div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">No team should feel like they got slammed while others had a quiet night. This checks whether stress was spread evenly across all teams.</p>
+        {/* Overall Results */}
+        <Section title="Overall Average Results" defaultOpen>
+          <div className="flex gap-2 text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+            <span className="w-36 shrink-0" />
+            <span className="flex-1 text-center text-blue-500 dark:text-blue-400">Formula</span>
+            <span className="flex-1 text-center text-amber-500 dark:text-amber-400">Round-Robin</span>
+          </div>
+          <div className="space-y-2">
+            <StatRow label="Fairness Score" formula="82.0" roundRobin="79.3" winner="formula" />
+            <StatRow label="Overwhelm Events" subtitle="fewer = safer patients & staff" formula="2.8" roundRobin="3.4" winner="formula" />
+            <StatRow label="Min Safety Margin" subtitle="higher = more cushion above 'overwhelmed'" formula="42%" roundRobin="28%" winner="formula" />
+            <StatRow label="Demand Spread" subtitle="higher = closer to even across teams" formula="91%" roundRobin="88%" winner="formula" />
+          </div>
+          <div className="mt-4 bg-slate-100 dark:bg-white/5 rounded-lg p-3 text-center">
+            <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">Win / Loss / Tie</div>
+            <div className="flex items-center justify-center gap-3 text-lg font-bold">
+              <span className="text-blue-600 dark:text-blue-300">749</span>
+              <span className="text-slate-500">/</span>
+              <span className="text-amber-600 dark:text-amber-300">202</span>
+              <span className="text-slate-500">/</span>
+              <span className="text-slate-500 dark:text-slate-400">49</span>
             </div>
           </div>
+        </Section>
+
+        {/* What is the Fairness Score? */}
+        <Section title="What is the Fairness Score?" defaultOpen={false}>
+          <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">Each shift is scored 0–100 across five weighted components:</p>
+          <div className="space-y-3 mb-6">
+            <div className="rounded-lg bg-slate-100 dark:bg-white/5 p-4 text-center">
+              <div className="font-bold text-slate-800 dark:text-slate-100">Overwhelm Avoidance <span className="ml-1 inline-block rounded-full bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-300">30%</span></div>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">How often does any team's patient demand exceed its provider strength? Even one overwhelm event can compromise care. Fewer = higher score.</p>
+            </div>
+            <div className="rounded-lg bg-slate-100 dark:bg-white/5 p-4 text-center">
+              <div className="font-bold text-slate-800 dark:text-slate-100">Balanced Workload <span className="ml-1 inline-block rounded-full bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-300">25%</span></div>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">A team with an attending + senior resident has more strength than one with a single junior. This measures whether patient volume matches each team's ability to handle it.</p>
+            </div>
+            <div className="rounded-lg bg-slate-100 dark:bg-white/5 p-4 text-center">
+              <div className="font-bold text-slate-800 dark:text-slate-100">Acuity Balance <span className="ml-1 inline-block rounded-full bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-300">15%</span></div>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Are the sickest patients (Red) distributed evenly rather than piling onto one team?</p>
+            </div>
+            <div className="rounded-lg bg-slate-100 dark:bg-white/5 p-4 text-center">
+              <div className="font-bold text-slate-800 dark:text-slate-100">Minimum Safety Margin <span className="ml-1 inline-block rounded-full bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-300">15%</span></div>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Did any team hit "Overwhelmed" during the shift? This tracks the closest any team got to drowning — even one bottoming out tanks the score.</p>
+            </div>
+            <div className="rounded-lg bg-slate-100 dark:bg-white/5 p-4 text-center">
+              <div className="font-bold text-slate-800 dark:text-slate-100">Stress Equity <span className="ml-1 inline-block rounded-full bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-300">15%</span></div>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">No team should feel like they got slammed while others had a quiet night. This checks whether stress was spread evenly across all teams.</p>
+            </div>
+          </div>
+          <ul className="space-y-4 text-sm text-slate-600 dark:text-slate-300">
+            <li>
+              <strong>Overwhelm Events</strong> — Count of assignments where the receiving team's capacity ratio fell below 3.75 (p5 of empirical distribution). Fewer = safer.
+              <br /><span className="text-xs text-slate-400 dark:text-slate-500">p &lt; 0.001</span>
+            </li>
+            <li>
+              <strong>Min Safety Margin</strong> — Lowest capacity ratio observed across all assignments, as % of the 3.75 overwhelm boundary. Higher = more cushion above crisis.
+              <br /><span className="text-xs text-slate-400 dark:text-slate-500">p &lt; 0.001</span>
+            </li>
+            <li>
+              <strong>Demand Spread</strong> — <code className="text-xs">1 − CV(stress per team)</code> where stress = patients / capacity. 100% = perfectly even distribution.
+              <br /><span className="text-xs text-slate-400 dark:text-slate-500">p &lt; 0.001</span>
+            </li>
+            <li>
+              <strong>Win / Loss / Tie</strong> — Per-seed comparison: formula's fairness score vs round-robin's. A seed is a "win" if formula scores &gt; 0.01 points higher, "loss" if lower, "tie" otherwise.
+            </li>
+          </ul>
         </Section>
 
         {/* Sample Calculation */}
@@ -152,63 +194,6 @@ export default function BenchmarkReport({ onBack }: Props) {
             <div className="text-2xl font-bold text-slate-900 dark:text-white">82.4 / 100</div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">A solid shift — room to improve on safety margin.</p>
           </div>
-        </Section>
-
-        {/* Overall Results */}
-        <Section title="Overall Average Results" defaultOpen>
-          <div className="flex gap-2 text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
-            <span className="w-36 shrink-0" />
-            <span className="flex-1 text-center text-blue-500 dark:text-blue-400">Formula</span>
-            <span className="flex-1 text-center text-amber-500 dark:text-amber-400">Round-Robin</span>
-          </div>
-          <div className="space-y-2">
-            <StatRow label="Fairness Score" formula="82.0" roundRobin="79.3" winner="formula" />
-            <StatRow label="Overwhelm Events" subtitle="fewer = safer patients & staff" formula="2.8" roundRobin="3.4" winner="formula" />
-            <StatRow label="Min Safety Margin" subtitle="higher = more cushion above 'overwhelmed'" formula="42%" roundRobin="28%" winner="formula" />
-            <StatRow label="Demand Spread" subtitle="higher = closer to even across teams" formula="91%" roundRobin="88%" winner="formula" />
-          </div>
-          <div className="mt-4 bg-slate-100 dark:bg-white/5 rounded-lg p-3 text-center">
-            <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">Win / Loss / Tie</div>
-            <div className="flex items-center justify-center gap-3 text-lg font-bold">
-              <span className="text-blue-600 dark:text-blue-300">749</span>
-              <span className="text-slate-500">/</span>
-              <span className="text-amber-600 dark:text-amber-300">202</span>
-              <span className="text-slate-500">/</span>
-              <span className="text-slate-500 dark:text-slate-400">49</span>
-            </div>
-          </div>
-        </Section>
-
-        {/* How Metrics Are Calculated */}
-        <Section title="How These Metrics Are Calculated" defaultOpen={false}>
-          <ul className="space-y-4 text-sm text-slate-600 dark:text-slate-300">
-            <li>
-              <strong>Fairness Score (0–100)</strong> — Weighted composite of 5 sub-scores:
-              <ul className="mt-1 ml-4 space-y-1 list-disc text-xs text-slate-500 dark:text-slate-400">
-                <li>Capacity-Proportional Balance (25%): <code className="text-xs">1 − CV(patients/capacity per team)</code></li>
-                <li>Acuity Balance (15%): <code className="text-xs">1 − CV(acuity-weighted load per team)</code></li>
-                <li>Overwhelm Avoidance (30%): <code className="text-xs">1 − (overwhelm events / total assignments)</code></li>
-                <li>Min Safety Margin (15%): <code className="text-xs">min(lowest capacity ratio / 3.35, 1)</code></li>
-                <li>Stress Equity (15%): <code className="text-xs">1 − CV(avg capacity ratio per team)</code></li>
-              </ul>
-              <span className="text-xs text-slate-400 dark:text-slate-500">p &lt; 0.001 (paired t-test, 1 000 runs)</span>
-            </li>
-            <li>
-              <strong>Overwhelm Events</strong> — Count of assignments where the receiving team's capacity ratio fell below 3.5. Fewer = safer.
-              <br /><span className="text-xs text-slate-400 dark:text-slate-500">p &lt; 0.001</span>
-            </li>
-            <li>
-              <strong>Min Safety Margin</strong> — Lowest capacity ratio observed across all assignments, as % of the 3.35 overwhelm boundary. Higher = more cushion above crisis.
-              <br /><span className="text-xs text-slate-400 dark:text-slate-500">p &lt; 0.001</span>
-            </li>
-            <li>
-              <strong>Demand Spread</strong> — <code className="text-xs">1 − CV(stress per team)</code> where stress = patients / capacity. 100% = perfectly even distribution.
-              <br /><span className="text-xs text-slate-400 dark:text-slate-500">p &lt; 0.001</span>
-            </li>
-            <li>
-              <strong>Win / Loss / Tie</strong> — Per-seed comparison: formula's fairness score vs round-robin's. A seed is a "win" if formula scores &gt; 0.01 points higher, "loss" if lower, "tie" otherwise.
-            </li>
-          </ul>
         </Section>
 
         {/* Preset Breakdown */}

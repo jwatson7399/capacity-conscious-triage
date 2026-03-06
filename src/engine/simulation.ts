@@ -6,6 +6,7 @@ import {
   BUFFER_DURATIONS_MS,
   ACUITY_DECAY,
   TRAUMA_TEAM_ID,
+  OVERWHELM_THRESHOLD,
 } from '../constants';
 import { getRecommendation, scoreTeam, createBuffer, type ScoringOverrides } from './recommendation';
 
@@ -497,7 +498,7 @@ export function runShadowSim(
     ratioSums[teamId] += ratio;
     ratioCounts[teamId]++;
     if (ratio < minRatioPerTeam[teamId]) minRatioPerTeam[teamId] = ratio;
-    if (ratio < 3.5) overwhelmEvents[teamId]++;
+    if (ratio < OVERWHELM_THRESHOLD) overwhelmEvents[teamId]++;
   }
 
   const avgRatioPerTeam: Record<number, number> = {};

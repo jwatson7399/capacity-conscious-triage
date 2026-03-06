@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useShift } from '../context/ShiftContext';
 import type { TeamId, TeamScore, ProviderType } from '../types';
-import { ACUITY_LABELS, ACUITY_COLORS, ACUITY_DECAY, PROVIDER_TYPE_LABELS, PROVIDER_TYPE_SHORT, TRAUMA_TEAM_ID, TEAM_CLOSE_TRANSFER_MS, TEAM_CLOSE_TRANSFER_TARGETS, getCapacityTerm } from '../constants';
+import { ACUITY_LABELS, ACUITY_COLORS, ACUITY_DECAY, PROVIDER_TYPE_LABELS, PROVIDER_TYPE_SHORT, TRAUMA_TEAM_ID, TEAM_CLOSE_TRANSFER_MS, TEAM_CLOSE_TRANSFER_TARGETS, getCapacityTerm, getCapacityColor } from '../constants';
 import { getActiveBuffers } from '../engine/recommendation';
 import ProviderStatusToggle from './ProviderStatusToggle';
 import PatientBadge from './PatientBadge';
@@ -142,8 +142,8 @@ export default function TeamCard({ teamId, score, recommendationRank, isClosed, 
           })()}
         </div>
         <div className="text-right" {...(recommendationRank === 'first' ? { 'data-tour': 'capacity-ratio' } : {})}>
-          <div className={`text-2xl font-bold ${teamProviders.length === 0 ? 'text-slate-300 dark:text-slate-600' : capacityTerm.color}`}>{teamProviders.length === 0 ? '—' : score.capacityRatio === Infinity ? '∞' : score.capacityRatio.toFixed(1)}</div>
-          <div className={`text-lg font-bold ${teamProviders.length === 0 ? 'text-amber-500 dark:text-amber-400' : activeBuffers.length > 0 ? (allCandidatesBuffered && recommendationRank === 'first' ? 'text-blue-500' : 'text-slate-400 dark:text-slate-500') : capacityTerm.color}`}>
+          <div className={`text-2xl font-bold ${teamProviders.length === 0 ? 'text-slate-300 dark:text-slate-600' : ''}`} style={teamProviders.length > 0 ? { color: getCapacityColor(score.capacityRatio) } : undefined}>{teamProviders.length === 0 ? '—' : score.capacityRatio === Infinity ? '∞' : score.capacityRatio.toFixed(1)}</div>
+          <div className={`text-lg font-bold ${teamProviders.length === 0 ? 'text-amber-500 dark:text-amber-400' : activeBuffers.length > 0 ? (allCandidatesBuffered && recommendationRank === 'first' ? 'text-blue-500' : 'text-slate-400 dark:text-slate-500') : ''}`} style={teamProviders.length > 0 && activeBuffers.length === 0 ? { color: getCapacityColor(score.capacityRatio) } : undefined}>
             {teamProviders.length === 0
               ? 'Add Providers'
               : activeBuffers.length > 0

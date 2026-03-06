@@ -26,7 +26,7 @@ import { mulberry32, getDefaultOverrides, generateStatusChanges } from '../src/e
 import { statsFromEntries, computeFairness } from '../src/engine/fairness';
 import { getRecommendation, scoreTeam, createBuffer, getEffectiveCapacity } from '../src/engine/recommendation';
 import type { ScoringOverrides } from '../src/engine/recommendation';
-import { TRAUMA_TEAM_ID } from '../src/constants';
+import { TRAUMA_TEAM_ID, OVERWHELM_THRESHOLD } from '../src/constants';
 import { uid } from '../src/uid';
 
 // ── Constants ───────────────────────────────────────────────────────
@@ -351,7 +351,7 @@ function runScheduleSim(
     ratioSums[e.teamId] += e.ratioAtAssignment;
     ratioCounts[e.teamId]++;
     if (e.ratioAtAssignment < minRatioPerTeam[e.teamId]) minRatioPerTeam[e.teamId] = e.ratioAtAssignment;
-    if (e.ratioAtAssignment < 3.5) overwhelmEvents[e.teamId]++;
+    if (e.ratioAtAssignment < OVERWHELM_THRESHOLD) overwhelmEvents[e.teamId]++;
   }
 
   const avgRatioPerTeam: Record<number, number> = {};

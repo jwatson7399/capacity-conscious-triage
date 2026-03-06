@@ -129,14 +129,16 @@ Buffer stacking is **additive** — 3 rapid assignments = ~3× duration, not max
 
 ### Capacity Terms (displayed on cards)
 
-| Ratio    | Label        | Color   |
-|----------|--------------|---------|
-| ≥ 21     | Ready        | emerald |
-| ≥ 10     | Stable       | green   |
-| ≥ 6      | Manageable   | yellow  |
-| ≥ 4      | Very Busy    | orange  |
-| ≥ 2      | High Demand  | red     |
-| 0        | Overwhelmed  | dark red|
+| Ratio    | Label        | Color    | Percentile |
+|----------|--------------|----------|------------|
+| ≥ 21.25  | Comfortable  | emerald  | top 25%    |
+| ≥ 10     | Manageable   | green    | p50–p75    |
+| ≥ 7.5    | Busy         | yellow   | p33–p50    |
+| ≥ 5      | Very Busy    | orange   | p15–p33    |
+| ≥ 3.75   | High Demand  | red      | p5–p15     |
+| < 3.75   | Overwhelmed  | dark red | bottom 5%  |
+
+Overwhelm threshold (`OVERWHELM_THRESHOLD` in `constants.ts`) = 3.75 (exact p5 of 23,193 empirical observations). Used by fairness engine, simulation, and benchmark script. See `METHODS.md` for full derivation.
 
 ## Key Design Decisions
 
