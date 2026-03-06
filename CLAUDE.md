@@ -11,6 +11,18 @@ npm run dev              # dev server (Vite)
 npm run build            # type-check + production build → dist/
 ```
 
+## Deploy = GitHub Pages (gh-pages branch)
+
+When the user says "deploy", build and push to the `gh-pages` branch. There is no GitHub Actions workflow — deployment is manual.
+
+```bash
+cd er-triage-app
+npm run build
+npx gh-pages -d dist
+```
+
+This publishes to: https://jwatson7399.github.io/er-triage-app/
+
 ## Delphi Survey — Google Sheets Backend
 
 The Delphi provider-strength survey can optionally store responses in a shared Google Sheet so all users see the same totals.
