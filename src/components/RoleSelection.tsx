@@ -21,6 +21,11 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
   const [showRealBenchmark, setShowRealBenchmark] = useState(false);
   const [showDelphi, setShowDelphi] = useState<false | 'survey' | 'results'>(false);
   const [showDelphiPrompt, setShowDelphiPrompt] = useState(false);
+  const [showAttestation, setShowAttestation] = useState(false);
+  const [attestationCounts, setAttestationCounts] = useState<{ yes: number; no: number } | null>(null);
+  const [attestationSubmitted, setAttestationSubmitted] = useState(false);
+  const [attestationId, setAttestationId] = useState('');
+  const [attestationLoading, setAttestationLoading] = useState(false);
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
 
@@ -136,6 +141,12 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
         >
           See ongoing survey averages →
         </button>
+        <button
+          onClick={() => setShowAttestation(true)}
+          className="w-full text-sm text-blue-600 dark:text-blue-400 font-medium -mt-1 active:text-blue-700 dark:active:text-blue-300"
+        >
+          Attending Attestation →
+        </button>
 
         {/* "Have you submitted?" prompt */}
         {showDelphiPrompt && (
@@ -157,6 +168,113 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
                   Yes, show results
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+        {/* Attending Attestation */}
+        {showAttestation && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6" onClick={() => { setShowAttestation(false); setAttestationSubmitted(false); setAttestationId(''); setAttestationLoading(false); }}>
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-sm w-full shadow-xl" onClick={e => e.stopPropagation()}>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-3">Attending Attestation</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-300 mb-5 leading-relaxed">
+                Are you okay with potentially seeing more A-side patients when you have a stronger team, knowing that you'll also potentially see less A-side patients when you have a weaker team?
+              </p>
+              {attestationSubmitted ? (
+                <div className="text-center">
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Response recorded. Thank you!</p>
+                  {attestationCounts && (
+                    <div className="flex justify-center gap-6 mb-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-emerald-600">{attestationCounts.yes}</div>
+                        <div className="text-xs text-slate-500">Yes</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-red-500">{attestationCounts.no}</div>
+                        <div className="text-xs text-slate-500">No</div>
+                      </div>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => { setShowAttestation(false); setAttestationSubmitted(false); setAttestationId(''); setAttestationLoading(false); }}
+                    className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl px-6 py-2.5 font-semibold text-sm"
+                  >
+                    Close
+                  </button>
+                </div>
+              ) : attestationLoading ? (
+                <div className="flex flex-col items-center gap-3 py-4">
+                  <div className="h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Submitting...</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    value={attestationId}
+                    onChange={e => setAttestationId(e.target.value)}
+                    placeholder="Enter your ID"
+                    className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white px-4 py-2.5 text-sm placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <div className="flex gap-3">
+                    <button
+                      disabled={!attestationId.trim()}
+                      onClick={async () => {
+                        setAttestationLoading(true);
+                        const url = import.meta.env.VITE_DELPHI_SHEETS_URL;
+                        if (url) {
+                          try {
+                            await fetch(url, {
+                              method: 'POST', mode: 'no-cors',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ type: 'attestation', response: 'no', id: attestationId.trim(), timestamp: new Date().toLocaleString() }),
+                            });
+                            const res = await fetch(url);
+                            const rows: Record<string, string>[] = await res.json();
+                            const attestRows = rows.filter(r => r['Type'] === 'attestation');
+                            setAttestationCounts({
+                              yes: attestRows.filter(r => r['Response'] === 'yes').length,
+                              no: attestRows.filter(r => r['Response'] === 'no').length,
+                            });
+                          } catch { /* ignore */ }
+                        }
+                        setAttestationLoading(false);
+                        setAttestationSubmitted(true);
+                      }}
+                      className="flex-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-xl py-3 font-semibold text-sm active:bg-red-200 dark:active:bg-red-900/50 disabled:opacity-40"
+                    >
+                      No
+                    </button>
+                    <button
+                      disabled={!attestationId.trim()}
+                      onClick={async () => {
+                        setAttestationLoading(true);
+                        const url = import.meta.env.VITE_DELPHI_SHEETS_URL;
+                        if (url) {
+                          try {
+                            await fetch(url, {
+                              method: 'POST', mode: 'no-cors',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ type: 'attestation', response: 'yes', id: attestationId.trim(), timestamp: new Date().toLocaleString() }),
+                            });
+                            const res = await fetch(url);
+                            const rows: Record<string, string>[] = await res.json();
+                            const attestRows = rows.filter(r => r['Type'] === 'attestation');
+                            setAttestationCounts({
+                              yes: attestRows.filter(r => r['Response'] === 'yes').length,
+                              no: attestRows.filter(r => r['Response'] === 'no').length,
+                            });
+                          } catch { /* ignore */ }
+                        }
+                        setAttestationLoading(false);
+                        setAttestationSubmitted(true);
+                      }}
+                      className="flex-1 bg-emerald-600 text-white rounded-xl py-3 font-semibold text-sm active:bg-emerald-700 disabled:opacity-40"
+                    >
+                      Yes
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
