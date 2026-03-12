@@ -535,8 +535,14 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
         if (teamId === 4) {
           // Trauma: attending + 1 resident
           demoProviders.push(makeProvider(4, pick(['senior_resident', 'junior_resident'])));
+        } else if (teamId === 1) {
+          // Team 1: attending + 1 junior resident + 1 PA + 1 rotator (compact for mobile tour)
+          // All active so tour step 3 shows clean strength values
+          for (const t of ['junior_resident', 'pa', 'rotator'] as PType[]) {
+            demoProviders.push({ id: `p${++pId}`, name: nextName(), type: t, status: 'active', statusExpiresAt: null, teamId: 1 });
+          }
         } else {
-          // Teams 1-3: uneven staffing (1-4 additional providers)
+          // Teams 2-3: uneven staffing (1-4 additional providers)
           const extraOptions = [1, 2, 3, 4];
           const extra = pick(extraOptions);
           const available = [...nonAttendingTypes].sort(() => Math.random() - 0.5);
