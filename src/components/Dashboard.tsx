@@ -19,7 +19,7 @@ import { buildTourSteps } from '../tourSteps';
 const TEAM_IDS: TeamId[] = [1, 2, 3, 4];
 
 export default function Dashboard({ tourActive, onTourComplete, darkMode, onToggleDarkMode }: { tourActive?: boolean; onTourComplete?: () => void; darkMode: boolean; onToggleDarkMode: () => void }) {
-  const { state, dispatch, recommendation } = useShift();
+  const { state, dispatch, recommendation, capacityWeights } = useShift();
   const [showAssign, setShowAssign] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showBenchmark, setShowBenchmark] = useState(false);
@@ -27,10 +27,14 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
   const [showShiftSetup, setShowShiftSetup] = useState(false);
   const [toastTeam, setToastTeam] = useState<TeamId | null>(null);
   const [legendOpen, setLegendOpen] = useState(!!tourActive);
+  const team1Providers = useMemo(() => state.providers.filter(p => p.teamId === 1), [state.providers]);
   const steps = useMemo(() => buildTourSteps({
     openHelp: () => setShowHelp(true),
     closeHelp: () => setShowHelp(false),
-  }), []);
+    capacityWeights,
+    team1Providers,
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [capacityWeights, team1Providers]);
   const [globalCollapseProviders, setGlobalCollapseProviders] = useState(true);
   const [globalCollapsePatients, setGlobalCollapsePatients] = useState(true);
   const [globalHideStabilized, setGlobalHideStabilized] = useState(true);

@@ -1,16 +1,33 @@
+import type { ReactNode } from 'react';
+import type { Provider, ProviderType } from './types';
+import { STATUS_MULTIPLIERS } from './constants';
+
 export interface TourStep {
   targetSelector: string | null;
   title: string;
-  description: string;
+  description: ReactNode;
+  wide?: boolean;             // wider tooltip (for tables, etc.)
   onEnter?: () => void;       // runs immediately (React state changes)
   onAfterRender?: () => void; // runs after DOM settles (open <details>, etc.)
 }
 
+// Provider weight labels in display order (matches HelpSection)
+const WEIGHT_DISPLAY_ORDER: { type: ProviderType; label: string }[] = [
+  { type: 'attending', label: 'Attending' },
+  { type: 'senior_resident', label: 'Senior Resident (PGY 3-4)' },
+  { type: 'pa', label: 'PA' },
+  { type: 'junior_resident', label: 'Resident (PGY-2)' },
+  { type: 'intern', label: 'Intern (PGY-1)' },
+  { type: 'rotator', label: 'Rotator' },
+];
+
 export function buildTourSteps(helpers: {
   openHelp: () => void;
   closeHelp: () => void;
+  capacityWeights: Record<ProviderType, number>;
+  team1Providers: Provider[];
 }): TourStep[] {
-  const { openHelp, closeHelp } = helpers;
+  const { openHelp, closeHelp, capacityWeights, team1Providers } = helpers;
 
   const closeAllDetails = () => {
     document.querySelectorAll('details[data-tour]').forEach(el => {
@@ -48,8 +65,37 @@ export function buildTourSteps(helpers: {
     {
       targetSelector: '[data-tour="provider-list"][data-tour-team="1"]',
       title: 'Team Strength',
-      description:
-        'Each provider has a weighted strength based on role and status. The team total is the sum.',
+      wide: true,
+      description: (() => {
+        const teamStrength = team1Providers.reduce(
+          (sum, p) => sum + capacityWeights[p.type] * STATUS_MULTIPLIERS[p.status],
+          0
+        );
+        return (
+          <div className="space-y-2">
+            <p>Each provider has a weighted strength based on role and status. The team total is the sum.</p>
+            <p className="font-semibold text-blue-600 dark:text-blue-400">
+              Team strength: {teamStrength.toFixed(1)}
+            </p>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-gray-200 dark:border-slate-600">
+                  <th className="text-left py-0.5 font-semibold text-gray-600 dark:text-gray-300">Type</th>
+                  <th className="text-right py-0.5 font-semibold text-gray-600 dark:text-gray-300">Weight</th>
+                </tr>
+              </thead>
+              <tbody>
+                {WEIGHT_DISPLAY_ORDER.map(({ type, label }) => (
+                  <tr key={type} className="border-b border-gray-50 dark:border-slate-700 last:border-0">
+                    <td className="py-0.5 text-gray-600 dark:text-gray-400">{label}</td>
+                    <td className="py-0.5 text-right text-gray-700 dark:text-gray-300">{capacityWeights[type]}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })(),
       onEnter: () => {
         closeHelp();
       },

@@ -85,11 +85,12 @@ export default function GuidedTour({ steps, onComplete }: Props) {
       tooltipStyle.bottom = window.innerHeight - targetRect.top + pad + 8;
       arrowPosition = 'bottom';
     }
+    const w = step.wide ? 360 : 300;
     tooltipStyle.left = Math.max(16, Math.min(
-      targetRect.left + targetRect.width / 2 - 150,
-      window.innerWidth - 316
+      targetRect.left + targetRect.width / 2 - w / 2,
+      window.innerWidth - w - 16
     ));
-    tooltipStyle.width = 300;
+    tooltipStyle.width = w;
   }
 
   return (
@@ -131,7 +132,7 @@ export default function GuidedTour({ steps, onComplete }: Props) {
             className={`absolute w-3 h-3 bg-white dark:bg-slate-800 rotate-45 ${
               arrowPosition === 'top' ? '-top-1.5' : '-bottom-1.5'
             }`}
-            style={{ left: Math.min(Math.max(24, (targetRect.left + targetRect.width / 2) - (parseFloat(String(tooltipStyle.left)) || 0)), 270) }}
+            style={{ left: Math.min(Math.max(24, (targetRect.left + targetRect.width / 2) - (parseFloat(String(tooltipStyle.left)) || 0)), (tooltipStyle.width as number) - 30) }}
           />
         )}
 
@@ -141,9 +142,9 @@ export default function GuidedTour({ steps, onComplete }: Props) {
         <h3 className="font-bold text-gray-900 dark:text-gray-100 text-base mb-1">
           {step.title}
         </h3>
-        <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+        <div className="text-sm text-gray-600 dark:text-gray-300 mb-4">
           {step.description}
-        </p>
+        </div>
         <div className="flex items-center justify-between gap-2">
           <button
             onClick={onComplete}
