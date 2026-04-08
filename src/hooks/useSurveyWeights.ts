@@ -17,7 +17,10 @@ async function fetchSurveyAverages(): Promise<Record<ProviderType, number> | nul
   if (!SHEETS_API) return null;
   try {
     const res = await fetch(SHEETS_API);
-    const rows: Record<string, string | number>[] = await res.json();
+    const allRows: Record<string, string | number>[] = await res.json();
+    const rows = allRows.filter(row =>
+      ROLE_KEYS.some(({ sheet }) => row[sheet] !== '' && row[sheet] != null && Number(row[sheet]) !== 0)
+    );
     if (rows.length === 0) return null;
 
     const weights: Record<string, number> = { attending: 20 };

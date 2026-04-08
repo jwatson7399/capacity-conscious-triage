@@ -22,16 +22,21 @@ async function fetchSheetResponses(): Promise<ResponseEntry[] | null> {
   try {
     const res = await fetch(SHEETS_API);
     const rows: Record<string, string | number>[] = await res.json();
-    return rows.map(row => ({
-      timestamp: String(row['Timestamp'] ?? ''),
-      responses: {
-        senior_resident: Number(row['Senior Resident'] ?? 0),
-        junior_resident: Number(row['Junior Resident'] ?? 0),
-        intern: Number(row['Intern'] ?? 0),
-        pa: Number(row['PA'] ?? 0),
-        rotator: Number(row['Rotator'] ?? 0),
-      },
-    }));
+    return rows
+      .filter(row => ROLE_KEYS.some(k => {
+        const col = { senior_resident: 'Senior Resident', junior_resident: 'Junior Resident', intern: 'Intern', pa: 'PA', rotator: 'Rotator' }[k]!;
+        return row[col] !== '' && row[col] != null && Number(row[col]) !== 0;
+      }))
+      .map(row => ({
+        timestamp: String(row['Timestamp'] ?? ''),
+        responses: {
+          senior_resident: Number(row['Senior Resident'] ?? 0),
+          junior_resident: Number(row['Junior Resident'] ?? 0),
+          intern: Number(row['Intern'] ?? 0),
+          pa: Number(row['PA'] ?? 0),
+          rotator: Number(row['Rotator'] ?? 0),
+        },
+      }));
   } catch {
     return null;
   }

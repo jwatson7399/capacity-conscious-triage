@@ -8,6 +8,7 @@ import SimulationSetup from './SimulationSetup';
 import BenchmarkReport from './BenchmarkReport';
 import RealScheduleBenchmarkReport from './RealScheduleBenchmarkReport';
 import DelphiSurvey from './DelphiSurvey';
+import EvidenceWalkthrough from './EvidenceWalkthrough';
 
 const roles: { role: Role; label: string; desc: string }[] = [
   { role: 'charge_nurse', label: 'Charge / Triage Nurse', desc: 'Set up shift, manage providers, assign patients' },
@@ -26,6 +27,7 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
   const [attestationSubmitted, setAttestationSubmitted] = useState(false);
   const [attestationId, setAttestationId] = useState('');
   const [attestationLoading, setAttestationLoading] = useState(false);
+  const [showEvidence, setShowEvidence] = useState(false);
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
 
@@ -33,6 +35,7 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
   if (showBenchmark) return <BenchmarkReport onBack={() => setShowBenchmark(false)} />;
   if (showRealBenchmark) return <RealScheduleBenchmarkReport onBack={() => setShowRealBenchmark(false)} />;
   if (showDelphi) return <DelphiSurvey onCancel={() => setShowDelphi(false)} startOnResults={showDelphi === 'results'} />;
+  if (showEvidence) return <EvidenceWalkthrough onBack={() => setShowEvidence(false)} />;
 
   return (
     <div className="dashboard-bg flex flex-col items-center justify-center p-6">
@@ -60,6 +63,13 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
             <div className="text-xs font-normal opacity-80 mt-0.5">New here? Start with a walkthrough</div>
           </button>
         )}
+        <button
+          onClick={() => setShowEvidence(true)}
+          className="w-full min-h-[56px] bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl px-5 py-4 font-semibold text-base active:from-emerald-700 active:to-teal-700 transition-colors"
+        >
+          <div>See the Evidence</div>
+          <div className="text-xs font-normal opacity-80 mt-0.5">4 months of real data, 1,541 encounters</div>
+        </button>
         <div className="bg-slate-200 dark:bg-white/10 rounded-xl border border-slate-300 dark:border-white/10 overflow-hidden">
           <div className="text-center text-base font-semibold text-slate-800 dark:text-white py-2">Demo</div>
           <div className="flex border-t border-slate-300 dark:border-white/10">

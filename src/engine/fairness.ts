@@ -50,19 +50,30 @@ export function statsFromEntries(entries: ShadowEntry[]): ModeStats {
   };
 }
 
-/** Compute a fairness score (0-100) from mode stats */
-export function computeFairness(
+export interface FairnessBreakdown {
+  composite: number;           // 0-100 weighted score
+  capacityBalance: number;     // 0-1
+  acuityBalance: number;       // 0-1
+  overwhelmAvoidance: number;  // 0-1
+  minRatioScore: number;       // 0-1
+  stressEquity: number;        // 0-1
+}
+
+/** Compute fairness score with full sub-score breakdown */
+export function computeFairnessDetailed(
   stats: ModeStats,
   permanentlyClosedTeams: number[],
   teamCapacities?: Record<number, number>,
-): number {
+): FairnessBreakdown {
   const eligible = ([1, 2, 3, 4] as TeamId[]).filter(
     t => t !== TRAUMA_TEAM_ID && !permanentlyClosedTeams.includes(t)
   );
 
   const counts = eligible.map(t => stats.teamCounts[t] ?? 0);
   const totalAssignments = counts.reduce((a, b) => a + b, 0);
-  if (totalAssignments === 0) return 50;
+  if (totalAssignments === 0) {
+    return { composite: 50, capacityBalance: 1, acuityBalance: 1, overwhelmAvoidance: 1, minRatioScore: 1, stressEquity: 1 };
+  }
 
   // Capacity-Proportional Balance (25%): stress = patients / capacity per team
   let capacityBalance = 1;
@@ -100,7 +111,7 @@ export function computeFairness(
   }
 
   // Overwhelm Avoidance (30%): 1 - (overwhelmEvents / totalAssignments)
-  const overwhelmScore = Math.max(0, Math.min(1, 1 - stats.overwhelms / totalAssignments));
+  const overwhelmAvoidance = Math.max(0, Math.min(1, 1 - stats.overwhelms / totalAssignments));
 
   // Min Ratio (15%): min(minRatio / OVERWHELM_THRESHOLD, 1)
   const minRatioScore = stats.minRatio === Infinity ? 1 : Math.min(stats.minRatio / OVERWHELM_THRESHOLD, 1);
@@ -120,11 +131,22 @@ export function computeFairness(
     }
   }
 
-  return (
+  const composite = (
     capacityBalance * 0.25 +
     acuityBalance * 0.15 +
-    overwhelmScore * 0.30 +
+    overwhelmAvoidance * 0.30 +
     minRatioScore * 0.15 +
     stressEquity * 0.15
   ) * 100;
+
+  return { composite, capacityBalance, acuityBalance, overwhelmAvoidance, minRatioScore, stressEquity };
+}
+
+/** Compute a fairness score (0-100) from mode stats */
+export function computeFairness(
+  stats: ModeStats,
+  permanentlyClosedTeams: number[],
+  teamCapacities?: Record<number, number>,
+): number {
+  return computeFairnessDetailed(stats, permanentlyClosedTeams, teamCapacities).composite;
 }

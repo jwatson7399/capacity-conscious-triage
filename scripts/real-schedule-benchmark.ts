@@ -489,6 +489,43 @@ function fmtMeanStd(vals: number[], dec = 1): string {
   return `${fmt(mean(vals), dec)} ± ${fmt(stddev(vals), dec)}`;
 }
 
+// ── Slam & Back-to-Back HA Counters ─────────────────────────────────
+
+const SLAM_WINDOW_MS = 60 * 60 * 1000;  // 1 hour
+const B2B_WINDOW_MS = 30 * 60 * 1000;   // 30 minutes
+
+function countSlams(entries: ShadowEntry[]): number {
+  let count = 0;
+  const teamTimes: Record<number, number[]> = {};
+  for (const e of entries) {
+    const times = teamTimes[e.teamId] ?? [];
+    for (const prev of times) {
+      if (e.arrivalTime - prev <= SLAM_WINDOW_MS) {
+        count++;
+        break;
+      }
+    }
+    times.push(e.arrivalTime);
+    teamTimes[e.teamId] = times;
+  }
+  return count;
+}
+
+function countBackToBackHA(entries: ShadowEntry[]): number {
+  let count = 0;
+  const lastHA: Record<number, number> = {};
+  for (const e of entries) {
+    if (e.acuity === 'tier_one' || e.acuity === 'tier_two') {
+      const prev = lastHA[e.teamId];
+      if (prev !== undefined && (e.arrivalTime - prev) <= B2B_WINDOW_MS) {
+        count++;
+      }
+      lastHA[e.teamId] = e.arrivalTime;
+    }
+  }
+  return count;
+}
+
 // ── Main ────────────────────────────────────────────────────────────
 
 interface RunMetrics {
@@ -497,12 +534,15 @@ interface RunMetrics {
   minRatio: number;
   overwhelms: number;
   demandSpread: number;   // stddev of team patient counts / mean
+  slams: number;
+  backToBackHA: number;
 }
 
 interface RunInfo {
   dayIdx: number;
   windowIdx: number;
   formula: RunMetrics;
+  formulaNoBuffer: RunMetrics;
   roundRobin: RunMetrics;
 }
 
@@ -832,7 +872,7 @@ for (let run = 0; run < NUM_RUNS; run++) {
   const activeTeams = new Set(allProviders.map(p => p.teamId));
   const permanentlyClosedTeams = ([1, 2, 3, 4] as TeamId[]).filter(t => !activeTeams.has(t));
 
-  // Run formula
+  // Run formula (full: capacity routing + buffers)
   const { result: fResult, rollingFairness: fRollingFairness } = runScheduleSim(
     day, timeline, statusChanges, overrides, BASE_TIME, startHour, 'formula',
   );
@@ -843,6 +883,27 @@ for (let run = 0; run < NUM_RUNS; run++) {
     minRatio: fStats.minRatio === Infinity ? 0 : fStats.minRatio,
     overwhelms: fStats.overwhelms,
     demandSpread: computeDemandSpread(fResult, permanentlyClosedTeams),
+    slams: countSlams(fResult.entries),
+    backToBackHA: countBackToBackHA(fResult.entries),
+  };
+
+  // Run formula WITHOUT buffers (capacity routing only, buffers expire instantly)
+  const noBufferOverrides: SimOverrides = {
+    ...overrides,
+    bufferDurations: { tier_one: 0, tier_two: 0, tier_three: 0 },
+  };
+  const { result: fnbResult, rollingFairness: fnbRollingFairness } = runScheduleSim(
+    day, timeline, statusChanges, noBufferOverrides, BASE_TIME, startHour, 'formula',
+  );
+  const fnbStats = statsFromEntries(fnbResult.entries);
+  const fnbMetrics: RunMetrics = {
+    fairness: fnbRollingFairness,
+    avgRatio: fnbStats.avgRatio,
+    minRatio: fnbStats.minRatio === Infinity ? 0 : fnbStats.minRatio,
+    overwhelms: fnbStats.overwhelms,
+    demandSpread: computeDemandSpread(fnbResult, permanentlyClosedTeams),
+    slams: countSlams(fnbResult.entries),
+    backToBackHA: countBackToBackHA(fnbResult.entries),
   };
 
   // Run round robin
@@ -856,9 +917,11 @@ for (let run = 0; run < NUM_RUNS; run++) {
     minRatio: rrStats.minRatio === Infinity ? 0 : rrStats.minRatio,
     overwhelms: rrStats.overwhelms,
     demandSpread: computeDemandSpread(rrResult, permanentlyClosedTeams),
+    slams: countSlams(rrResult.entries),
+    backToBackHA: countBackToBackHA(rrResult.entries),
   };
 
-  runs.push({ dayIdx, windowIdx, formula: fMetrics, roundRobin: rrMetrics });
+  runs.push({ dayIdx, windowIdx, formula: fMetrics, formulaNoBuffer: fnbMetrics, roundRobin: rrMetrics });
 
   if ((run + 1) % 100 === 0) process.stdout.write(' done\n');
 }
@@ -880,6 +943,9 @@ console.log('\nDay distribution:');
 const dowOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 console.log('  ' + dowOrder.filter(d => dayOfWeekCounts[d]).map(d => `${d.slice(0, 3)}: ${dayOfWeekCounts[d]}`).join('  '));
 
+// Helper used by multiple report sections
+const pct = (n: number) => ((n / NUM_RUNS) * 100).toFixed(0);
+
 // Aggregate results
 console.log(`\n${'═'.repeat(70)}`);
 console.log(`  AGGREGATE RESULTS (${NUM_RUNS} runs)`);
@@ -891,35 +957,108 @@ const metricDefs: { label: string; key: keyof RunMetrics; higherBetter: boolean 
   { label: 'Min Ratio', key: 'minRatio', higherBetter: true },
   { label: 'Overwhelms', key: 'overwhelms', higherBetter: false },
   { label: 'Demand Spread', key: 'demandSpread', higherBetter: false },
+  { label: 'Slams', key: 'slams', higherBetter: false },
+  { label: 'Back-to-back HA', key: 'backToBackHA', higherBetter: false },
 ];
 
 console.log(
   pad('', 18) +
   rpad('Formula', 18) +
+  rpad('No Buffers', 18) +
   rpad('Round Robin', 18) +
-  rpad('Δ', 12) +
-  rpad('p-value', 10) +
-  rpad("Cohen's d", 10)
+  rpad('Δ F vs RR', 12) +
+  rpad('p (F vs RR)', 12)
 );
-console.log('-'.repeat(86));
+console.log('-'.repeat(96));
 
 for (const m of metricDefs) {
   const fVals = runs.map(r => r.formula[m.key]);
+  const fnbVals = runs.map(r => r.formulaNoBuffer[m.key]);
   const rrVals = runs.map(r => r.roundRobin[m.key]);
   const delta = mean(fVals) - mean(rrVals);
   const p = pairedTTest(fVals, rrVals);
-  const d = cohenD(fVals, rrVals);
   console.log(
     pad(m.label, 18) +
     rpad(fmtMeanStd(fVals), 18) +
+    rpad(fmtMeanStd(fnbVals), 18) +
     rpad(fmtMeanStd(rrVals), 18) +
     rpad((delta >= 0 ? '+' : '') + fmt(delta, 2), 12) +
-    rpad(fmtPValue(p), 10) +
-    rpad(fmt(Math.abs(d), 2), 10)
+    rpad(fmtPValue(p), 12)
   );
 }
 
-// Win/loss
+// ── Buffer Ablation Decomposition ──
+console.log(`\n${'═'.repeat(70)}`);
+console.log('  BUFFER ABLATION — Decomposing the Improvement');
+console.log('═'.repeat(70));
+
+const fFairness = runs.map(r => r.formula.fairness);
+const fnbFairness = runs.map(r => r.formulaNoBuffer.fairness);
+const rrFairness = runs.map(r => r.roundRobin.fairness);
+
+const totalGain = mean(fFairness) - mean(rrFairness);
+const capacityGain = mean(fnbFairness) - mean(rrFairness);
+const bufferGain = mean(fFairness) - mean(fnbFairness);
+const capacityPct = totalGain !== 0 ? (capacityGain / totalGain * 100) : 0;
+const bufferPct = totalGain !== 0 ? (bufferGain / totalGain * 100) : 0;
+
+console.log(`\n  Total fairness gain (Formula vs Round Robin):    +${fmt(totalGain, 2)} points`);
+console.log(`  ├─ Capacity-aware routing (No Buffers vs RR):     +${fmt(capacityGain, 2)} points (${fmt(capacityPct, 1)}%)`);
+console.log(`  └─ Buffer cooldowns (Formula vs No Buffers):      +${fmt(bufferGain, 2)} points (${fmt(bufferPct, 1)}%)`);
+
+// Statistical tests for each component
+const pCapacity = pairedTTest(fnbFairness, rrFairness);
+const pBuffer = pairedTTest(fFairness, fnbFairness);
+const dCapacity = cohenD(fnbFairness, rrFairness);
+const dBuffer = cohenD(fFairness, fnbFairness);
+
+console.log(`\n  Capacity routing significance:  p=${fmtPValue(pCapacity)}, Cohen's d=${fmt(Math.abs(dCapacity), 2)}`);
+console.log(`  Buffer cooldown significance:   p=${fmtPValue(pBuffer)}, Cohen's d=${fmt(Math.abs(dBuffer), 2)}`);
+
+// Per-metric decomposition
+console.log(`\n  Per-metric decomposition:`);
+console.log(
+  pad('', 18) +
+  rpad('Total Δ', 12) +
+  rpad('Capacity', 12) +
+  rpad('Buffers', 12) +
+  rpad('% Capacity', 12) +
+  rpad('% Buffers', 12)
+);
+console.log('  ' + '-'.repeat(68));
+for (const m of metricDefs) {
+  const fVals = runs.map(r => r.formula[m.key]);
+  const fnbVals = runs.map(r => r.formulaNoBuffer[m.key]);
+  const rrVals = runs.map(r => r.roundRobin[m.key]);
+  const total = mean(fVals) - mean(rrVals);
+  const cap = mean(fnbVals) - mean(rrVals);
+  const buf = mean(fVals) - mean(fnbVals);
+  const capPct = total !== 0 ? (cap / total * 100) : 0;
+  const bufPctM = total !== 0 ? (buf / total * 100) : 0;
+  console.log(
+    pad(m.label, 18) +
+    rpad((total >= 0 ? '+' : '') + fmt(total, 2), 12) +
+    rpad((cap >= 0 ? '+' : '') + fmt(cap, 2), 12) +
+    rpad((buf >= 0 ? '+' : '') + fmt(buf, 2), 12) +
+    rpad(fmt(capPct, 1) + '%', 12) +
+    rpad(fmt(bufPctM, 1) + '%', 12)
+  );
+}
+
+// Win rates for all three pairings
+let fVsNb_fWins = 0, fVsNb_nbWins = 0, fVsNb_ties = 0;
+let nbVsRr_nbWins = 0, nbVsRr_rrWins = 0, nbVsRr_ties = 0;
+for (const r of runs) {
+  const d1 = r.formula.fairness - r.formulaNoBuffer.fairness;
+  if (Math.abs(d1) < 0.01) fVsNb_ties++; else if (d1 > 0) fVsNb_fWins++; else fVsNb_nbWins++;
+  const d2 = r.formulaNoBuffer.fairness - r.roundRobin.fairness;
+  if (Math.abs(d2) < 0.01) nbVsRr_ties++; else if (d2 > 0) nbVsRr_nbWins++; else nbVsRr_rrWins++;
+}
+console.log(`\n  Win rates:`);
+console.log(`    Formula vs No-Buffer:   Formula wins ${pct(fVsNb_fWins)}%, No-Buffer wins ${pct(fVsNb_nbWins)}%, ties ${pct(fVsNb_ties)}%`);
+console.log(`    No-Buffer vs Round Robin: No-Buffer wins ${pct(nbVsRr_nbWins)}%, RR wins ${pct(nbVsRr_rrWins)}%, ties ${pct(nbVsRr_ties)}%`);
+
+// Win/loss (Formula vs Round Robin)
 let fWins = 0, rrWins = 0, ties = 0;
 for (const r of runs) {
   const diff = r.formula.fairness - r.roundRobin.fairness;
@@ -927,9 +1066,8 @@ for (const r of runs) {
   else if (diff > 0) fWins++;
   else rrWins++;
 }
-const pct = (n: number) => ((n / NUM_RUNS) * 100).toFixed(0);
 console.log(
-  `\nFormula wins: ${fWins}/${NUM_RUNS} (${pct(fWins)}%)  |  ` +
+  `\nFormula vs RR: Formula wins ${fWins}/${NUM_RUNS} (${pct(fWins)}%)  |  ` +
   `RR wins: ${rrWins}/${NUM_RUNS} (${pct(rrWins)}%)  |  ` +
   `Ties: ${ties}/${NUM_RUNS} (${pct(ties)}%)`
 );
@@ -1003,6 +1141,7 @@ console.log('═'.repeat(70));
 const overallP = pairedTTest(runs.map(r => r.formula.fairness), runs.map(r => r.roundRobin.fairness));
 const overallD = cohenD(runs.map(r => r.formula.fairness), runs.map(r => r.roundRobin.fairness));
 const fMeanFairness = mean(runs.map(r => r.formula.fairness));
+const fnbMeanFairness = mean(runs.map(r => r.formulaNoBuffer.fairness));
 const rrMeanFairness = mean(runs.map(r => r.roundRobin.fairness));
 
 const sigLabel = overallP < 0.001 ? 'highly significant' : overallP < 0.05 ? 'significant' : 'not significant';
@@ -1013,4 +1152,15 @@ console.log(`\n  ${winner} achieves higher rolling fairness (${fmt(fMeanFairness
 console.log(`  The difference is ${sigLabel} (p=${fmtPValue(overallP)}) with ${effectLabel} effect size (d=${fmt(Math.abs(overallD), 2)}).`);
 console.log(`  Formula wins ${pct(fWins)}% of runs across real schedule data with dynamic provider rosters.`);
 console.log(`  Rolling fairness captures mid-shift balance, not just end-of-shift state.`);
+console.log();
+console.log(`  BUFFER ABLATION SUMMARY:`);
+console.log(`  Capacity routing alone scores ${fmt(fnbMeanFairness)} (vs full formula ${fmt(fMeanFairness)}, RR ${fmt(rrMeanFairness)}).`);
+const totalDelta = fMeanFairness - rrMeanFairness;
+const capDelta = fnbMeanFairness - rrMeanFairness;
+const bufDelta = fMeanFairness - fnbMeanFairness;
+if (totalDelta > 0) {
+  console.log(`  Of the +${fmt(totalDelta, 2)} total improvement:`);
+  console.log(`    ${fmt(capDelta / totalDelta * 100, 1)}% from capacity-aware routing (+${fmt(capDelta, 2)} pts)`);
+  console.log(`    ${fmt(bufDelta / totalDelta * 100, 1)}% from buffer cooldowns (+${fmt(bufDelta, 2)} pts)`);
+}
 console.log();
