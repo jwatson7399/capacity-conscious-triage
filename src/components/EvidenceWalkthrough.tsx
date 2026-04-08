@@ -47,9 +47,16 @@ function InfoTip({ term, label, children }: { term: string; label?: string; chil
 
 /* ─── Dimension Tag ──────────────────────────────────────────────────── */
 
-function DimensionTag({ children }: { children: React.ReactNode }) {
+const DIMENSION_COLORS = {
+  rose: 'text-rose-500 dark:text-rose-400/70 bg-rose-50 dark:bg-rose-500/10 border-rose-200/50 dark:border-rose-500/20',
+  emerald: 'text-emerald-500 dark:text-emerald-400/70 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200/50 dark:border-emerald-500/20',
+  violet: 'text-violet-500 dark:text-violet-400/70 bg-violet-50 dark:bg-violet-500/10 border-violet-200/50 dark:border-violet-500/20',
+  amber: 'text-amber-500 dark:text-amber-400/70 bg-amber-50 dark:bg-amber-500/10 border-amber-200/50 dark:border-amber-500/20',
+} as const;
+
+function DimensionTag({ children, color = 'rose' }: { children: React.ReactNode; color?: keyof typeof DIMENSION_COLORS }) {
   return (
-    <span className="inline-block text-[9px] sm:text-[10px] uppercase tracking-widest text-blue-400 dark:text-blue-400/70 font-medium mb-3 px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-500/10 border border-blue-200/50 dark:border-blue-500/20">
+    <span className={`inline-block text-[9px] sm:text-[10px] uppercase tracking-widest font-medium mb-3 px-2.5 py-0.5 rounded-full border ${DIMENSION_COLORS[color]}`}>
       {children}
     </span>
   );
@@ -61,6 +68,30 @@ function HeroNumber({ children, className = '' }: { children: React.ReactNode; c
   return (
     <div className={`font-bold tracking-tight ${className}`} style={{ fontSize: 'clamp(2.8rem, 10vw, 5rem)' }}>
       {children}
+    </div>
+  );
+}
+
+function ProviderSilhouette({ label, color, highlighted }: { label: string; color: string; highlighted?: boolean }) {
+  return (
+    <div className={`flex flex-col items-center ${highlighted ? 'animate-fadeScaleIn' : ''}`}>
+      <svg width="24" height="28" viewBox="0 0 24 28" fill="none" className={color}>
+        <circle cx="12" cy="7" r="5" fill="currentColor" />
+        <path d="M2 26c0-5.523 4.477-10 10-10s10 4.477 10 10" fill="currentColor" />
+      </svg>
+      <span className={`text-[8px] font-bold mt-0.5 ${color}`}>{label}</span>
+    </div>
+  );
+}
+
+function PatientSilhouette() {
+  return (
+    <div className="flex flex-col items-center">
+      <svg width="20" height="24" viewBox="0 0 24 28" fill="none" className="text-purple-400 dark:text-purple-400/70">
+        <circle cx="12" cy="7" r="5" fill="currentColor" />
+        <path d="M2 26c0-5.523 4.477-10 10-10s10 4.477 10 10" fill="currentColor" />
+      </svg>
+      <span className="text-[8px] text-purple-400 dark:text-purple-400/70 font-medium">ESI-3</span>
     </div>
   );
 }
@@ -93,7 +124,7 @@ function CardStudy({ isActive }: { isActive: boolean }) {
         <p className="text-sm text-slate-500 dark:text-slate-400">Teams 1, 2, and 3 · A-side only</p>
       </div>
       <p className="mt-8 text-xs sm:text-sm text-slate-600 dark:text-slate-400 max-w-xs leading-relaxed">
-        We replayed every A-side patient assignment using your actual schedules and real arrival times. Both methods compared side by side.
+        We replayed every A-side patient assignment using your actual schedules, real arrival times, real ESI acuity levels. What actually happened vs what our formula would have done, both methods compared side by side.
       </p>
     </div>
   );
@@ -126,12 +157,40 @@ function CardCurrentProcess({ isActive }: { isActive: boolean }) {
   );
 }
 
-/* ─── Card 3: Slams ───────────────────────────────────────────────────── */
+/* ─── Card 3: Road Map ───────────────────────────────────────────────── */
+
+function CardRoadMap({ isActive }: { isActive: boolean }) {
+  const dimensions = [
+    { tag: 'Stress Equity', color: 'text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/20', desc: 'How evenly are high-pressure moments distributed across teams?' },
+    { tag: 'Capacity Balance', color: 'text-emerald-500 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20', desc: 'Are patients going to the team with the most bandwidth?' },
+    { tag: 'Acuity Balance', color: 'text-violet-500 dark:text-violet-400 bg-violet-50 dark:bg-violet-500/10 border-violet-200 dark:border-violet-500/20', desc: 'Is the severity of cases spread fairly, not just the count?' },
+    { tag: 'Safety Floor', color: 'text-amber-500 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20', desc: 'How bad does it get for the worst-off team at the worst moment?' },
+  ];
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full px-6 text-center">
+      <p className="text-xs sm:text-sm uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-2 font-semibold">What We Measured</p>
+      <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 mb-5 max-w-xs leading-relaxed">
+        We compared both methods across four dimensions of fairness:
+      </p>
+      <div className={`space-y-3 max-w-xs w-full ${isActive ? 'animate-fadeSlideUp' : 'opacity-0'}`}>
+        {dimensions.map((d) => (
+          <div key={d.tag} className={`rounded-xl border px-4 py-3 text-left ${d.color}`}>
+            <p className="text-sm font-semibold">{d.tag}</p>
+            <p className="text-xs mt-0.5 text-slate-600 dark:text-slate-300">{d.desc}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Card 4: Slams ───────────────────────────────────────────────────── */
 
 function CardSlams({ isActive }: { isActive: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-      <DimensionTag>Stress Equity</DimensionTag>
+      <DimensionTag color="rose">Stress Equity</DimensionTag>
       <p className="text-xs sm:text-sm uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-1 font-semibold">Slams</p>
       <p className="text-xs text-slate-600 dark:text-slate-400 mb-5">2+ patients to one team within 1 hour</p>
 
@@ -163,7 +222,7 @@ function CardSlams({ isActive }: { isActive: boolean }) {
 function CardDangerStacking({ isActive }: { isActive: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-      <DimensionTag>Stress Equity</DimensionTag>
+      <DimensionTag color="rose">Stress Equity</DimensionTag>
       <div className="text-2xl mb-1">⚠️</div>
       <p className="text-xs sm:text-sm uppercase tracking-widest text-red-400 dark:text-red-400 mb-1 font-semibold">Back-to-Back High Acuity</p>
       <p className="text-xs text-slate-600 dark:text-slate-400 mb-5">Two ESI 1-2 patients to one team within 30 min</p>
@@ -196,7 +255,7 @@ function CardDangerStacking({ isActive }: { isActive: boolean }) {
 function CardCapacityBalance({ isActive }: { isActive: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-      <DimensionTag>Capacity Balance</DimensionTag>
+      <DimensionTag color="emerald">Capacity Balance</DimensionTag>
       <p className="text-xs sm:text-sm uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-2 font-semibold">Patient Count Gap</p>
       <p className="text-xs text-slate-600 dark:text-slate-400 mb-6">Busiest team vs. lightest team per day</p>
 
@@ -212,7 +271,7 @@ function CardCapacityBalance({ isActive }: { isActive: boolean }) {
       </div>
 
       <p className="mt-6 text-xs sm:text-sm text-slate-600 dark:text-slate-400 max-w-xs leading-relaxed">
-        Teams get patients proportional to their staffing strength — a strong team handles more, a light team gets breathing room.
+        Each time a team receives a patient, its capacity ratio drops, making other teams more attractive for the next arrival. This self-correcting cycle spreads patients proportional to staffing strength. A strong team handles more, a light team gets breathing room, but no one team gets piled on while another sits empty.
       </p>
 
       <div className="mt-3 flex justify-center">
@@ -233,7 +292,7 @@ function CardAcuityBalance({ isActive }: { isActive: boolean }) {
 
   return (
     <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-      <DimensionTag>Acuity Balance</DimensionTag>
+      <DimensionTag color="violet">Acuity Balance</DimensionTag>
       <p className="text-xs sm:text-sm uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-2 font-semibold">Severity Gap</p>
       <p className="text-xs text-slate-600 dark:text-slate-400 mb-4">Heaviest acuity load vs. lightest per day</p>
 
@@ -266,7 +325,7 @@ function CardAcuityBalance({ isActive }: { isActive: boolean }) {
       </div>
 
       <p className="mt-4 text-xs sm:text-sm text-slate-600 dark:text-slate-400 max-w-xs leading-relaxed">
-        The formula doesn't just spread patients more evenly — it spreads the <em>sickest</em> patients more evenly.
+        This one was surprising. The formula doesn't consider severity until after a patient is already assigned. It routes entirely by which team has the most room. You might expect that to widen the severity gap. Instead, it shrank. When patients are spread evenly, severity follows. No team gets an unlucky run of the sickest cases.
       </p>
 
       <div className="mt-2 flex justify-center">
@@ -283,23 +342,60 @@ function CardAcuityBalance({ isActive }: { isActive: boolean }) {
 function CardSafetyFloor({ isActive }: { isActive: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-      <DimensionTag>Safety Floor</DimensionTag>
+      <DimensionTag color="amber">Safety Floor</DimensionTag>
       <p className="text-xs sm:text-sm uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-2 font-semibold">Worst Moment of a Typical Day</p>
-      <p className="text-xs text-slate-600 dark:text-slate-400 mb-6">Average daily minimum capacity ratio at time of assignment</p>
+      <p className="text-xs text-slate-600 dark:text-slate-400 mb-4">Average daily minimum capacity ratio at time of assignment</p>
 
-      <div className="w-full max-w-xs">
-        <ComparisonBar label="Current" value={18} maxValue={35} color="bg-amber-500" unit="ratio" isActive={isActive} />
-        <div className="h-3" />
-        <ComparisonBar label="Formula" value={32} maxValue={35} color="bg-blue-500" unit="ratio" isActive={isActive} />
+      {/* Provider silhouette analogy with embedded bars */}
+      <div className={`flex items-center justify-center gap-4 max-w-xs w-full ${isActive ? 'animate-fadeSlideUp' : 'opacity-0'}`}>
+        {/* Current: PA + PGY-1 over patient */}
+        <div className="flex-1 rounded-xl border border-amber-300 dark:border-amber-500/30 bg-amber-50/50 dark:bg-amber-500/5 p-3">
+          <p className="text-[10px] uppercase tracking-wider text-amber-500 dark:text-amber-400 text-center font-semibold mb-2">Current</p>
+          <div className="flex justify-center gap-3 mb-1">
+            <ProviderSilhouette label="PA" color="text-amber-500" />
+            <ProviderSilhouette label="PGY-1" color="text-amber-500" />
+          </div>
+          <div className="h-0.5 bg-amber-300 dark:bg-amber-500/40 rounded-full mx-2 my-1.5" />
+          <div className="flex justify-center">
+            <PatientSilhouette />
+          </div>
+          <div className="mt-2 bg-slate-200 dark:bg-white/10 rounded-full h-4 overflow-hidden">
+            <div className="bg-amber-500 h-full rounded-full transition-all duration-700 ease-out" style={{ width: isActive ? '40%' : '0%' }} />
+          </div>
+          <p className="text-[10px] font-bold text-amber-600 dark:text-amber-300 text-center mt-1">18 ratio</p>
+        </div>
+
+        <div className="text-lg text-slate-300 dark:text-slate-600 shrink-0">→</div>
+
+        {/* Formula: PA + PGY-1 + PGY-3 over patient */}
+        <div className="flex-1 rounded-xl border border-blue-300 dark:border-blue-500/30 bg-blue-50/50 dark:bg-blue-500/5 p-3">
+          <p className="text-[10px] uppercase tracking-wider text-blue-500 dark:text-blue-400 text-center font-semibold mb-2">Formula</p>
+          <div className="flex justify-center gap-2 mb-1">
+            <ProviderSilhouette label="PA" color="text-blue-500" />
+            <ProviderSilhouette label="PGY-1" color="text-blue-500" />
+            <ProviderSilhouette label="PGY-3" color="text-blue-500" highlighted />
+          </div>
+          <div className="h-0.5 bg-blue-300 dark:bg-blue-500/40 rounded-full mx-2 my-1.5" />
+          <div className="flex justify-center">
+            <PatientSilhouette />
+          </div>
+          <div className="mt-2 bg-slate-200 dark:bg-white/10 rounded-full h-4 overflow-hidden">
+            <div className="bg-blue-500 h-full rounded-full transition-all duration-700 ease-out" style={{ width: isActive ? '71%' : '0%' }} />
+          </div>
+          <p className="text-[10px] font-bold text-blue-600 dark:text-blue-300 text-center mt-1">32 ratio</p>
+        </div>
       </div>
 
-      <div className={`mt-5 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 rounded-xl px-5 py-3 ${isActive ? 'animate-fadeSlideUp' : 'opacity-0'}`}>
-        <p className="text-sm text-slate-600 dark:text-slate-300">
-          The team that was most stretched at their worst moment. The formula provides nearly <span className="font-bold text-slate-700 dark:text-slate-200">2× the breathing room</span>.
-        </p>
+      <div className={`mt-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 rounded-xl px-5 py-3 max-w-xs ${isActive ? 'animate-fadeSlideUp' : 'opacity-0'}`} style={{ animationDelay: '300ms' }}>
+        <p className="text-xs text-blue-500 dark:text-blue-400">At peak strain, the worst-off team has</p>
+        <p className="text-sm font-bold text-blue-600 dark:text-blue-300">2× the staffing support.</p>
       </div>
 
-      <div className="mt-4 flex justify-center">
+      <p className="mt-2 text-xs sm:text-sm text-slate-600 dark:text-slate-400 max-w-xs leading-relaxed">
+        Every day, there's a moment when one team is more stretched than any other. Under the current process, nothing redirects the next patient elsewhere, that team just keeps getting hit. The formula catches the dip by always routing to the team with the most room, raising the floor from 18 to 32.
+      </p>
+
+      <div className="mt-2 flex justify-center">
         <InfoTip term="Capacity Ratio" label="Capacity Ratio">
           A team's total provider strength divided by their current patient load. Higher = more bandwidth to take a new patient.
         </InfoTip>
@@ -311,24 +407,24 @@ function CardSafetyFloor({ isActive }: { isActive: boolean }) {
 /* ─── Card 7: The Fairness Score ──────────────────────────────────────── */
 
 const FAIRNESS_ROWS = [
-  { label: 'Stress Equity', weight: 20, score: 0.90 },
-  { label: 'Capacity Balance', weight: 35, score: 0.84 },
-  { label: 'Acuity Balance', weight: 25, score: 0.84 },
-  { label: 'Safety Floor', weight: 20, score: 1.0 },
+  { label: 'Stress Equity', weight: 20, score: 0.90, actual: 0.82 },
+  { label: 'Capacity Balance', weight: 35, score: 0.84, actual: 0.72 },
+  { label: 'Acuity Balance', weight: 25, score: 0.84, actual: 0.70 },
+  { label: 'Safety Floor', weight: 20, score: 1.0, actual: 1.0 },
 ] as const;
 
 const FAIRNESS_TIPS: Record<string, string> = {
   'Capacity Balance': 'Are teams getting patients proportional to their staffing strength? A strong team with an attending + senior resident should handle more than a team with one intern.',
   'Acuity Balance': 'Is patient severity spread evenly, or does one team get all the high-acuity patients?',
   'Stress Equity': 'Did all teams experience similar levels of strain throughout the day, or did one team get hammered in a burst while another coasted? This is what the Slams and Back-to-Back High Acuity cards measure.',
-  'Safety Floor': 'How bad was the worst single moment? The formula nearly doubled the breathing room at the most stretched point of the day.',
+  'Safety Floor': 'Each day\'s worst single moment: how stretched was the most overloaded team? Averaged across all 121 days, the formula nearly doubled the breathing room at peak strain (capacity ratio 18 → 32).',
 };
 
 function CardFairnessScore({ isActive }: { isActive: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center h-full px-5 text-center">
       <p className="text-xs sm:text-sm uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-1 font-semibold">Fairness Score</p>
-      <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mb-4">Four dimensions combined into one composite</p>
+      <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mb-4">121-day averages: four dimensions combined into one composite</p>
 
       <div className="w-full max-w-xs space-y-2">
         {FAIRNESS_ROWS.map((row) => (
@@ -349,9 +445,12 @@ function CardFairnessScore({ isActive }: { isActive: boolean }) {
       <div className="mt-4 text-slate-300 dark:text-slate-600">↓</div>
 
       <div className={`mt-2 ${isActive ? 'animate-fadeScaleIn' : 'opacity-0'}`}>
-        <div className="text-4xl sm:text-5xl font-bold text-blue-500">92.2</div>
-        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">/ 100</p>
-        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">Actual process: <span className="font-semibold">85.7</span></p>
+        <div className="text-4xl sm:text-5xl font-bold text-blue-500">92.2 <span className="text-xs font-normal text-slate-600 dark:text-slate-400">/ 100</span></div>
+        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">121-day average</p>
+        <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Actual process: <span className="font-semibold text-red-500">85.7</span></p>
+        <p className="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5">p &lt; 0.001 · Cohen's d = 0.84
+          <InfoTip term="Cohen's d">A standardized measure of effect size: the difference between two group means divided by their pooled standard deviation. Values of 0.2, 0.5, and 0.8 are conventionally considered small, medium, and large effects. The formula's d = 0.84 is a large effect, meaning the improvement is not just statistically significant but practically meaningful.</InfoTip>
+        </p>
       </div>
 
       <p className="mt-4 text-xs text-slate-600 dark:text-slate-400 max-w-xs leading-relaxed">
@@ -405,10 +504,10 @@ function CardWinRate({ isActive }: { isActive: boolean }) {
 
       <div className="mt-3 flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
         <InfoTip term="Statistically Significant" label="Statistical Significance">
-          The improvement is unlikely to be due to chance. Every day of the week individually reached p &lt; 0.05 — the standard threshold in medical research.
+          The improvement is unlikely to be due to chance. Every day of the week individually reached p &lt; 0.05, the standard threshold in medical research.
         </InfoTip>
         <InfoTip term="Cohen's d = 0.84" label="Effect Size">
-          A measure of how large the effect is. 0.2 = small, 0.5 = medium, 0.8 = large. Ours is 0.84 — a large effect. It means if you picked a random day from each method, the formula's day would be better about 79% of the time.
+          A measure of how large the effect is. 0.2 = small, 0.5 = medium, 0.8 = large. Ours is 0.84, a large effect. It means if you picked a random day from each method, the formula's day would be better about 79% of the time.
         </InfoTip>
       </div>
     </div>
@@ -514,7 +613,7 @@ function CardSummary({ onBack, isActive, onMethodology }: { onBack: () => void; 
 
 /* ─── Main Component ──────────────────────────────────────────────────── */
 
-const TOTAL_CARDS = 11;
+const TOTAL_CARDS = 12;
 
 export default function EvidenceWalkthrough({ onBack }: { onBack: () => void }) {
   const [currentCard, setCurrentCard] = useState(0);
@@ -560,6 +659,7 @@ export default function EvidenceWalkthrough({ onBack }: { onBack: () => void }) 
   const cards = [
     (active: boolean) => <CardStudy key="study" isActive={active} />,
     (active: boolean) => <CardCurrentProcess key="current" isActive={active} />,
+    (active: boolean) => <CardRoadMap key="roadmap" isActive={active} />,
     (active: boolean) => <CardSlams key="slams" isActive={active} />,
     (active: boolean) => <CardDangerStacking key="danger" isActive={active} />,
     (active: boolean) => <CardCapacityBalance key="capacity" isActive={active} />,

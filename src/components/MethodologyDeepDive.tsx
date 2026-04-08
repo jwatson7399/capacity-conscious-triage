@@ -62,7 +62,7 @@ export default function MethodologyDeepDive({ onBack }: Props) {
         {/* 1. Data Source */}
         <Section title="1. Data Source">
           <p className="text-base text-slate-600 dark:text-slate-300 leading-relaxed mb-3">
-            Patient data was extracted from the Epic EMR system at NYU Langone Brooklyn. Arrival times come from ED tracking board timestamps, team assignments reflect the actual workflow, and provider schedules were parsed from 18 weekly <code className="text-xs bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded">.xlsx</code> files covering Dec 2025 &ndash; Mar 2026.
+            Patient data was extracted from the Epic EMR system for NYU Langone Brooklyn. Arrival times come from ED tracking board timestamps, team assignments reflect the actual workflow, and provider schedules were parsed from 18 weekly <code className="text-xs bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded">.xlsx</code> files covering Dec 2025 &ndash; Mar 2026.
           </p>
           <DataTable
             headers={['Scope', 'Encounters', 'Days']}
@@ -138,16 +138,16 @@ export default function MethodologyDeepDive({ onBack }: Props) {
             <div className="pl-16">+ (Safety Floor &times; 0.20)</div>
           </div>
           <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-            The underlying engine uses five components weighted 25/15/30/15/15. Two of them &mdash; Overwhelm Avoidance (30%) and Min Ratio Score (15%) &mdash; score 1.000 for all methods in this dataset, so the display folds their weight into the four visible dimensions.
+            The underlying engine uses five components weighted 25/15/30/15/15. Two of them (Overwhelm Avoidance at 30% and Min Ratio Score at 15%) score 1.000 for all methods in this dataset, so the display folds their weight into the four visible dimensions.
           </p>
           <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">121-day averages (each sub-score 0&ndash;1)</p>
           <DataTable
-            headers={['Dimension', 'Actual', 'Formula']}
+            headers={['Dimension', 'Actual', 'Formula', '\u0394', 'p']}
             rows={[
-              ['Capacity Balance', '0.715', '0.843'],
-              ['Acuity Balance', '0.700', '0.841'],
-              ['Stress Equity', '0.819', '0.903'],
-              ['Composite (0\u2013100)', '85.7', '92.2'],
+              ['Capacity Balance', '0.715', '0.843', '+17.9%', '<0.001'],
+              ['Acuity Balance', '0.700', '0.841', '+20.1%', '<0.001'],
+              ['Stress Equity', '0.819', '0.903', '+10.3%', '<0.001'],
+              ['Composite (0\u2013100)', '85.7', '92.2', '+7.6%', '<0.001'],
             ]}
           />
         </Section>
@@ -168,7 +168,7 @@ export default function MethodologyDeepDive({ onBack }: Props) {
             </div>
           </div>
           <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">
-            Overall significance: <strong>p &lt; 0.001</strong>. Day-of-week stratification confirms the formula doesn't just win on easy days &mdash; all seven weekdays are individually significant:
+            Overall significance: <strong>p &lt; 0.001</strong>. Day-of-week stratification confirms the formula doesn't just win on easy days. All seven weekdays are individually significant:
           </p>
           <DataTable
             headers={['Day', 'n', 'Win %', '\u0394', "Cohen's d", 'p']}
@@ -214,7 +214,7 @@ export default function MethodologyDeepDive({ onBack }: Props) {
             Sunday, Feb 9, 2026 illustrates the problem the formula solves. The actual process assigned <strong>8 of 12 patients to Team 1</strong>, left Team 3 with zero, and created 3 slams. The formula spread them 3/4/5 with no slams.
           </p>
 
-          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">Morning roster (9 AM) &mdash; all teams at capacity 35</p>
+          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">Morning roster (9 AM), all teams at capacity 35</p>
           <DataTable
             headers={['Team', 'Providers', 'Capacity']}
             rows={[
@@ -292,7 +292,7 @@ export default function MethodologyDeepDive({ onBack }: Props) {
             ]}
           />
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-3">
-            Feb 9 was a particularly bad day (fairness 62 vs the 121-day mean of 86), but the pattern &mdash; the actual process ignoring team capacity while the formula routes based on it &mdash; holds consistently. The formula won on 94 of 121 days.
+            Feb 9 was a particularly bad day (fairness 62 vs the 121-day mean of 86), but the pattern holds consistently: the actual process ignores team capacity while the formula routes based on it. The formula won on 94 of 121 days.
           </p>
         </Section>
 
