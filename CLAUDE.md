@@ -29,7 +29,7 @@ The Delphi provider-strength survey can optionally store responses in a shared G
 
 ### Setup
 
-1. Create a Google Sheet with columns: `Timestamp | Senior Resident | Junior Resident | Intern | PA | Rotator` (name the sheet tab `Responses`)
+1. Create a Google Sheet with columns: `Timestamp | Senior Resident | Junior Resident | Intern | PA | Rotator | Round` (name the sheet tab `Responses`). The `Round` column stores `1` or `2`; rows without a value are treated as Round 1.
 2. Open **Extensions → Apps Script** and paste:
 
 ```javascript
@@ -57,7 +57,8 @@ function doPost(e) {
     body.junior_resident,
     body.intern,
     body.pa,
-    body.rotator
+    body.rotator,
+    body.round || 1
   ]);
   return ContentService.createTextOutput(JSON.stringify({ status: 'ok' }))
     .setMimeType(ContentService.MimeType.JSON);

@@ -34,9 +34,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PROJECT_ROOT = join(__dirname, '..');
 
-const CENSUS_PATH = join(PROJECT_ROOT, 'provider data 12:25 - 3:26', 'Aside data Dec 2025–Mar 2026.xlsx');
-const SCHEDULE_DIR_1 = join(PROJECT_ROOT, 'provider data 12:25 - 3:26', 'schedules');
-const SCHEDULE_DIR_2 = join(PROJECT_ROOT, 'provider data 12:25 - 3:26', 'initially missing schedules');
+const CENSUS_PATH = join(PROJECT_ROOT, 'data', 'provider-schedules', 'Aside data Dec 2025–Mar 2026.xlsx');
+const SCHEDULE_DIR_1 = join(PROJECT_ROOT, 'data', 'provider-schedules', 'schedules');
+const SCHEDULE_DIR_2 = join(PROJECT_ROOT, 'data', 'provider-schedules', 'initially missing schedules');
 
 // ── Acuity weights (4:2:1) ────────────────────────────────────────
 

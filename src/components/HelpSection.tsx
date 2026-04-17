@@ -33,30 +33,29 @@ export default function HelpSection({ onClose, onShowBenchmark, onShowBacktest }
       {/* Quick Start — always visible */}
       <div className="px-4 py-4 text-sm text-gray-600 dark:text-gray-300 space-y-3 border-b border-gray-200 dark:border-slate-700">
         <p>
-          Replaces round-robin with capacity-based scoring — teams are recommended based on who actually has bandwidth, not whose turn it is.
+          Replaces round-robin with capacity-based scoring: teams are recommended based on who actually has bandwidth, not whose turn it is.
         </p>
         <p data-tour="help-problems">
           Round-robin can't tell that Team 2 just got a code and an intubation while Team 1 has two stable patients. This tool can.
         </p>
         <ul className="list-disc ml-4 space-y-1">
-          <li>The <strong>big number</strong> on each team card is <strong>Capacity</strong> — higher means more room for a new patient.</li>
+          <li>The <strong>big number</strong> on each team card is <strong>Capacity</strong>:higher means more room for a new patient.</li>
           <li>Tap <strong>+ New Patient</strong>, pick acuity color, and assign to the recommended team (or override).</li>
-          <li>After assignment, a <strong>buffer</strong> temporarily skips that team so they aren't hit back-to-back.</li>
         </ul>
         <p>
-          Every recommendation can be overridden. The final call is always yours. No new workflow — same assign flow, smarter suggestions.
+          Every recommendation can be overridden. The final call is always yours. No new workflow. Same assign flow, smarter suggestions.
         </p>
         {onShowBenchmark && (
           <div className="p-3 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-lg space-y-2">
             <p className="text-gray-800 dark:text-gray-200">
-              We tested this formula vs round-robin across 1,000 random shifts — it distributed workload more fairly 75% of the time.{' '}
+              Tested against 1,541 patient arrivals over 121 days of real NYU BK shifts: average capacity ratio +55%, minimum ratio +249%, back-to-back high-acuity events &minus;83% (all p &lt; 0.001).{' '}
               <button onClick={onShowBenchmark} className="text-blue-600 dark:text-blue-400 font-medium">
                 Benchmark →
               </button>
             </p>
             {onShowBacktest && (
               <p className="text-gray-800 dark:text-gray-200">
-                Then we replayed a real week of NYU BK schedules — still fairer 72% of the time.{' '}
+                Replay a real week of NYU BK schedules.{' '}
                 <button onClick={onShowBacktest} className="text-blue-600 dark:text-blue-400 font-medium">
                   Backtest →
                 </button>
@@ -71,8 +70,8 @@ export default function HelpSection({ onClose, onShowBenchmark, onShowBacktest }
         <div data-tour="help-formula-core">
           <p>Each team's <strong>Capacity = Strength / Demand</strong>. Higher = more room. The recommended team has the highest capacity among unbuffered teams.</p>
           <ul className="list-disc ml-4 space-y-1">
-            <li><strong>Strength</strong> — sum of provider weights adjusted by status (active, in procedure, etc.).</li>
-            <li><strong>Demand</strong> — sum of acuity weights for current patients, decaying over time as they stabilize.</li>
+            <li><strong>Strength</strong>:sum of provider weights adjusted by status (active, in procedure, etc.).</li>
+            <li><strong>Demand</strong>:sum of acuity weights for current patients, decaying over time as they stabilize.</li>
           </ul>
         </div>
         <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 rounded-lg space-y-1">
@@ -100,7 +99,7 @@ export default function HelpSection({ onClose, onShowBenchmark, onShowBacktest }
           <div className="space-y-1.5">
             <div className="relative rounded overflow-hidden h-5" style={{ background: CAPACITY_GRADIENT_CSS, opacity: 0.7 }}>
               <div className="absolute inset-0 flex">
-                {['<3.75', '3.75+', '5+', '7.5+', '10+', '21.25+'].map(label => (
+                {['<8.5', '8.5+', '11.5+', '16+', '23+', '50+'].map(label => (
                   <div key={label} className="flex-1 flex items-center justify-center">
                     <span className="text-[9px] font-semibold text-white/90 leading-none drop-shadow-sm">{label}</span>
                   </div>
@@ -108,14 +107,14 @@ export default function HelpSection({ onClose, onShowBenchmark, onShowBacktest }
               </div>
             </div>
             <div className="flex text-[9px] font-medium">
-              <div className="flex-1 text-center text-red-700 dark:text-red-400">Overwhelmed</div>
+              <div className="flex-1 text-center text-red-700 dark:text-red-400">Red Zone</div>
               <div className="flex-1 text-center text-red-600 dark:text-red-400">High Demand</div>
               <div className="flex-1 text-center text-orange-600 dark:text-orange-400">Very Busy</div>
               <div className="flex-1 text-center text-yellow-600 dark:text-yellow-400">Busy</div>
               <div className="flex-1 text-center text-green-600 dark:text-green-400">Manageable</div>
               <div className="flex-1 text-center text-emerald-600 dark:text-emerald-400">Comfortable</div>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Cutoffs calibrated from 1,000 simulated shifts run against 3 months of real NYU BK provider schedules. Boundaries placed at percentiles of the empirical distribution (23,193 observations), with granularity concentrated in the dense 4–10 range where teams spend most of their time.</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Cutoffs recalibrated under the recommended config (4:2:1 acuity weights, D6 linear decay, no buffers) from 1,000 simulated shifts run against 3 months of real NYU BK provider schedules (23,193 team-level observations). Boundaries placed at p5/p15/p33/p50/p75 of the empirical distribution.</p>
             <details className="mt-1">
               <summary className="text-xs text-blue-600 dark:text-blue-400 cursor-pointer">
                 How were these cutoffs derived?
@@ -124,26 +123,26 @@ export default function HelpSection({ onClose, onShowBenchmark, onShowBacktest }
                 <p>
                   <strong>Simulation setup.</strong> 1,000 eight-hour shifts were generated against 12 real NYU BK
                   provider schedule files (Dec 2025 – Mar 2026), covering 7 days × 4 shift windows (7A–3P, 9A–5P, 3P–11P, 5P–1A).
-                  Each run sampled a date's actual roster — real team compositions, provider types, and scheduled hours —
-                  then simulated patients arriving randomly at rates that match real-world patterns — busier in the
-                  morning, quieter at night — with a realistic mix of Red, Yellow, and Purple acuities.
+                  Each run sampled a date's actual roster (real team compositions, provider types, and scheduled hours),
+                  then simulated patients arriving randomly at rates that match real-world patterns (busier in the
+                  morning, quieter at night), with a realistic mix of Red, Yellow, and Purple acuities.
                 </p>
                 <p>
                   <strong>Capacity ratio distribution.</strong> At every simulated arrival, the receiving team's capacity ratio
-                  (Strength ÷ Demand) was recorded — 23,193 team-level observations total. The distribution is right-skewed
-                  with a mode at 5–6 and a secondary peak at 7–8. The bulk of observations fall between 3 and 15.
+                  (Strength ÷ Demand) was recorded: 23,193 team-level observations total. Under the recommended config the
+                  distribution is right-skewed with the modal plateau in the 10–15 range; the bulk of observations fall between
+                  8 and 30, with a long tail at very high ratios.
                 </p>
                 <p>
-                  <strong>Percentile boundaries.</strong> Thresholds were placed at empirical percentiles, with three tiers
-                  concentrated in the dense 3.75–10 plateau where teams spend 60%+ of their time:
+                  <strong>Percentile boundaries.</strong> Thresholds were placed at empirical percentiles:
                 </p>
                 <ul className="list-disc ml-4 space-y-0.5">
-                  <li><strong>≥ 21.25 (Comfortable)</strong> — top 25% (≥ p75); significant slack.</li>
-                  <li><strong>≥ 10 (Manageable)</strong> — p50–p75; above median, comfortable headroom.</li>
-                  <li><strong>≥ 7.5 (Busy)</strong> — p33–p50; secondary density peak, below median.</li>
-                  <li><strong>≥ 5 (Very Busy)</strong> — p15–p33; modal plateau, peak typical workload.</li>
-                  <li><strong>≥ 3.75 (High Demand)</strong> — p5–p15; approaching danger zone.</li>
-                  <li><strong>&lt; 3.75 (Overwhelmed)</strong> — bottom 5% (p5); demand approaching or exceeding capacity.</li>
+                  <li><strong>≥ 50 (Comfortable)</strong>:top 25% (≥ p75); significant slack.</li>
+                  <li><strong>≥ 23 (Manageable)</strong>:p50–p75; above median, comfortable headroom.</li>
+                  <li><strong>≥ 16 (Busy)</strong>:p33–p50; below median.</li>
+                  <li><strong>≥ 11.5 (Very Busy)</strong>:p15–p33; modal plateau, peak typical workload.</li>
+                  <li><strong>≥ 8.5 (High Demand)</strong>:p5–p15; approaching danger zone.</li>
+                  <li><strong>&lt; 8.5 (Red Zone)</strong>:bottom 5% (p5); demand approaching or exceeding capacity.</li>
                 </ul>
               </div>
             </details>
@@ -154,60 +153,43 @@ export default function HelpSection({ onClose, onShowBenchmark, onShowBacktest }
       {/* 2. Acuity Colors & Decay */}
       <Section title="Acuity Colors & Decay" dataTour="help-patient-load">
         <p>
-          When assigning a patient, select an acuity color. Each carries a different demand weight that decays as the patient stabilizes. Decay is a step function — demand drops instantly at each threshold, not gradually.
+          When assigning a patient, select an acuity color. Each carries a different demand weight that decays linearly to zero as the patient stabilizes.
         </p>
         <div data-tour="help-patient-load-chart">
         <table className="w-full text-left">
-          <thead><tr className="border-b"><th className="py-1">Color</th><th>Weight</th><th>Decay</th></tr></thead>
+          <thead><tr className="border-b"><th className="py-1">Color</th><th>Initial Weight</th><th>Stabilizes</th></tr></thead>
           <tbody>
-            <tr><td className="py-1"><span className="text-red-600 font-semibold">Red</span></td><td>5</td><td>→ 3 at 60m → 1 at 120m → 0 at 240m</td></tr>
-            <tr><td className="py-1"><span className="text-amber-600 font-semibold">Yellow</span></td><td>3</td><td>→ 1 at 90m → 0 at 240m</td></tr>
-            <tr><td className="py-1"><span className="text-violet-600 font-semibold">Purple</span></td><td>1</td><td>→ 0 at 120m</td></tr>
+            <tr><td className="py-1"><span className="text-red-600 font-semibold">Red</span></td><td>4</td><td>linearly to 0 over 180 min</td></tr>
+            <tr><td className="py-1"><span className="text-amber-600 font-semibold">Yellow</span></td><td>2</td><td>linearly to 0 over 180 min</td></tr>
+            <tr><td className="py-1"><span className="text-violet-600 font-semibold">Purple</span></td><td>1</td><td>linearly to 0 over 90 min</td></tr>
           </tbody>
         </table>
         </div>
         <div className="mt-2 space-y-2">
           <p className="font-semibold text-gray-700 dark:text-gray-200">Clinical examples</p>
           <ul className="list-disc ml-4 space-y-1">
-            <li><span className="text-red-600 font-semibold">Red</span> — Cardiac arrests, hypotensive arrhythmias, unstable active GIB, active seizure, anaphylaxis, likely intubation/BiPAP</li>
-            <li><span className="text-amber-600 font-semibold">Yellow</span> — Sepsis, AMS, normotensive arrhythmias, stable but active GIB, active EtOH withdrawal requiring IV benzos, seizure now postictal</li>
-            <li><span className="text-violet-600 font-semibold">Purple</span> — Sedated EDP on end-tidal CO₂ monitoring, stable overdose requiring observation</li>
+            <li><span className="text-red-600 font-semibold">Red</span>:Cardiac arrests, hypotensive arrhythmias, unstable active GIB, active seizure, anaphylaxis, likely intubation/BiPAP</li>
+            <li><span className="text-amber-600 font-semibold">Yellow</span>:Sepsis, AMS, normotensive arrhythmias, stable but active GIB, active EtOH withdrawal requiring IV benzos, seizure now postictal</li>
+            <li><span className="text-violet-600 font-semibold">Purple</span>:Sedated EDP on end-tidal CO₂ monitoring, stable overdose requiring observation</li>
           </ul>
         </div>
         <p>
-          Decay mirrors stabilization — a code requires intense resources on arrival, but as the patient stabilizes the marginal workload drops.
+          Decay mirrors stabilization: a code requires intense resources on arrival, but as the patient stabilizes the marginal workload drops.
         </p>
       </Section>
 
-      {/* 3. Buffers & Recommendations */}
-      <Section title="Buffers & Recommendations" dataTour="help-recommendations">
-        <p>
-          After assignment, a <strong>buffer</strong> temporarily skips that team from recommendations, preventing back-to-back hits. The acuity of the patient that created the buffer determines its duration:
-        </p>
-        <table className="w-full text-left">
-          <thead><tr className="border-b"><th className="py-1">Acuity</th><th>Buffer Duration</th></tr></thead>
-          <tbody>
-            <tr><td className="py-1"><span className="text-red-600 font-semibold">Red</span></td><td>35 minutes</td></tr>
-            <tr><td className="py-1"><span className="text-amber-600 font-semibold">Yellow</span></td><td>25 minutes</td></tr>
-            <tr><td className="py-1"><span className="text-violet-600 font-semibold">Purple</span></td><td>15 minutes</td></tr>
-          </tbody>
-        </table>
-        <p>The colored bar on each team card shows active buffers — it shrinks as time passes. Stacked buffers merge into a pulsing rainbow bar with a combined count.</p>
-
-        <p className="font-semibold text-gray-700 dark:text-gray-200 mt-2">Recommendation algorithm</p>
+      {/* 3. Recommendations */}
+      <Section title="Recommendations" dataTour="help-recommendations">
+        <p className="font-semibold text-gray-700 dark:text-gray-200">Algorithm</p>
         <ol className="list-decimal ml-4 space-y-1">
-          <li><strong>Exclude Trauma (Team 4)</strong> — always manual-only, never auto-recommended.</li>
-          <li><strong>Skip buffered teams</strong> — any active buffer grants temporary immunity from recommendation.</li>
-          <li><strong>Highest capacity wins</strong> — the unbuffered team with the most room gets the patient.</li>
-          <li><strong>Tiebreaker: recency</strong> — if capacity is equal, the team that went longest without a patient is preferred.</li>
-          <li><strong>Tiebreaker: team number</strong> — if still tied, lowest team number wins.</li>
+          <li><strong>Exclude Trauma (Team 4)</strong>:always manual-only, never auto-recommended.</li>
+          <li><strong>Highest capacity wins</strong>:the team with the most room gets the patient.</li>
+          <li><strong>Tiebreaker: recency</strong>:if capacity is equal, the team that went longest without a patient is preferred.</li>
+          <li><strong>Tiebreaker: team number</strong>:if still tied, lowest team number wins.</li>
         </ol>
-
-        <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 rounded-lg space-y-2">
-          <p className="font-semibold text-gray-800 dark:text-gray-200">All teams buffered? Recency takes over</p>
+        <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 rounded-lg">
           <p>
-            When every eligible team is buffered simultaneously, the system switches to <strong>least-recent-assignment-first</strong>
-            {' '}to force fair alternation. Capacity is still the tiebreaker, but recency dominates. When at least one team is unbuffered, normal priority resumes.
+            A team that just received a high-acuity patient sees its capacity drop immediately, so the next arrival is naturally directed elsewhere. No artificial cooldown is needed; the load model itself prevents back-to-back hits proportional to acuity.
           </p>
         </div>
       </Section>
@@ -216,26 +198,26 @@ export default function HelpSection({ onClose, onShowBenchmark, onShowBacktest }
       <Section title="Actions & Controls">
         <p className="font-semibold text-gray-700 dark:text-gray-200">Assigning patients</p>
         <ul className="list-disc ml-4 space-y-1">
-          <li><strong>+ New Patient</strong> (blue button) — Assign a new patient to the Critical area.</li>
+          <li><strong>+ New Patient</strong> (blue button): Assign a new patient to the Critical area.</li>
         </ul>
         <p className="font-semibold text-gray-700 dark:text-gray-200 mt-2">Per-patient actions</p>
         <p>Tap any patient badge to expand it:</p>
         <ul className="list-disc ml-4 space-y-1">
-          <li><strong>Upgrade to Red</strong> — Escalate acuity (resets weight and decay timer).</li>
-          <li><strong>Remove from A-Side</strong> — Patient discharged or no longer A-side.</li>
-          <li><strong>Mark Deceased</strong> — Grays out patient; applies 30-minute team buffer for debrief.</li>
-          <li><strong>Reassign to Another Team</strong> — Move patient to a different team (requires a reason).</li>
+          <li><strong>Upgrade to Red</strong>:Escalate acuity (resets weight and decay timer).</li>
+          <li><strong>Remove from A-Side</strong>:Patient discharged or no longer A-side.</li>
+          <li><strong>Mark Deceased</strong>:Grays out patient and pauses recommendations to that team briefly for debrief.</li>
+          <li><strong>Reassign to Another Team</strong>:Move patient to a different team (requires a reason).</li>
         </ul>
         <p className="font-semibold text-gray-700 dark:text-gray-200 mt-2">Team management</p>
         <ul className="list-disc ml-4 space-y-1">
-          <li><strong>Close Team</strong> — Teams 3/4 only. 60-minute countdown, then patients auto-transfer to partner team.</li>
-          <li><strong>Sign Out to Team N</strong> — Immediately transfer all patients from a closed team.</li>
-          <li><strong>Swap Provider</strong> — Replace a provider (e.g. shift change). Tap the provider row, then "Swap."</li>
-          <li><strong>Provider status</strong> — Cycle through Active, In Procedure, Taking Signout, Off Floor. Statuses auto-expire.</li>
+          <li><strong>Close Team</strong>:Teams 3/4 only. 60-minute countdown, then patients auto-transfer to partner team.</li>
+          <li><strong>Sign Out to Team N</strong>:Immediately transfer all patients from a closed team.</li>
+          <li><strong>Swap Provider</strong>:Replace a provider (e.g. shift change). Tap the provider row, then "Swap."</li>
+          <li><strong>Provider status</strong>:Cycle through Active, In Procedure, Taking Signout, Off Floor. Statuses auto-expire.</li>
         </ul>
         <p className="font-semibold text-gray-700 dark:text-gray-200 mt-2">Overrides</p>
         <p>
-          You can assign a patient to any team, not just the recommended one — select a reason when overriding. Overrides are logged for shift review. Team 4 (Trauma) is only reachable via override.
+          You can assign a patient to any team, not just the recommended one. Select a reason when overriding. Overrides are logged for shift review. Team 4 (Trauma) is only reachable via override.
         </p>
       </Section>
 
@@ -269,16 +251,15 @@ export default function HelpSection({ onClose, onShowBenchmark, onShowBacktest }
 
         <p className="font-semibold text-gray-700 dark:text-gray-200 mt-3">Patient nomenclature</p>
         <ul className="list-disc ml-4 space-y-1">
-          <li><strong>C-###</strong> — New arrival from triage assigned to Critical area (e.g. C-001)</li>
-          <li><strong>F-###</strong> — Floor upgrade patient (select "Floor Upgrade" as source when assigning)</li>
-          <li><strong>demand drops from N to M in [time]</strong> — Next decay step countdown</li>
-          <li><strong>(demand: N)</strong> — Current decayed weight</li>
-          <li><strong>(stabilized)</strong> — Demand fully decayed; no further reductions</li>
+          <li><strong>C-###</strong>:New arrival from triage assigned to Critical area (e.g. C-001)</li>
+          <li><strong>F-###</strong>:Floor upgrade patient (select "Floor Upgrade" as source when assigning)</li>
+          <li><strong>current demand X.X; stabilizes in [time]</strong>:Live decayed weight and time until weight reaches zero</li>
+          <li><strong>(stabilized)</strong>:Demand fully decayed; no further reductions</li>
         </ul>
 
         <div className="mt-3 p-3 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 rounded-lg">
           <p className="text-gray-700 dark:text-gray-300">
-            <strong>Calibration note:</strong> Weights reflect estimated supervisory capacity based on departmental input and iterative simulation tuning — these are configurable.
+            <strong>Calibration note:</strong> Provider weights come from a Delphi survey of NYU BK clinicians (n=19, attendings/seniors/PAs); attending = 20 is the fixed reference. Values are fetched live from the survey sheet and update as additional rounds complete.
           </p>
         </div>
       </Section>

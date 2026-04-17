@@ -1,13 +1,13 @@
 import type { ProviderType, ProviderStatus, AcuityTier, TeamId, FloatModifier } from './types';
 
-// Fallback defaults — overridden at runtime by Delphi survey averages (see useSurveyWeights)
+// Fallback defaults — Delphi round-one survey averages (n=19); overridden at runtime by live sheet (see useSurveyWeights)
 export const CAPACITY_WEIGHTS: Record<ProviderType, number> = {
   attending: 20,
-  senior_resident: 15,
-  junior_resident: 7.5,
-  intern: 5,
-  pa: 10,
-  rotator: 1,
+  senior_resident: 15.2,
+  junior_resident: 10.8,
+  intern: 6.6,
+  pa: 11.4,
+  rotator: 2.4,
 };
 
 export const STATUS_MULTIPLIERS: Record<ProviderStatus, number> = {
@@ -17,31 +17,26 @@ export const STATUS_MULTIPLIERS: Record<ProviderStatus, number> = {
   off_floor: 0,
 };
 
+// Recommended config (per Methods & Validation paper): 4 : 2 : 1 (Red : Yellow : Purple)
 export const ACUITY_WEIGHTS: Record<AcuityTier, number> = {
-  tier_one: 5,
-  tier_two: 3,
+  tier_one: 4,
+  tier_two: 2,
   tier_three: 1,
 };
 
+// Buffers removed (per Methods & Validation paper): the load model provides implicit protection.
 export const BUFFER_DURATIONS_MS: Record<AcuityTier, number> = {
-  tier_one: 35 * 60 * 1000,
-  tier_two: 25 * 60 * 1000,
-  tier_three: 15 * 60 * 1000,
+  tier_one: 0,
+  tier_two: 0,
+  tier_three: 0,
 };
 
+// D6 linear decay (per Methods & Validation paper): weight declines linearly from base to 0 over duration.
+// The single endpoint encodes the linear duration; getDecayedAcuityWeight interpolates linearly.
 export const ACUITY_DECAY: Record<AcuityTier, Array<{ afterMs: number; weight: number }>> = {
-  tier_one: [
-    { afterMs: 60 * 60 * 1000, weight: 3 },
-    { afterMs: 120 * 60 * 1000, weight: 1 },
-    { afterMs: 240 * 60 * 1000, weight: 0 },
-  ],
-  tier_two: [
-    { afterMs: 90 * 60 * 1000, weight: 1 },
-    { afterMs: 240 * 60 * 1000, weight: 0 },
-  ],
-  tier_three: [
-    { afterMs: 120 * 60 * 1000, weight: 0 },
-  ],
+  tier_one: [{ afterMs: 180 * 60 * 1000, weight: 0 }],
+  tier_two: [{ afterMs: 180 * 60 * 1000, weight: 0 }],
+  tier_three: [{ afterMs: 90 * 60 * 1000, weight: 0 }],
 };
 
 export const STATUS_EXPIRE_MS = 30 * 60 * 1000;
@@ -52,6 +47,11 @@ export const STATUS_EXPIRE_MS_MAP: Record<ProviderStatus, number | null> = {
   taking_signout: 30 * 60 * 1000,
   off_floor: 15 * 60 * 1000,
 };
+
+// Delphi round currently being collected. New survey submissions are stamped with this.
+// R2 panelists see R1 aggregate feedback (mean + IQR) on each slider.
+export const CURRENT_ROUND: 1 | 2 = 2;
+export const R2_MIN_RESPONSES = 5;
 
 export const TRAUMA_TEAM_ID = 4 as const;
 
@@ -129,27 +129,27 @@ export interface CapacityTerm {
   color: string;
 }
 
-export const OVERWHELM_THRESHOLD = 3.75;  // p5 of empirical distribution (23,193 obs)
+export const OVERWHELM_THRESHOLD = 8.5;  // p5 of empirical distribution (23,193 obs) under recommended config
 
 export const CAPACITY_TERMS: Array<{ minRatio: number; label: string; color: string }> = [
-  { minRatio: 21.25, label: 'Comfortable', color: 'text-emerald-500' },  // top 25% (≥ p75)
-  { minRatio: 10, label: 'Manageable', color: 'text-green-500' },        // p50–p75 (above median)
-  { minRatio: 7.5, label: 'Busy', color: 'text-yellow-600' },            // p33–p50 (secondary peak)
-  { minRatio: 5, label: 'Very Busy', color: 'text-orange-500' },         // p15–p33 (modal plateau)
+  { minRatio: 50, label: 'Comfortable', color: 'text-emerald-500' },     // top 25% (≥ p75)
+  { minRatio: 23, label: 'Manageable', color: 'text-green-500' },        // p50–p75 (above median)
+  { minRatio: 16, label: 'Busy', color: 'text-yellow-600' },             // p33–p50
+  { minRatio: 11.5, label: 'Very Busy', color: 'text-orange-500' },      // p15–p33 (modal plateau)
   { minRatio: OVERWHELM_THRESHOLD, label: 'High Demand', color: 'text-red-500' },  // p5–p15
 ];
 
 const COLOR_STOPS: Array<{ ratio: number; r: number; g: number; b: number }> = [
-  { ratio: 0, r: 153, g: 27, b: 27 },      // red-800
-  { ratio: 3.75, r: 239, g: 68, b: 68 },    // red-500
-  { ratio: 5.0, r: 249, g: 115, b: 22 },    // orange-500
-  { ratio: 7.5, r: 250, g: 204, b: 21 },    // yellow-400
-  { ratio: 10.0, r: 34, g: 197, b: 94 },    // green-500
-  { ratio: 21.25, r: 16, g: 185, b: 129 },  // emerald-500
+  { ratio: 0, r: 153, g: 27, b: 27 },        // red-800
+  { ratio: 8.5, r: 239, g: 68, b: 68 },      // red-500
+  { ratio: 11.5, r: 249, g: 115, b: 22 },    // orange-500
+  { ratio: 16, r: 250, g: 204, b: 21 },      // yellow-400
+  { ratio: 23, r: 34, g: 197, b: 94 },       // green-500
+  { ratio: 50, r: 16, g: 185, b: 129 },      // emerald-500
 ];
 
 export function getCapacityColor(ratio: number): string {
-  if (!isFinite(ratio) || ratio >= 21.25) return 'rgb(16, 185, 129)';
+  if (!isFinite(ratio) || ratio >= 50) return 'rgb(16, 185, 129)';
   if (ratio <= 0) return 'rgb(153, 27, 27)';
   for (let i = 0; i < COLOR_STOPS.length - 1; i++) {
     const a = COLOR_STOPS[i], b = COLOR_STOPS[i + 1];
@@ -168,5 +168,5 @@ export function getCapacityTerm(capacityRatio: number): CapacityTerm {
   for (const term of CAPACITY_TERMS) {
     if (capacityRatio >= term.minRatio) return { label: term.label, color: term.color };
   }
-  return { label: 'Overwhelmed', color: 'text-red-700' };
+  return { label: 'Red Zone', color: 'text-red-700' };
 }

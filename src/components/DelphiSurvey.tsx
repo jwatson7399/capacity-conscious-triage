@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { CURRENT_ROUND } from '../constants';
 
 type DelphiRole = { key: string; label: string; color: string; accent: string };
 
@@ -10,12 +11,24 @@ const ROLES: DelphiRole[] = [
   { key: 'rotator', label: 'Off-Service Rotator', color: 'bg-rose-500', accent: '#f43f5e' },
 ];
 
-const CSV_HEADERS = ['Timestamp', 'Senior Resident', 'Junior Resident', 'Intern', 'PA', 'Rotator'];
-const ROLE_KEYS = ['senior_resident', 'junior_resident', 'intern', 'pa', 'rotator'];
+const CSV_HEADERS = ['Timestamp', 'Senior Resident', 'Junior Resident', 'Intern', 'PA', 'Rotator', 'Round'];
+const ROLE_KEYS = ['senior_resident', 'junior_resident', 'intern', 'pa', 'rotator'] as const;
+const SHEET_COL: Record<string, string> = {
+  senior_resident: 'Senior Resident',
+  junior_resident: 'Junior Resident',
+  intern: 'Intern',
+  pa: 'PA',
+  rotator: 'Rotator',
+};
 
 const SHEETS_API = import.meta.env.VITE_DELPHI_SHEETS_URL || '';
 
-type ResponseEntry = { timestamp: string; responses: Record<string, number> };
+type ResponseEntry = { timestamp: string; responses: Record<string, number>; round: 1 | 2 };
+
+function parseRound(val: unknown): 1 | 2 {
+  const n = Number(val);
+  return n === 2 ? 2 : 1;
+}
 
 async function fetchSheetResponses(): Promise<ResponseEntry[] | null> {
   if (!SHEETS_API) return null;
@@ -23,12 +36,16 @@ async function fetchSheetResponses(): Promise<ResponseEntry[] | null> {
     const res = await fetch(SHEETS_API);
     const rows: Record<string, string | number>[] = await res.json();
     return rows
-      .filter(row => ROLE_KEYS.some(k => {
-        const col = { senior_resident: 'Senior Resident', junior_resident: 'Junior Resident', intern: 'Intern', pa: 'PA', rotator: 'Rotator' }[k]!;
-        return row[col] !== '' && row[col] != null && Number(row[col]) !== 0;
-      }))
+      .filter(row => {
+        if (row['Type'] === 'attestation') return false;
+        return ROLE_KEYS.some(k => {
+          const v = row[SHEET_COL[k]];
+          return v !== '' && v != null && Number(v) !== 0;
+        });
+      })
       .map(row => ({
         timestamp: String(row['Timestamp'] ?? ''),
+        round: parseRound(row['Round']),
         responses: {
           senior_resident: Number(row['Senior Resident'] ?? 0),
           junior_resident: Number(row['Junior Resident'] ?? 0),
@@ -56,6 +73,7 @@ async function submitToSheet(entry: ResponseEntry): Promise<void> {
         intern: entry.responses.intern,
         pa: entry.responses.pa,
         rotator: entry.responses.rotator,
+        round: entry.round,
       }),
     });
   } catch {
@@ -68,7 +86,7 @@ function downloadCSV(responses: ResponseEntry[]) {
   for (const entry of responses) {
     const ts = new Date(entry.timestamp).toLocaleString();
     const vals = ROLE_KEYS.map(k => entry.responses[k] ?? '');
-    rows.push([ts, ...vals].join(','));
+    rows.push([ts, ...vals, entry.round].join(','));
   }
   const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
@@ -79,21 +97,43 @@ function downloadCSV(responses: ResponseEntry[]) {
   URL.revokeObjectURL(url);
 }
 
-function computeAverages(responses: ResponseEntry[]): Record<string, number> {
-  if (responses.length === 0) return {};
-  const sums: Record<string, number> = {};
-  for (const key of ROLE_KEYS) sums[key] = 0;
-  for (const entry of responses) {
-    for (const key of ROLE_KEYS) sums[key] += entry.responses[key] ?? 0;
+function mean(values: number[]): number {
+  if (values.length === 0) return 0;
+  return values.reduce((a, b) => a + b, 0) / values.length;
+}
+
+function percentile(sorted: number[], p: number): number {
+  if (sorted.length === 0) return 0;
+  if (sorted.length === 1) return sorted[0];
+  const rank = p * (sorted.length - 1);
+  const lo = Math.floor(rank);
+  const hi = Math.ceil(rank);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (rank - lo) * (sorted[hi] - sorted[lo]);
+}
+
+function computeStats(responses: ResponseEntry[]): Record<string, { mean: number; p25: number; p75: number; n: number }> {
+  const out: Record<string, { mean: number; p25: number; p75: number; n: number }> = {};
+  for (const key of ROLE_KEYS) {
+    const vals = responses.map(r => r.responses[key] ?? 0).filter(v => !Number.isNaN(v));
+    const sorted = [...vals].sort((a, b) => a - b);
+    out[key] = {
+      mean: mean(vals),
+      p25: percentile(sorted, 0.25),
+      p75: percentile(sorted, 0.75),
+      n: vals.length,
+    };
   }
-  const avgs: Record<string, number> = {};
-  for (const key of ROLE_KEYS) avgs[key] = sums[key] / responses.length;
-  return avgs;
+  return out;
 }
 
 function loadResponses(): ResponseEntry[] {
-  try { return JSON.parse(localStorage.getItem('delphi-responses') || '[]'); }
-  catch { return []; }
+  try {
+    const raw = JSON.parse(localStorage.getItem('delphi-responses') || '[]');
+    return (raw as ResponseEntry[]).map(r => ({ ...r, round: parseRound(r.round) }));
+  } catch {
+    return [];
+  }
 }
 
 export default function DelphiSurvey({ onCancel, startOnResults }: { onCancel: () => void; startOnResults?: boolean }) {
@@ -103,8 +143,6 @@ export default function DelphiSurvey({ onCancel, startOnResults }: { onCancel: (
   );
   const [submitted, setSubmitted] = useState(startOnResults ?? false);
   const [delphiInfoOpen, setDelphiInfoOpen] = useState(false);
-  // TODO: re-add per-browser duplicate prevention (localStorage 'delphi-submitted' flag)
-  // Removed temporarily so multiple people can submit from the same device
 
   useEffect(() => {
     if (!SHEETS_API) return;
@@ -116,54 +154,71 @@ export default function DelphiSurvey({ onCancel, startOnResults }: { onCancel: (
     return () => clearInterval(id);
   }, []);
 
-  const submissionCount = allResponses.length;
-  const averages = computeAverages(allResponses);
+  const r1Responses = useMemo(() => allResponses.filter(r => r.round === 1), [allResponses]);
+  const r2Responses = useMemo(() => allResponses.filter(r => r.round === 2), [allResponses]);
+  const r1Stats = useMemo(() => computeStats(r1Responses), [r1Responses]);
+  const r2Stats = useMemo(() => computeStats(r2Responses), [r2Responses]);
+
+  const showR1Feedback = CURRENT_ROUND === 2 && r1Responses.length >= 3;
+  const currentCount = CURRENT_ROUND === 2 ? r2Responses.length : r1Responses.length;
 
   const handleSubmit = async () => {
-    const entry: ResponseEntry = { timestamp: new Date().toISOString(), responses: { ...ratings } };
+    const entry: ResponseEntry = {
+      timestamp: new Date().toISOString(),
+      responses: { ...ratings },
+      round: CURRENT_ROUND,
+    };
     const updated = [...allResponses, entry];
     localStorage.setItem('delphi-responses', JSON.stringify(updated));
     setAllResponses(updated);
     setSubmitted(true);
     await submitToSheet(entry);
-    // Re-fetch to get other people's submissions
     const fresh = await fetchSheetResponses();
     if (fresh) setAllResponses(fresh);
+    window.dispatchEvent(new Event('delphi-submitted'));
   };
 
-  // Results view — shown after submit or when viewing results from already-submitted screen
   const ResultsView = () => (
     <div className="dashboard-bg flex flex-col items-center justify-center p-6">
       <div className="glass-card rounded-xl p-8 max-w-sm w-full text-center">
         <div className="text-3xl mb-3">✓</div>
         <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Thank You</h2>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-          {submissionCount} response{submissionCount !== 1 ? 's' : ''} collected
+          R1: {r1Responses.length} · R2: {r2Responses.length}
         </p>
 
-        {/* Average scores table */}
-        {submissionCount > 0 && (
-          <div className="text-left mb-5 space-y-2">
-            <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Average Scores</h3>
-            {ROLES.map(r => (
-              <div key={r.key} className="flex items-center gap-2">
-                <span className={`w-2.5 h-2.5 rounded-full ${r.color} shrink-0`} />
-                <span className="text-sm text-slate-700 dark:text-slate-300 flex-1">{r.label}</span>
-                <span className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">
-                  {averages[r.key]?.toFixed(1)}
-                </span>
-                <div className="w-16 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full"
-                    style={{ width: `${((averages[r.key] ?? 0) / 20) * 100}%`, backgroundColor: r.accent }}
-                  />
+        <div className="text-left mb-5 space-y-3">
+          <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+            Average Scores (R1 vs R2)
+          </h3>
+          {ROLES.map(r => {
+            const r1 = r1Stats[r.key];
+            const r2 = r2Stats[r.key];
+            return (
+              <div key={r.key} className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2.5 h-2.5 rounded-full ${r.color} shrink-0`} />
+                  <span className="text-sm text-slate-700 dark:text-slate-300">{r.label}</span>
+                </div>
+                <div className="flex items-center gap-2 pl-4 text-xs">
+                  <span className="w-6 text-slate-500">R1</span>
+                  <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full opacity-60" style={{ width: `${(r1.mean / 20) * 100}%`, backgroundColor: r.accent }} />
+                  </div>
+                  <span className="w-8 text-right tabular-nums text-slate-700 dark:text-slate-300">{r1.n > 0 ? r1.mean.toFixed(1) : '—'}</span>
+                </div>
+                <div className="flex items-center gap-2 pl-4 text-xs">
+                  <span className="w-6 text-slate-500 font-semibold">R2</span>
+                  <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: `${(r2.mean / 20) * 100}%`, backgroundColor: r.accent }} />
+                  </div>
+                  <span className="w-8 text-right tabular-nums text-slate-900 dark:text-white font-semibold">{r2.n > 0 ? r2.mean.toFixed(1) : '—'}</span>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            );
+          })}
+        </div>
 
-        {/* Delphi Method explainer */}
         <details
           className="text-left mb-5 glass-card rounded-lg p-3"
           open={delphiInfoOpen}
@@ -179,17 +234,7 @@ export default function DelphiSurvey({ onCancel, startOnResults }: { onCancel: (
             </div>
             <div>
               <p className="font-semibold text-slate-700 dark:text-slate-300 mb-1">Why it works here</p>
-              <p>In Round 1 you rate each role blind — running averages are revealed only after you submit. In Round 2 you can calibrate your ratings against the group, driving convergence toward shared consensus.</p>
-            </div>
-            <div>
-              <p className="font-semibold text-slate-700 dark:text-slate-300 mb-1">Delphi products you already use in the ED</p>
-              <ul className="list-disc list-inside space-y-1.5 mt-1">
-                <li><span className="font-medium text-slate-700 dark:text-slate-300">ESI & CTAS triage scales</span> — the 5-level Emergency Severity Index and Canadian Triage and Acuity Scale were both developed and validated through Delphi consensus</li>
-                <li><span className="font-medium text-slate-700 dark:text-slate-300">Wells Criteria & HEART Score</span> — clinical prediction rules for PE/DVT and chest pain risk stratification derived from structured expert consensus panels</li>
-                <li><span className="font-medium text-slate-700 dark:text-slate-300">Surviving Sepsis Campaign</span> — the sepsis bundles every ED follows are produced using modified Delphi (GRADE + expert panel voting)</li>
-                <li><span className="font-medium text-slate-700 dark:text-slate-300">ACLS/BLS protocols</span> — ILCOR/AHA resuscitation guidelines are updated every 5 years using systematic review + Delphi consensus among international experts</li>
-                <li><span className="font-medium text-slate-700 dark:text-slate-300">ACGME EM Milestones</span> — the competency framework used to evaluate EM residents was built entirely through Delphi consensus among educators</li>
-              </ul>
+              <p>In Round 1 you rated each role blind. In Round 2 you re-rate each role after seeing the R1 group mean and interquartile range, driving convergence toward shared consensus.</p>
             </div>
           </div>
         </details>
@@ -219,10 +264,13 @@ export default function DelphiSurvey({ onCancel, startOnResults }: { onCancel: (
     </div>
   );
 
-  // Post-submission results
   if (submitted) return <ResultsView />;
 
-  // Survey form
+  const headerTitle = CURRENT_ROUND === 2 ? 'Provider Strength Survey, Round 2' : 'Provider Strength Survey';
+  const headerSub = CURRENT_ROUND === 2
+    ? 'Re-rate each role after seeing the Round 1 group mean and interquartile range. Aim for your honest calibrated judgment. Convergence is not required.'
+    : 'How strong is each role clinically? Drag each slider to score independence from 0 (fully supervised) to 20 (attending-level autonomy).';
+
   return (
     <div className="dashboard-bg flex flex-col items-center p-6 overflow-y-auto">
       <button
@@ -232,17 +280,13 @@ export default function DelphiSurvey({ onCancel, startOnResults }: { onCancel: (
         ← Back
       </button>
 
-      <h1 className="text-xl font-bold text-slate-900 dark:text-white mb-1">Provider Strength Survey</h1>
-      <p className="text-sm text-slate-500 dark:text-slate-400 text-center max-w-sm mb-3">
-        How strong is each role clinically? Drag each slider to score independence from 0 (fully supervised) to 20 (attending-level autonomy).
-      </p>
+      <h1 className="text-xl font-bold text-slate-900 dark:text-white mb-1">{headerTitle}</h1>
+      <p className="text-sm text-slate-500 dark:text-slate-400 text-center max-w-sm mb-3">{headerSub}</p>
 
-      {/* Submission count badge */}
       <span className="inline-block bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-medium px-3 py-1 rounded-full mb-4">
-        {submissionCount} response{submissionCount !== 1 ? 's' : ''} collected
+        Round {CURRENT_ROUND}: {currentCount} response{currentCount !== 1 ? 's' : ''} collected
       </span>
 
-      {/* Reference scale */}
       <div className="w-full max-w-sm mb-6">
         <div className="relative h-4 rounded-full bg-gradient-to-r from-slate-300 to-blue-500 dark:from-slate-600 dark:to-blue-400">
           {[0, 5, 10, 15].map(v => (
@@ -266,31 +310,77 @@ export default function DelphiSurvey({ onCancel, startOnResults }: { onCancel: (
         </div>
       </div>
 
-      {/* Slider cards */}
+      {showR1Feedback && (
+        <div className="w-full max-w-sm text-[11px] text-slate-500 dark:text-slate-400 mb-3 leading-snug">
+          <span className="font-semibold text-slate-600 dark:text-slate-300">IQR</span> (interquartile range) = the middle 50% of Round 1 responses (25th–75th percentile). The colored band shows this spread; the tick shows the group mean. <span className="text-slate-600 dark:text-slate-300">Wider band = more disagreement · tighter band = stronger consensus.</span>
+        </div>
+      )}
+
       <div className="w-full max-w-sm space-y-4 mb-6">
-        {ROLES.map(r => (
-          <div key={r.key} className="glass-card rounded-xl px-5 py-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-white text-sm">
-                <span className={`w-2.5 h-2.5 rounded-full ${r.color} shrink-0`} />
-                {r.label}
-              </span>
-              <span className="text-2xl font-bold text-blue-600 dark:text-blue-400 tabular-nums w-8 text-right">
-                {ratings[r.key]}
-              </span>
+        {ROLES.map(r => {
+          const s = r1Stats[r.key];
+          const showBand = showR1Feedback && s.n >= 3;
+          const p25Pct = (s.p25 / 20) * 100;
+          const p75Pct = (s.p75 / 20) * 100;
+          const meanPct = (s.mean / 20) * 100;
+          return (
+            <div key={r.key} className="glass-card rounded-xl px-5 py-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-white text-sm">
+                  <span className={`w-2.5 h-2.5 rounded-full ${r.color} shrink-0`} />
+                  {r.label}
+                </span>
+                <span className="text-2xl font-bold text-blue-600 dark:text-blue-400 tabular-nums w-8 text-right">
+                  {ratings[r.key]}
+                </span>
+              </div>
+
+              {showBand && (
+                <div className="relative h-4 mb-1 rounded-full bg-slate-100 dark:bg-slate-800/60">
+                  <div
+                    className="absolute top-1/2 -translate-y-1/2 h-1 rounded-full opacity-25"
+                    style={{
+                      left: `${p25Pct}%`,
+                      width: `${Math.max(p75Pct - p25Pct, 1)}%`,
+                      backgroundColor: r.accent,
+                    }}
+                  />
+                  <div
+                    className="absolute top-0 bottom-0 w-1 rounded-sm"
+                    style={{ left: `calc(${meanPct}% - 2px)`, backgroundColor: r.accent }}
+                  />
+                  <div
+                    className="absolute -top-1 text-[11px] font-bold tabular-nums"
+                    style={{
+                      left: `${meanPct}%`,
+                      transform: 'translateX(-50%)',
+                      color: r.accent,
+                      top: '-14px',
+                    }}
+                  >
+                    {s.mean.toFixed(1)}
+                  </div>
+                </div>
+              )}
+              {showBand && (
+                <div className="text-[10px] text-slate-400 dark:text-slate-500 mb-2 tabular-nums">
+                  R1 mean (n={s.n}) · IQR {s.p25.toFixed(1)}–{s.p75.toFixed(1)}
+                </div>
+              )}
+
+              <input
+                type="range"
+                min={0}
+                max={20}
+                step={1}
+                value={ratings[r.key]}
+                onChange={e => setRatings(prev => ({ ...prev, [r.key]: Number(e.target.value) }))}
+                className="w-full"
+                style={{ accentColor: r.accent }}
+              />
             </div>
-            <input
-              type="range"
-              min={0}
-              max={20}
-              step={1}
-              value={ratings[r.key]}
-              onChange={e => setRatings(prev => ({ ...prev, [r.key]: Number(e.target.value) }))}
-              className="w-full"
-              style={{ accentColor: r.accent }}
-            />
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <button

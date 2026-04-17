@@ -28,6 +28,7 @@ import { statsFromEntries, computeFairness, computeFairnessDetailed } from '../s
 import type { FairnessBreakdown } from '../src/engine/fairness';
 import {
   getRecommendation, scoreTeam, createBuffer, getEffectiveCapacity,
+  getDecayedAcuityWeight,
 } from '../src/engine/recommendation';
 import type { ScoringOverrides } from '../src/engine/recommendation';
 import { TRAUMA_TEAM_ID, OVERWHELM_THRESHOLD, ACUITY_WEIGHTS } from '../src/constants';
@@ -38,6 +39,7 @@ import { uid } from '../src/uid';
 const FLAG_JSON = process.argv.includes('--json');
 const FLAG_VERBOSE = process.argv.includes('--verbose');
 const FLAG_OUTCOMES = process.argv.includes('--outcomes');
+const FLAG_POST_ASSIGN = process.argv.includes('--post-assign');
 
 // --weights 4:2:1  →  override acuity weights (tier_one:tier_two:tier_three)
 const weightsIdx = process.argv.findIndex(a => a === '--weights');
@@ -77,15 +79,53 @@ function parseWeightFlag(flag: string | null): { acuityWeights: Record<AcuityTie
 const WEIGHT_OVERRIDE = parseWeightFlag(FLAG_WEIGHTS);
 const WEIGHT_LABEL = FLAG_WEIGHTS ?? '5:3:1';
 
+// --decay none | --decay timeout:T  →  override decay schedule (applied after --weights)
+const decayIdx = process.argv.findIndex(a => a === '--decay');
+const FLAG_DECAY = decayIdx >= 0 ? process.argv[decayIdx + 1] : null;
+let DECAY_LABEL = '';
+
+function applyDecayOverride(base: typeof WEIGHT_OVERRIDE): typeof WEIGHT_OVERRIDE {
+  if (!FLAG_DECAY || !base) return base;
+
+  if (FLAG_DECAY === 'none') {
+    DECAY_LABEL = 'no-decay';
+    return {
+      ...base,
+      decaySteps: { tier_one: [], tier_two: [], tier_three: [] },
+    };
+  }
+
+  const timeoutMatch = FLAG_DECAY.match(/^timeout:(\d+)$/);
+  if (timeoutMatch) {
+    const T = parseInt(timeoutMatch[1], 10);
+    DECAY_LABEL = `timeout-${T}`;
+    const step = [{ afterMs: T * 60 * 1000, weight: 0 }];
+    return {
+      ...base,
+      decaySteps: { tier_one: step, tier_two: step, tier_three: step },
+    };
+  }
+
+  if (FLAG_DECAY === 'current') {
+    DECAY_LABEL = '';
+    return base;
+  }
+
+  console.error(`  ERROR: --decay must be 'none', 'current', or 'timeout:T' (e.g., timeout:240)`);
+  process.exit(1);
+}
+
+const EFFECTIVE_OVERRIDE = applyDecayOverride(WEIGHT_OVERRIDE);
+
 // ── Paths ──────────────────────────────────────────────────────────
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PROJECT_ROOT = join(__dirname, '..');
 
-const CENSUS_PATH = join(PROJECT_ROOT, 'provider data 12:25 - 3:26', 'Aside data Dec 2025–Mar 2026.xlsx');
-const SCHEDULE_DIR_1 = join(PROJECT_ROOT, 'provider data 12:25 - 3:26', 'schedules');
-const SCHEDULE_DIR_2 = join(PROJECT_ROOT, 'provider data 12:25 - 3:26', 'initially missing schedules');
+const CENSUS_PATH = join(PROJECT_ROOT, 'data', 'provider-schedules', 'Aside data Dec 2025–Mar 2026.xlsx');
+const SCHEDULE_DIR_1 = join(PROJECT_ROOT, 'data', 'provider-schedules', 'schedules');
+const SCHEDULE_DIR_2 = join(PROJECT_ROOT, 'data', 'provider-schedules', 'initially missing schedules');
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -137,6 +177,13 @@ interface CohortMetrics {
   giniCount: number;
   giniAcuity: number;
   entries: ReplayEntry[];
+  loadMinutesPerTeam: Record<number, number>;
+  capacityMinutesPerTeam: Record<number, number>;
+  normalizedLoadMinutesPerTeam: Record<number, number>;
+  loadMinutesSD: number;
+  normalizedLoadMinutesSD: number;
+  windowStartMs: number;
+  windowEndMs: number;
 }
 
 // ── ESI → Acuity mapping ──────────────────────────────────────────
@@ -432,8 +479,8 @@ const overrides = getDefaultOverrides();
 const scoringOv: ScoringOverrides = {
   capacityWeights: overrides.capacityWeights,
   statusMultipliers: overrides.statusMultipliers,
-  acuityWeights: WEIGHT_OVERRIDE?.acuityWeights ?? overrides.acuityWeights,
-  decaySteps: WEIGHT_OVERRIDE?.decaySteps ?? overrides.decaySteps,
+  acuityWeights: EFFECTIVE_OVERRIDE?.acuityWeights ?? overrides.acuityWeights,
+  decaySteps: EFFECTIVE_OVERRIDE?.decaySteps ?? overrides.decaySteps,
   bufferDurations: overrides.bufferDurations,
 };
 
@@ -461,6 +508,8 @@ function replayCohort(
       teamCounts: {}, avgRatio: 0, minRatio: 0,
       overwhelms: 0, backToBackHA: 0, slams: 0, teamSpread: 0, acuitySpread: 0,
       giniCount: 0, giniAcuity: 0, entries: [],
+      loadMinutesPerTeam: {}, capacityMinutesPerTeam: {}, normalizedLoadMinutesPerTeam: {},
+      loadMinutesSD: 0, normalizedLoadMinutesSD: 0, windowStartMs: 0, windowEndMs: 0,
     };
     return { actual: empty, formula: empty, formulaNoBuffer: empty, roundRobin: empty, formulaAgreement: 0, actualPickedBest: 0 };
   }
@@ -525,7 +574,7 @@ function replayCohort(
     // ── FORMULA MODE ──
     {
       formulaBuffers = formulaBuffers.filter(b => b.expiresAt > now);
-      const rec = getRecommendation(simProviders, formulaPatients, formulaBuffers, now, closedTeams, scoringOv);
+      const rec = getRecommendation(simProviders, formulaPatients, formulaBuffers, now, closedTeams, scoringOv, FLAG_POST_ASSIGN ? arr.acuity : undefined);
       const teamId = rec.first ?? eligibleTeams[0];
       const score = scoreTeam(teamId, simProviders, formulaPatients, formulaBuffers, now, scoringOv);
       const ratio = score.capacityRatio === Infinity ? 100 : score.capacityRatio;
@@ -568,7 +617,7 @@ function replayCohort(
     // ── FORMULA NO-BUFFER MODE ──
     {
       // No buffers: just capacity-aware routing with no cooldown protection
-      const rec = getRecommendation(simProviders, fnbPatients, [], now, closedTeams, scoringOvNoBuffer);
+      const rec = getRecommendation(simProviders, fnbPatients, [], now, closedTeams, scoringOvNoBuffer, FLAG_POST_ASSIGN ? arr.acuity : undefined);
       const teamId = rec.first ?? eligibleTeams[0];
       const score = scoreTeam(teamId, simProviders, fnbPatients, [], now, scoringOvNoBuffer);
       const ratio = score.capacityRatio === Infinity ? 100 : score.capacityRatio;
@@ -652,6 +701,50 @@ function replayCohort(
     const giniAcuityVal = gini(acuityLoadValues);
     const acuitySpreadVal = acuityLoadValues.length > 0 ? Math.max(...acuityLoadValues) - Math.min(...acuityLoadValues) : 0;
 
+    // ── Load-minutes: integrate acuity-weighted load and capacity across the shift window ──
+    // Window = [firstArrival, shiftEnd] where shiftEnd is midnight for three-team cohort (9A shift start
+    // + 15h) or 9am for two-team cohort (0A shift start + 9h). Anchored from firstArrival's local date
+    // so timezone matches how `hour` was computed when parsing the census. Per-minute step.
+    const firstArrivalMs = arrivals[0].arrivalTime;
+    const shiftAnchor = new Date(firstArrivalMs);
+    const isThreeTeam = eligibleTeams.length === 3;
+    shiftAnchor.setHours(isThreeTeam ? 9 : 0, 0, 0, 0);
+    const shiftStartMs = shiftAnchor.getTime();
+    const shiftEndMs = shiftStartMs + (isThreeTeam ? 15 : 9) * 3_600_000;
+    const windowStartMs = Math.min(firstArrivalMs, shiftStartMs);
+    const windowEndMs = shiftEndMs;
+
+    const loadMins: Record<number, number> = {};
+    const capMins: Record<number, number> = {};
+    for (const t of eligibleTeams) { loadMins[t] = 0; capMins[t] = 0; }
+
+    const STEP_MS = 60_000;
+    for (let now = windowStartMs; now < windowEndMs; now += STEP_MS) {
+      const hourOfDay = new Date(now).getHours();
+      const { providers: scheduledProviders } = getProvidersForShift(day, hourOfDay);
+      const simProviders = toProviders(scheduledProviders);
+      for (const team of eligibleTeams) {
+        let load = 0;
+        for (const p of patients) {
+          if (p.assignedTeamId !== team) continue;
+          if (p.assignedAt > now) continue;
+          load += getDecayedAcuityWeight(p, now, scoringOv);
+        }
+        loadMins[team] += load;
+        const teamProviders = simProviders.filter(p => p.teamId === team);
+        capMins[team] += getEffectiveCapacity(teamProviders, now, scoringOv);
+      }
+    }
+
+    const normalizedLoadMins: Record<number, number> = {};
+    for (const t of eligibleTeams) {
+      normalizedLoadMins[t] = capMins[t] > 0 ? loadMins[t] / capMins[t] : 0;
+    }
+    const loadMinVals = eligibleTeams.map(t => loadMins[t]);
+    const normVals = eligibleTeams.map(t => normalizedLoadMins[t]);
+    const loadMinutesSDVal = stddev(loadMinVals);
+    const normalizedLoadMinutesSDVal = stddev(normVals);
+
     return {
       fairness,
       fairnessBreakdown,
@@ -666,6 +759,13 @@ function replayCohort(
       giniCount: giniCountVal,
       giniAcuity: giniAcuityVal,
       entries,
+      loadMinutesPerTeam: loadMins,
+      capacityMinutesPerTeam: capMins,
+      normalizedLoadMinutesPerTeam: normalizedLoadMins,
+      loadMinutesSD: loadMinutesSDVal,
+      normalizedLoadMinutesSD: normalizedLoadMinutesSDVal,
+      windowStartMs,
+      windowEndMs,
     };
   }
 
@@ -928,7 +1028,11 @@ console.log('\nHistorical Replay Benchmark');
 console.log('═'.repeat(70));
 if (WEIGHT_OVERRIDE) {
   console.log(`  *** USING CUSTOM WEIGHTS: ${WEIGHT_LABEL} (tier_one:tier_two:tier_three) ***`);
-  console.log(`  Decay schedule adjusted to match weight ratios`);
+  if (DECAY_LABEL) {
+    console.log(`  Decay override: ${DECAY_LABEL}`);
+  } else {
+    console.log(`  Decay schedule adjusted to match weight ratios`);
+  }
 }
 
 // Step 1: Load census data
@@ -1045,7 +1149,8 @@ console.log('  HISTORICAL REPLAY — REAL ARRIVALS × REAL SCHEDULES');
 console.log(`  Dec 2025 – Mar 2026 · ${processedDates} days · ${arrivals.length} A-side encounters`);
 console.log(`  (${excludedCount} trauma/Team 4 encounters excluded from ${totalCount} total)`);
 if (WEIGHT_OVERRIDE) {
-  console.log(`  Acuity weights: ${WEIGHT_LABEL} · Decay: adjusted`);
+  const decayDesc = DECAY_LABEL || 'adjusted';
+  console.log(`  Acuity weights: ${WEIGHT_LABEL} · Decay: ${decayDesc}${FLAG_POST_ASSIGN ? ' · Post-assign scoring' : ''}`);
 }
 console.log('═'.repeat(70));
 
@@ -1280,9 +1385,10 @@ if (FLAG_JSON) {
       date: d.date,
       dayOfWeek: d.dayOfWeek,
       arrivalCount: d.arrivalCount,
-      actual: { fairness: d.actual.fairness, fairnessBreakdown: d.actual.fairnessBreakdown, giniCount: d.actual.giniCount, giniAcuity: d.actual.giniAcuity, avgRatio: d.actual.avgRatio, minRatio: d.actual.minRatio, overwhelms: d.actual.overwhelms, backToBackHA: d.actual.backToBackHA, slams: d.actual.slams, teamSpread: d.actual.teamSpread, acuitySpread: d.actual.acuitySpread, teamCounts: d.actual.teamCounts},
-      formula: { fairness: d.formula.fairness, fairnessBreakdown: d.formula.fairnessBreakdown, giniCount: d.formula.giniCount, giniAcuity: d.formula.giniAcuity, avgRatio: d.formula.avgRatio, minRatio: d.formula.minRatio, overwhelms: d.formula.overwhelms, backToBackHA: d.formula.backToBackHA, slams: d.formula.slams, teamSpread: d.formula.teamSpread, acuitySpread: d.formula.acuitySpread, teamCounts: d.formula.teamCounts },
-      roundRobin: { fairness: d.roundRobin.fairness, fairnessBreakdown: d.roundRobin.fairnessBreakdown, giniCount: d.roundRobin.giniCount, giniAcuity: d.roundRobin.giniAcuity, avgRatio: d.roundRobin.avgRatio, minRatio: d.roundRobin.minRatio, overwhelms: d.roundRobin.overwhelms, backToBackHA: d.roundRobin.backToBackHA, slams: d.roundRobin.slams, teamSpread: d.roundRobin.teamSpread, acuitySpread: d.roundRobin.acuitySpread, teamCounts: d.roundRobin.teamCounts },
+      actual: { fairness: d.actual.fairness, fairnessBreakdown: d.actual.fairnessBreakdown, giniCount: d.actual.giniCount, giniAcuity: d.actual.giniAcuity, avgRatio: d.actual.avgRatio, minRatio: d.actual.minRatio, overwhelms: d.actual.overwhelms, backToBackHA: d.actual.backToBackHA, slams: d.actual.slams, teamSpread: d.actual.teamSpread, acuitySpread: d.actual.acuitySpread, teamCounts: d.actual.teamCounts, loadMinutesPerTeam: d.actual.loadMinutesPerTeam, capacityMinutesPerTeam: d.actual.capacityMinutesPerTeam, normalizedLoadMinutesPerTeam: d.actual.normalizedLoadMinutesPerTeam, loadMinutesSD: d.actual.loadMinutesSD, normalizedLoadMinutesSD: d.actual.normalizedLoadMinutesSD, windowStartMs: d.actual.windowStartMs, windowEndMs: d.actual.windowEndMs },
+      formula: { fairness: d.formula.fairness, fairnessBreakdown: d.formula.fairnessBreakdown, giniCount: d.formula.giniCount, giniAcuity: d.formula.giniAcuity, avgRatio: d.formula.avgRatio, minRatio: d.formula.minRatio, overwhelms: d.formula.overwhelms, backToBackHA: d.formula.backToBackHA, slams: d.formula.slams, teamSpread: d.formula.teamSpread, acuitySpread: d.formula.acuitySpread, teamCounts: d.formula.teamCounts, loadMinutesPerTeam: d.formula.loadMinutesPerTeam, capacityMinutesPerTeam: d.formula.capacityMinutesPerTeam, normalizedLoadMinutesPerTeam: d.formula.normalizedLoadMinutesPerTeam, loadMinutesSD: d.formula.loadMinutesSD, normalizedLoadMinutesSD: d.formula.normalizedLoadMinutesSD, windowStartMs: d.formula.windowStartMs, windowEndMs: d.formula.windowEndMs },
+      roundRobin: { fairness: d.roundRobin.fairness, fairnessBreakdown: d.roundRobin.fairnessBreakdown, giniCount: d.roundRobin.giniCount, giniAcuity: d.roundRobin.giniAcuity, avgRatio: d.roundRobin.avgRatio, minRatio: d.roundRobin.minRatio, overwhelms: d.roundRobin.overwhelms, backToBackHA: d.roundRobin.backToBackHA, slams: d.roundRobin.slams, teamSpread: d.roundRobin.teamSpread, acuitySpread: d.roundRobin.acuitySpread, teamCounts: d.roundRobin.teamCounts, loadMinutesPerTeam: d.roundRobin.loadMinutesPerTeam, capacityMinutesPerTeam: d.roundRobin.capacityMinutesPerTeam, normalizedLoadMinutesPerTeam: d.roundRobin.normalizedLoadMinutesPerTeam, loadMinutesSD: d.roundRobin.loadMinutesSD, normalizedLoadMinutesSD: d.roundRobin.normalizedLoadMinutesSD, windowStartMs: d.roundRobin.windowStartMs, windowEndMs: d.roundRobin.windowEndMs },
+      formulaNoBuffer: { fairness: d.formulaNoBuffer.fairness, fairnessBreakdown: d.formulaNoBuffer.fairnessBreakdown, giniCount: d.formulaNoBuffer.giniCount, giniAcuity: d.formulaNoBuffer.giniAcuity, avgRatio: d.formulaNoBuffer.avgRatio, minRatio: d.formulaNoBuffer.minRatio, overwhelms: d.formulaNoBuffer.overwhelms, backToBackHA: d.formulaNoBuffer.backToBackHA, slams: d.formulaNoBuffer.slams, teamSpread: d.formulaNoBuffer.teamSpread, acuitySpread: d.formulaNoBuffer.acuitySpread, teamCounts: d.formulaNoBuffer.teamCounts, loadMinutesPerTeam: d.formulaNoBuffer.loadMinutesPerTeam, capacityMinutesPerTeam: d.formulaNoBuffer.capacityMinutesPerTeam, normalizedLoadMinutesPerTeam: d.formulaNoBuffer.normalizedLoadMinutesPerTeam, loadMinutesSD: d.formulaNoBuffer.loadMinutesSD, normalizedLoadMinutesSD: d.formulaNoBuffer.normalizedLoadMinutesSD, windowStartMs: d.formulaNoBuffer.windowStartMs, windowEndMs: d.formulaNoBuffer.windowEndMs },
       formulaAgreement: d.formulaAgreement,
       actualPickedBest: d.actualPickedBest,
     })),
@@ -1298,8 +1404,8 @@ if (FLAG_JSON) {
     })),
   };
 
-  const jsonSuffix = WEIGHT_OVERRIDE ? `-${WEIGHT_LABEL.replace(/:/g, '-')}` : '';
-  const jsonPath = join(PROJECT_ROOT, `historical-replay-results${jsonSuffix}.json`);
+  const jsonSuffix = (WEIGHT_OVERRIDE ? `-${WEIGHT_LABEL.replace(/:/g, '-')}` : '') + (DECAY_LABEL ? `-${DECAY_LABEL}` : '') + (FLAG_POST_ASSIGN ? '-post' : '');
+  const jsonPath = join(PROJECT_ROOT, 'data', 'historical-replay-runs', `historical-replay-results${jsonSuffix}.json`);
   writeFileSync(jsonPath, JSON.stringify(jsonOutput, null, 2));
   console.log(`\n  JSON results written to: ${jsonPath}`);
 }

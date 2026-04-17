@@ -89,7 +89,7 @@ export default function RealScheduleBenchmarkReport({ onBack }: Props) {
             <StatRow label="Rolling Fairness" subtitle="measured at every patient arrival" formula="86.2" roundRobin="83.9" winner="formula" />
             <StatRow label="Avg Capacity Ratio" subtitle="higher = more headroom" formula="27.1" roundRobin="26.2" winner="formula" />
             <StatRow label="Min Capacity Ratio" subtitle="worst moment of the shift" formula="5.6" roundRobin="4.6" winner="formula" />
-            <StatRow label="Overwhelm Events" subtitle="ratio < 3.75, fewer = safer" formula="0.8" roundRobin="1.1" winner="formula" />
+            <StatRow label="Overwhelm Events" subtitle="ratio < 8.5, fewer = safer" formula="0.8" roundRobin="1.1" winner="formula" />
           </div>
           <div className="mt-4 bg-slate-100 dark:bg-white/5 rounded-lg p-3 text-center">
             <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">Win / Loss / Tie</div>

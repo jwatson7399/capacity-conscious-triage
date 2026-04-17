@@ -85,7 +85,7 @@ export default function BenchmarkReport({ onBack }: Props) {
           <div className="space-y-2">
             <StatRow label="Fairness Score" formula="82.0" roundRobin="79.3" winner="formula" />
             <StatRow label="Overwhelm Events" subtitle="fewer = safer patients & staff" formula="2.8" roundRobin="3.4" winner="formula" />
-            <StatRow label="Min Safety Margin" subtitle="higher = more cushion above 'overwhelmed'" formula="42%" roundRobin="28%" winner="formula" />
+            <StatRow label="Min Safety Margin" subtitle="higher = more cushion above 'red zone'" formula="42%" roundRobin="28%" winner="formula" />
             <StatRow label="Demand Spread" subtitle="higher = closer to even across teams" formula="91%" roundRobin="88%" winner="formula" />
           </div>
           <div className="mt-4 bg-slate-100 dark:bg-white/5 rounded-lg p-3 text-center">
@@ -118,7 +118,7 @@ export default function BenchmarkReport({ onBack }: Props) {
             </div>
             <div className="rounded-lg bg-slate-100 dark:bg-white/5 p-4 text-center">
               <div className="font-bold text-slate-800 dark:text-slate-100">Minimum Safety Margin <span className="ml-1 inline-block rounded-full bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-300">15%</span></div>
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Did any team hit "Overwhelmed" during the shift? This tracks the closest any team got to drowning — even one bottoming out tanks the score.</p>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Did any team hit "Red Zone" during the shift? This tracks the closest any team got to drowning — even one bottoming out tanks the score.</p>
             </div>
             <div className="rounded-lg bg-slate-100 dark:bg-white/5 p-4 text-center">
               <div className="font-bold text-slate-800 dark:text-slate-100">Stress Equity <span className="ml-1 inline-block rounded-full bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-300">15%</span></div>
@@ -127,11 +127,11 @@ export default function BenchmarkReport({ onBack }: Props) {
           </div>
           <ul className="space-y-4 text-sm text-slate-600 dark:text-slate-300">
             <li>
-              <strong>Overwhelm Events</strong> — Count of assignments where the receiving team's capacity ratio fell below 3.75 (p5 of empirical distribution). Fewer = safer.
+              <strong>Overwhelm Events</strong> — Count of assignments where the receiving team's capacity ratio fell below 8.5 (p5 of empirical distribution). Fewer = safer.
               <br /><span className="text-xs text-slate-400 dark:text-slate-500">p &lt; 0.001</span>
             </li>
             <li>
-              <strong>Min Safety Margin</strong> — Lowest capacity ratio observed across all assignments, as % of the 3.75 overwhelm boundary. Higher = more cushion above crisis.
+              <strong>Min Safety Margin</strong> — Lowest capacity ratio observed across all assignments, as % of the 8.5 overwhelm boundary. Higher = more cushion above crisis.
               <br /><span className="text-xs text-slate-400 dark:text-slate-500">p &lt; 0.001</span>
             </li>
             <li>
@@ -176,7 +176,7 @@ export default function BenchmarkReport({ onBack }: Props) {
               { name: "Overwhelm Avoidance", weight: "30%", desc: "3 of 25 assignments happened when a team was near full demand", score: 0.88, points: "26.4 / 30 pts" },
               { name: "Balanced Workload", weight: "25%", desc: "Each team carried a similar patient-to-strength demand — no one team was significantly busier", score: 0.92, points: "23.0 / 25 pts" },
               { name: "Acuity Balance", weight: "15%", desc: "Team 2 got more Red patients, creating some imbalance", score: 0.76, points: "11.4 / 15 pts" },
-              { name: "Min Safety Margin", weight: "15%", desc: "The busiest moment was still above \"Overwhelmed\" — but not by much", score: 0.54, points: "8.1 / 15 pts" },
+              { name: "Min Safety Margin", weight: "15%", desc: "The busiest moment was still above \"Red Zone\" — but not by much", score: 0.54, points: "8.1 / 15 pts" },
               { name: "Stress Equity", weight: "15%", desc: "Teams had similar strength-to-demand ratios — none was stretched much thinner than the rest", score: 0.90, points: "13.5 / 15 pts" },
             ].map((c) => (
               <div key={c.name} className="bg-slate-100 dark:bg-white/5 rounded-lg p-3 text-center">

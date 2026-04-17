@@ -225,7 +225,7 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
             <div className="font-semibold text-gray-700 dark:text-gray-200 mb-2">Capacity Scale</div>
             <div className="relative rounded-lg overflow-hidden h-7" style={{ background: CAPACITY_GRADIENT_CSS }}>
               <div className="absolute inset-0 flex">
-                {['<3.75', '3.75', '5', '7.5', '10', '21.25'].map((label) => (
+                {['<8.5', '8.5', '11.5', '16', '23', '50'].map((label) => (
                   <div key={label} className="flex-1 flex items-center justify-center">
                     <span className="text-[10px] font-bold text-white leading-none drop-shadow-sm">{label}</span>
                   </div>
@@ -233,7 +233,7 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
               </div>
             </div>
             <div className="flex mt-0.5">
-              <div className="flex-1 text-center text-[10px] font-semibold text-red-700">Overwhelmed</div>
+              <div className="flex-1 text-center text-[10px] font-semibold text-red-700">Red Zone</div>
               {[...CAPACITY_TERMS].reverse().map(term => (
                 <div key={term.label} className={`flex-1 text-center text-[10px] font-semibold ${term.color}`}>
                   {term.label}

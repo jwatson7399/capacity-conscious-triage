@@ -33,13 +33,22 @@ export function getDecayedAcuityWeight(patient: Patient, now: number, overrides?
   const ds = overrides?.decaySteps ?? ACUITY_DECAY;
   const base = aw[patient.acuity] ?? 0;
   const steps = ds[patient.acuity] ?? [];
-  let weight = base;
+  if (steps.length === 0 || elapsed <= 0) return base;
+  // D6 linear decay: linearly interpolate from base at t=0 to the final endpoint's weight at t=afterMs.
+  // For multi-step inputs (e.g. benchmark scripts), linearly interpolate piecewise between consecutive points.
+  let prevT = 0;
+  let prevW = base;
   for (const step of steps) {
-    if (elapsed >= step.afterMs) {
-      weight = step.weight;
+    if (elapsed <= step.afterMs) {
+      const span = step.afterMs - prevT;
+      if (span <= 0) return step.weight;
+      const t = (elapsed - prevT) / span;
+      return prevW + t * (step.weight - prevW);
     }
+    prevT = step.afterMs;
+    prevW = step.weight;
   }
-  return weight;
+  return prevW;
 }
 
 export function getCurrentLoad(patients: Patient[], teamId: TeamId, now: number, overrides?: ScoringOverrides): number {
@@ -92,9 +101,20 @@ export function getRecommendation(
   now: number,
   closedTeams: Record<number, number> = {},
   overrides?: ScoringOverrides,
+  incomingTier?: AcuityTier,
 ): Recommendation {
   const teamIds: TeamId[] = [1, 2, 3, 4];
   const scores = teamIds.map(id => scoreTeam(id, providers, patients, buffers, now, overrides));
+
+  // If incomingTier is provided, compute post-assignment ratio for ranking
+  if (incomingTier) {
+    const aw = overrides?.acuityWeights ?? ACUITY_WEIGHTS;
+    const incomingWeight = aw[incomingTier] ?? 0;
+    for (const s of scores) {
+      s.capacityRatio = s.capacity === 0 ? 0 : s.capacity / (s.load + incomingWeight);
+    }
+  }
+
   const candidates = scores.filter(s => s.teamId !== TRAUMA_TEAM_ID && !(s.teamId in closedTeams));
 
   // Sort: not-buffered first, then highest capacityRatio, then least recent assignment, then lowest team id

@@ -45,23 +45,6 @@ function InfoTip({ term, label, children }: { term: string; label?: string; chil
   );
 }
 
-/* ─── Dimension Tag ──────────────────────────────────────────────────── */
-
-const DIMENSION_COLORS = {
-  rose: 'text-rose-500 dark:text-rose-400/70 bg-rose-50 dark:bg-rose-500/10 border-rose-200/50 dark:border-rose-500/20',
-  emerald: 'text-emerald-500 dark:text-emerald-400/70 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200/50 dark:border-emerald-500/20',
-  violet: 'text-violet-500 dark:text-violet-400/70 bg-violet-50 dark:bg-violet-500/10 border-violet-200/50 dark:border-violet-500/20',
-  amber: 'text-amber-500 dark:text-amber-400/70 bg-amber-50 dark:bg-amber-500/10 border-amber-200/50 dark:border-amber-500/20',
-} as const;
-
-function DimensionTag({ children, color = 'rose' }: { children: React.ReactNode; color?: keyof typeof DIMENSION_COLORS }) {
-  return (
-    <span className={`inline-block text-[9px] sm:text-[10px] uppercase tracking-widest font-medium mb-3 px-2.5 py-0.5 rounded-full border ${DIMENSION_COLORS[color]}`}>
-      {children}
-    </span>
-  );
-}
-
 /* ─── Shared visual helpers ───────────────────────────────────────────── */
 
 function HeroNumber({ children, className = '' }: { children: React.ReactNode; className?: string }) {
@@ -160,24 +143,25 @@ function CardCurrentProcess({ isActive }: { isActive: boolean }) {
 /* ─── Card 3: Road Map ───────────────────────────────────────────────── */
 
 function CardRoadMap({ isActive }: { isActive: boolean }) {
-  const dimensions = [
-    { tag: 'Stress Equity', color: 'text-rose-500 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/20', desc: 'How evenly are high-pressure moments distributed across teams?' },
-    { tag: 'Capacity Balance', color: 'text-emerald-500 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20', desc: 'Are patients going to the team with the most bandwidth?' },
-    { tag: 'Acuity Balance', color: 'text-violet-500 dark:text-violet-400 bg-violet-50 dark:bg-violet-500/10 border-violet-200 dark:border-violet-500/20', desc: 'Is the severity of cases spread fairly, not just the count?' },
-    { tag: 'Safety Floor', color: 'text-amber-500 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20', desc: 'How bad does it get for the worst-off team at the worst moment?' },
+  const metrics = [
+    { tag: 'Slams', desc: '2+ patients to one team within 1 hour' },
+    { tag: 'Back-to-Back High Acuity', desc: 'Two ESI 1–2 patients to one team within 30 min' },
+    { tag: 'Patient Count Gap', desc: 'Busiest vs. lightest team, by patient count' },
+    { tag: 'Severity Gap', desc: 'Busiest vs. lightest team, by acuity-weighted load' },
+    { tag: 'Worst-Moment Floor', desc: 'How stretched the most overloaded team gets at peak strain' },
   ];
 
   return (
     <div className="flex flex-col items-center justify-center h-full px-6 text-center">
       <p className="text-xs sm:text-sm uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-2 font-semibold">What We Measured</p>
       <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 mb-5 max-w-xs leading-relaxed">
-        We compared both methods across four dimensions of fairness:
+        Five metrics, each compared head-to-head across all 121 days:
       </p>
-      <div className={`space-y-3 max-w-xs w-full ${isActive ? 'animate-fadeSlideUp' : 'opacity-0'}`}>
-        {dimensions.map((d) => (
-          <div key={d.tag} className={`rounded-xl border px-4 py-3 text-left ${d.color}`}>
-            <p className="text-sm font-semibold">{d.tag}</p>
-            <p className="text-xs mt-0.5 text-slate-600 dark:text-slate-300">{d.desc}</p>
+      <div className={`space-y-2 max-w-xs w-full ${isActive ? 'animate-fadeSlideUp' : 'opacity-0'}`}>
+        {metrics.map((m) => (
+          <div key={m.tag} className="rounded-xl border border-slate-200 dark:border-white/10 bg-white/40 dark:bg-white/5 px-4 py-2.5 text-left">
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{m.tag}</p>
+            <p className="text-xs mt-0.5 text-slate-500 dark:text-slate-400">{m.desc}</p>
           </div>
         ))}
       </div>
@@ -190,7 +174,6 @@ function CardRoadMap({ isActive }: { isActive: boolean }) {
 function CardSlams({ isActive }: { isActive: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-      <DimensionTag color="rose">Stress Equity</DimensionTag>
       <p className="text-xs sm:text-sm uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-1 font-semibold">Slams</p>
       <p className="text-xs text-slate-600 dark:text-slate-400 mb-5">2+ patients to one team within 1 hour</p>
 
@@ -222,7 +205,6 @@ function CardSlams({ isActive }: { isActive: boolean }) {
 function CardDangerStacking({ isActive }: { isActive: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-      <DimensionTag color="rose">Stress Equity</DimensionTag>
       <div className="text-2xl mb-1">⚠️</div>
       <p className="text-xs sm:text-sm uppercase tracking-widest text-red-400 dark:text-red-400 mb-1 font-semibold">Back-to-Back High Acuity</p>
       <p className="text-xs text-slate-600 dark:text-slate-400 mb-5">Two ESI 1-2 patients to one team within 30 min</p>
@@ -255,7 +237,6 @@ function CardDangerStacking({ isActive }: { isActive: boolean }) {
 function CardCapacityBalance({ isActive }: { isActive: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-      <DimensionTag color="emerald">Capacity Balance</DimensionTag>
       <p className="text-xs sm:text-sm uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-2 font-semibold">Patient Count Gap</p>
       <p className="text-xs text-slate-600 dark:text-slate-400 mb-6">Busiest team vs. lightest team per day</p>
 
@@ -292,7 +273,6 @@ function CardAcuityBalance({ isActive }: { isActive: boolean }) {
 
   return (
     <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-      <DimensionTag color="violet">Acuity Balance</DimensionTag>
       <p className="text-xs sm:text-sm uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-2 font-semibold">Severity Gap</p>
       <p className="text-xs text-slate-600 dark:text-slate-400 mb-4">Heaviest acuity load vs. lightest per day</p>
 
@@ -342,7 +322,6 @@ function CardAcuityBalance({ isActive }: { isActive: boolean }) {
 function CardSafetyFloor({ isActive }: { isActive: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-      <DimensionTag color="amber">Safety Floor</DimensionTag>
       <p className="text-xs sm:text-sm uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-2 font-semibold">Worst Moment of a Typical Day</p>
       <p className="text-xs text-slate-600 dark:text-slate-400 mb-4">Average daily minimum capacity ratio at time of assignment</p>
 
@@ -404,63 +383,7 @@ function CardSafetyFloor({ isActive }: { isActive: boolean }) {
   );
 }
 
-/* ─── Card 7: The Fairness Score ──────────────────────────────────────── */
-
-const FAIRNESS_ROWS = [
-  { label: 'Stress Equity', weight: 20, score: 0.90, actual: 0.82 },
-  { label: 'Capacity Balance', weight: 35, score: 0.84, actual: 0.72 },
-  { label: 'Acuity Balance', weight: 25, score: 0.84, actual: 0.70 },
-  { label: 'Safety Floor', weight: 20, score: 1.0, actual: 1.0 },
-] as const;
-
-const FAIRNESS_TIPS: Record<string, string> = {
-  'Capacity Balance': 'Are teams getting patients proportional to their staffing strength? A strong team with an attending + senior resident should handle more than a team with one intern.',
-  'Acuity Balance': 'Is patient severity spread evenly, or does one team get all the high-acuity patients?',
-  'Stress Equity': 'Did all teams experience similar levels of strain throughout the day, or did one team get hammered in a burst while another coasted? This is what the Slams and Back-to-Back High Acuity cards measure.',
-  'Safety Floor': 'Each day\'s worst single moment: how stretched was the most overloaded team? Averaged across all 121 days, the formula nearly doubled the breathing room at peak strain (capacity ratio 18 → 32).',
-};
-
-function CardFairnessScore({ isActive }: { isActive: boolean }) {
-  return (
-    <div className="flex flex-col items-center justify-center h-full px-5 text-center">
-      <p className="text-xs sm:text-sm uppercase tracking-widest text-slate-600 dark:text-slate-400 mb-1 font-semibold">Fairness Score</p>
-      <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mb-4">121-day averages: four dimensions combined into one composite</p>
-
-      <div className="w-full max-w-xs space-y-2">
-        {FAIRNESS_ROWS.map((row) => (
-          <div key={row.label} className="flex items-center gap-2">
-            <div className="flex items-center gap-0.5 w-[120px] sm:w-[140px] shrink-0 text-left">
-              <span className="text-xs text-slate-600 dark:text-slate-300 truncate">{row.label}</span>
-              <InfoTip term={row.label}>{FAIRNESS_TIPS[row.label]}</InfoTip>
-            </div>
-            <span className="text-xs text-slate-600 dark:text-slate-400 w-8 shrink-0 text-right">{row.weight}%</span>
-            <div className="flex-1 bg-slate-200 dark:bg-white/10 rounded-full h-3 overflow-hidden">
-              <div className="bg-blue-500 h-full rounded-full transition-all duration-700 ease-out" style={{ width: isActive ? `${row.score * 100}%` : '0%' }} />
-            </div>
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-200 w-8 shrink-0">{row.score.toFixed(2)}</span>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-4 text-slate-300 dark:text-slate-600">↓</div>
-
-      <div className={`mt-2 ${isActive ? 'animate-fadeScaleIn' : 'opacity-0'}`}>
-        <div className="text-4xl sm:text-5xl font-bold text-blue-500">92.2 <span className="text-xs font-normal text-slate-600 dark:text-slate-400">/ 100</span></div>
-        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">121-day average</p>
-        <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Actual process: <span className="font-semibold text-red-500">85.7</span></p>
-        <p className="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5">p &lt; 0.001 · Cohen's d = 0.84
-          <InfoTip term="Cohen's d">A standardized measure of effect size: the difference between two group means divided by their pooled standard deviation. Values of 0.2, 0.5, and 0.8 are conventionally considered small, medium, and large effects. The formula's d = 0.84 is a large effect, meaning the improvement is not just statistically significant but practically meaningful.</InfoTip>
-        </p>
-      </div>
-
-      <p className="mt-4 text-xs text-slate-600 dark:text-slate-400 max-w-xs leading-relaxed">
-        The formula's edge comes from distributing workload proportionally to team capacity and spreading severity more evenly.
-      </p>
-    </div>
-  );
-}
-
-/* ─── Card 8: 78% of Days ─────────────────────────────────────────────── */
+/* ─── Card: Win Rate ──────────────────────────────────────────────────── */
 
 const DAY_DATA = [
   { day: 'Mon', pct: 67 },
@@ -477,7 +400,7 @@ function CardWinRate({ isActive }: { isActive: boolean }) {
     <div className="flex flex-col items-center justify-center h-full px-6 text-center">
       <div className={isActive ? 'animate-fadeScaleIn' : 'opacity-0'}><HeroNumber className="text-emerald-500">7 / 7</HeroNumber></div>
       <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 mt-2 max-w-xs">
-        Every day of the week, the formula scored higher on the Fairness Score
+        Every day of the week, the formula won on the majority of the metrics shown above
       </p>
       <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">77.7% overall (94 of 121 days)</p>
 
@@ -613,7 +536,7 @@ function CardSummary({ onBack, isActive, onMethodology }: { onBack: () => void; 
 
 /* ─── Main Component ──────────────────────────────────────────────────── */
 
-const TOTAL_CARDS = 12;
+const TOTAL_CARDS = 11;
 
 export default function EvidenceWalkthrough({ onBack }: { onBack: () => void }) {
   const [currentCard, setCurrentCard] = useState(0);
@@ -665,7 +588,6 @@ export default function EvidenceWalkthrough({ onBack }: { onBack: () => void }) 
     (active: boolean) => <CardCapacityBalance key="capacity" isActive={active} />,
     (active: boolean) => <CardAcuityBalance key="acuity" isActive={active} />,
     (active: boolean) => <CardSafetyFloor key="safety" isActive={active} />,
-    (active: boolean) => <CardFairnessScore key="fairness" isActive={active} />,
     (active: boolean) => <CardWinRate key="winrate" isActive={active} />,
     (active: boolean) => <CardWhatChanges key="changes" isActive={active} />,
     (active: boolean) => <CardSummary key="summary" onBack={onBack} isActive={active} onMethodology={() => setShowMethodology(true)} />,

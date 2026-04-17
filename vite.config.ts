@@ -3,6 +3,6 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
-  base: '/adaptive-triage/',
+  base: '/capacity-conscious-triage/',
   plugins: [react(), tailwindcss()],
 })

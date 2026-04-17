@@ -8,6 +8,8 @@ import SimulationSetup from './SimulationSetup';
 import BenchmarkReport from './BenchmarkReport';
 import RealScheduleBenchmarkReport from './RealScheduleBenchmarkReport';
 import DelphiSurvey from './DelphiSurvey';
+import DelphiAdminPanel from './DelphiAdminPanel';
+import { CURRENT_ROUND } from '../constants';
 import EvidenceWalkthrough from './EvidenceWalkthrough';
 
 const roles: { role: Role; label: string; desc: string }[] = [
@@ -21,7 +23,6 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
   const [showBenchmark, setShowBenchmark] = useState(false);
   const [showRealBenchmark, setShowRealBenchmark] = useState(false);
   const [showDelphi, setShowDelphi] = useState<false | 'survey' | 'results'>(false);
-  const [showDelphiPrompt, setShowDelphiPrompt] = useState(false);
   const [showAttestation, setShowAttestation] = useState(false);
   const [attestationCounts, setAttestationCounts] = useState<{ yes: number; no: number } | null>(null);
   const [attestationSubmitted, setAttestationSubmitted] = useState(false);
@@ -39,13 +40,19 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
 
   return (
     <div className="dashboard-bg flex flex-col items-center justify-center p-6">
-      <h1 className="text-4xl font-bold text-slate-900 dark:text-white mb-4">ER Triage</h1>
+      <div className="mb-6 text-center">
+        <h1 className="text-center leading-none text-slate-900 dark:text-white text-5xl sm:text-6xl" style={{ fontFamily: "'EB Garamond', serif", fontWeight: 500, letterSpacing: "0.01em" }}>
+          <span className="block">Capacity</span>
+          <span className="block">Conscious</span>
+          <span className="block">Triage</span>
+        </h1>
+      </div>
       <div className="w-full max-w-sm space-y-4">
         {roles.map(r => (
           <button
             key={r.role}
             onClick={() => dispatch({ type: 'SET_ROLE', role: r.role })}
-            className="w-full min-h-[64px] glass-card rounded-xl px-5 py-4 text-left active:bg-white/90 transition-colors"
+            className="w-full min-h-[64px] glass-card rounded-xl px-5 py-4 text-center active:bg-white/90 transition-colors"
             aria-label={`Select role: ${r.label}`}
           >
             <div className="font-semibold text-gray-900 dark:text-gray-100 text-lg">{r.label}</div>
@@ -143,13 +150,19 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
           className="w-full min-h-[48px] bg-slate-200 dark:bg-white/10 text-slate-700 dark:text-slate-300 rounded-xl px-5 py-3 font-semibold text-sm active:bg-slate-300 dark:active:bg-white/20 border border-slate-300 dark:border-white/10"
         >
           <div>Provider Strength Survey</div>
-          <div className="text-xs font-normal text-slate-500 dark:text-slate-400 mt-0.5">Rate provider independence — Round 1 Delphi</div>
-        </button>
-        <button
-          onClick={() => setShowDelphiPrompt(true)}
-          className="w-full text-sm text-blue-600 dark:text-blue-400 font-medium -mt-1 active:text-blue-700 dark:active:text-blue-300"
-        >
-          See ongoing survey averages →
+          <div className="text-xs font-normal text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+            {CURRENT_ROUND === 2 ? (
+              <>
+                <div>Rate provider independence</div>
+                <div>Round 2 Delphi (re-rate with R1 feedback)</div>
+              </>
+            ) : (
+              <>
+                <div>Rate provider independence</div>
+                <div>Round 1 Delphi</div>
+              </>
+            )}
+          </div>
         </button>
         <button
           onClick={() => setShowAttestation(true)}
@@ -158,29 +171,6 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
           Attending Attestation →
         </button>
 
-        {/* "Have you submitted?" prompt */}
-        {showDelphiPrompt && (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6" onClick={() => setShowDelphiPrompt(false)}>
-            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-xs w-full shadow-xl" onClick={e => e.stopPropagation()}>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Have you submitted a response yet?</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-5">Please submit your own ratings before viewing group averages.</p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => { setShowDelphiPrompt(false); setShowDelphi('survey'); }}
-                  className="flex-1 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl py-3 font-semibold text-sm active:bg-slate-300 dark:active:bg-slate-600"
-                >
-                  No, take survey
-                </button>
-                <button
-                  onClick={() => { setShowDelphiPrompt(false); setShowDelphi('results'); }}
-                  className="flex-1 bg-blue-600 text-white rounded-xl py-3 font-semibold text-sm active:bg-blue-700"
-                >
-                  Yes, show results
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
         {/* Attending Attestation */}
         {showAttestation && (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6" onClick={() => { setShowAttestation(false); setAttestationSubmitted(false); setAttestationId(''); setAttestationLoading(false); }}>
@@ -288,6 +278,7 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
             </div>
           </div>
         )}
+        <DelphiAdminPanel />
         <div className="flex items-center justify-center pt-2 text-xs text-slate-500">
           <button
             onClick={() => setShowBenchmark(true)}

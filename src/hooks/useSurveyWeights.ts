@@ -4,6 +4,7 @@ import { CAPACITY_WEIGHTS } from '../constants';
 
 const SHEETS_API = import.meta.env.VITE_DELPHI_SHEETS_URL || '';
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const ACTIVE_ROUND_KEY = 'delphi-active-round';
 
 const ROLE_KEYS: { sheet: string; type: ProviderType }[] = [
   { sheet: 'Senior Resident', type: 'senior_resident' },
@@ -13,14 +14,30 @@ const ROLE_KEYS: { sheet: string; type: ProviderType }[] = [
   { sheet: 'Rotator', type: 'rotator' },
 ];
 
-async function fetchSurveyAverages(): Promise<Record<ProviderType, number> | null> {
+function getActiveRound(): 1 | 2 {
+  const raw = localStorage.getItem(ACTIVE_ROUND_KEY);
+  return raw === '2' ? 2 : 1;
+}
+
+async function fetchSurveyAverages(activeRound: 1 | 2): Promise<Record<ProviderType, number> | null> {
   if (!SHEETS_API) return null;
   try {
     const res = await fetch(SHEETS_API);
     const allRows: Record<string, string | number>[] = await res.json();
-    const rows = allRows.filter(row =>
-      ROLE_KEYS.some(({ sheet }) => row[sheet] !== '' && row[sheet] != null && Number(row[sheet]) !== 0)
-    );
+    const validRows = allRows.filter(row => {
+      if (row['Type'] === 'attestation') return false;
+      return ROLE_KEYS.some(({ sheet }) => row[sheet] !== '' && row[sheet] != null && Number(row[sheet]) !== 0);
+    });
+
+    const rowsForRound = (round: 1 | 2) => validRows.filter(r => {
+      const n = Number(r['Round']);
+      const rowRound = n === 2 ? 2 : 1;
+      return rowRound === round;
+    });
+
+    // Prefer active round; fall back to the other round if empty.
+    let rows = rowsForRound(activeRound);
+    if (rows.length === 0) rows = rowsForRound(activeRound === 1 ? 2 : 1);
     if (rows.length === 0) return null;
 
     const weights: Record<string, number> = { attending: 20 };
@@ -37,15 +54,25 @@ async function fetchSurveyAverages(): Promise<Record<ProviderType, number> | nul
 
 export function useSurveyWeights(): Record<ProviderType, number> {
   const [weights, setWeights] = useState<Record<ProviderType, number>>(CAPACITY_WEIGHTS);
+  const [activeRound, setActiveRound] = useState<1 | 2>(getActiveRound);
+
+  useEffect(() => {
+    const onStorage = () => setActiveRound(getActiveRound());
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('delphi-active-round-changed', onStorage);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('delphi-active-round-changed', onStorage);
+    };
+  }, []);
 
   useEffect(() => {
     if (!SHEETS_API) return;
-
-    const poll = () => fetchSurveyAverages().then(w => { if (w) setWeights(w); });
+    const poll = () => fetchSurveyAverages(activeRound).then(w => { if (w) setWeights(w); });
     poll();
     const id = setInterval(poll, POLL_INTERVAL_MS);
     return () => clearInterval(id);
-  }, []);
+  }, [activeRound]);
 
   return weights;
 }

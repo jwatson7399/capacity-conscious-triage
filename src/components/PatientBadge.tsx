@@ -14,14 +14,11 @@ function formatDuration(totalMins: number): string {
 function getNextDecayInfo(patient: Patient, now: number, currentWeight: number): { label: string; decaying: boolean } {
   const elapsed = now - (patient.upgradedAt ?? patient.assignedAt);
   const steps = ACUITY_DECAY[patient.acuity];
-  for (const step of steps) {
-    if (elapsed < step.afterMs) {
-      const remainMs = step.afterMs - elapsed;
-      const mins = Math.ceil(remainMs / 60000);
-      return { label: `demand drops from ${currentWeight} to ${step.weight} in [${formatDuration(mins)}]`, decaying: true };
-    }
-  }
-  return { label: '(stabilized)', decaying: false };
+  const last = steps[steps.length - 1];
+  if (!last || elapsed >= last.afterMs) return { label: '(stabilized)', decaying: false };
+  const remainMs = last.afterMs - elapsed;
+  const mins = Math.ceil(remainMs / 60000);
+  return { label: `current demand ${currentWeight.toFixed(1)}; stabilizes in [${formatDuration(mins)}]`, decaying: true };
 }
 
 interface Props {
