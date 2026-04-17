@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useShift } from '../context/ShiftContext';
 import type { Role, Provider } from '../types';
 import { parseWeeklySchedule, getProvidersForShift } from '../utils/scheduleParser';
@@ -19,6 +19,26 @@ const roles: { role: Role; label: string; desc: string }[] = [
 
 export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode }: { onStartTour?: () => void; darkMode: boolean; onToggleDarkMode: () => void }) {
   const { dispatch } = useShift();
+  const [activeRound, setActiveRound] = useState<1 | 2>(() => {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('delphi-active-round') : null;
+    if (raw === '1') return 1;
+    if (raw === '2') return 2;
+    return CURRENT_ROUND;
+  });
+  useEffect(() => {
+    const update = () => {
+      const raw = localStorage.getItem('delphi-active-round');
+      if (raw === '1') setActiveRound(1);
+      else if (raw === '2') setActiveRound(2);
+      else setActiveRound(CURRENT_ROUND);
+    };
+    window.addEventListener('delphi-active-round-changed', update);
+    window.addEventListener('storage', update);
+    return () => {
+      window.removeEventListener('delphi-active-round-changed', update);
+      window.removeEventListener('storage', update);
+    };
+  }, []);
   const [showSimSetup, setShowSimSetup] = useState(false);
   const [showBenchmark, setShowBenchmark] = useState(false);
   const [showRealBenchmark, setShowRealBenchmark] = useState(false);
@@ -151,7 +171,7 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
         >
           <div>Provider Strength Survey</div>
           <div className="text-xs font-normal text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
-            {CURRENT_ROUND === 2 ? (
+            {activeRound === 2 ? (
               <>
                 <div>Rate provider independence</div>
                 <div>Round 2 Delphi (re-rate with R1 feedback)</div>

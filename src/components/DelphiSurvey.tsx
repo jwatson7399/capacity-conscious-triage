@@ -1,6 +1,29 @@
 import { useState, useEffect, useMemo } from 'react';
 import { CURRENT_ROUND } from '../constants';
 
+const ACTIVE_ROUND_KEY = 'delphi-active-round';
+
+function readActiveRound(): 1 | 2 {
+  const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(ACTIVE_ROUND_KEY) : null;
+  if (raw === '1') return 1;
+  if (raw === '2') return 2;
+  return CURRENT_ROUND;
+}
+
+function useActiveRound(): 1 | 2 {
+  const [round, setRound] = useState<1 | 2>(readActiveRound);
+  useEffect(() => {
+    const update = () => setRound(readActiveRound());
+    window.addEventListener('delphi-active-round-changed', update);
+    window.addEventListener('storage', update);
+    return () => {
+      window.removeEventListener('delphi-active-round-changed', update);
+      window.removeEventListener('storage', update);
+    };
+  }, []);
+  return round;
+}
+
 type DelphiRole = { key: string; label: string; color: string; accent: string };
 
 const ROLES: DelphiRole[] = [
@@ -137,6 +160,7 @@ function loadResponses(): ResponseEntry[] {
 }
 
 export default function DelphiSurvey({ onCancel, startOnResults }: { onCancel: () => void; startOnResults?: boolean }) {
+  const activeRound = useActiveRound();
   const [allResponses, setAllResponses] = useState<ResponseEntry[]>(loadResponses);
   const [ratings, setRatings] = useState<Record<string, number>>(
     Object.fromEntries(ROLES.map(r => [r.key, 10]))
@@ -159,14 +183,14 @@ export default function DelphiSurvey({ onCancel, startOnResults }: { onCancel: (
   const r1Stats = useMemo(() => computeStats(r1Responses), [r1Responses]);
   const r2Stats = useMemo(() => computeStats(r2Responses), [r2Responses]);
 
-  const showR1Feedback = CURRENT_ROUND === 2 && r1Responses.length >= 3;
-  const currentCount = CURRENT_ROUND === 2 ? r2Responses.length : r1Responses.length;
+  const showR1Feedback = activeRound === 2 && r1Responses.length >= 3;
+  const currentCount = activeRound === 2 ? r2Responses.length : r1Responses.length;
 
   const handleSubmit = async () => {
     const entry: ResponseEntry = {
       timestamp: new Date().toISOString(),
       responses: { ...ratings },
-      round: CURRENT_ROUND,
+      round: activeRound,
     };
     const updated = [...allResponses, entry];
     localStorage.setItem('delphi-responses', JSON.stringify(updated));
@@ -266,8 +290,8 @@ export default function DelphiSurvey({ onCancel, startOnResults }: { onCancel: (
 
   if (submitted) return <ResultsView />;
 
-  const headerTitle = CURRENT_ROUND === 2 ? 'Provider Strength Survey, Round 2' : 'Provider Strength Survey';
-  const headerSub = CURRENT_ROUND === 2
+  const headerTitle = activeRound === 2 ? 'Provider Strength Survey, Round 2' : 'Provider Strength Survey';
+  const headerSub = activeRound === 2
     ? 'Re-rate each role after seeing the Round 1 group mean and interquartile range. Aim for your honest calibrated judgment. Convergence is not required.'
     : 'How strong is each role clinically? Drag each slider to score independence from 0 (fully supervised) to 20 (attending-level autonomy).';
 
@@ -284,7 +308,7 @@ export default function DelphiSurvey({ onCancel, startOnResults }: { onCancel: (
       <p className="text-sm text-slate-500 dark:text-slate-400 text-center max-w-sm mb-3">{headerSub}</p>
 
       <span className="inline-block bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-medium px-3 py-1 rounded-full mb-4">
-        Round {CURRENT_ROUND}: {currentCount} response{currentCount !== 1 ? 's' : ''} collected
+        Round {activeRound}: {currentCount} response{currentCount !== 1 ? 's' : ''} collected
       </span>
 
       <div className="w-full max-w-sm mb-6">
