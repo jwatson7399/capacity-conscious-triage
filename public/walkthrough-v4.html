@@ -2897,7 +2897,14 @@ function updateFormulaCompare(prevPhase, nextPhase) {
   slide.classList.toggle('slide-shades', nextPhase === 1);
   ['T1', 'T2', 'T3'].forEach(tid => slide.classList.remove('focus-' + tid));
   const focus = FORMULA_COMPARE_FOCUS[nextPhase];
-  if (focus) slide.classList.add('focus-' + focus);
+  if (focus) {
+    // The intro animation leaves inline opacity on dots/labels which would
+    // outrank the focus-T{N} CSS rule — strip it so CSS can dim them.
+    slide.querySelectorAll('.patient-dot, .patient-dot-label').forEach(el => {
+      el.style.removeProperty('opacity');
+    });
+    slide.classList.add('focus-' + focus);
+  }
   const heading = slide.querySelector('.compare-heading');
   const sub = slide.querySelector('.compare-sub');
   if (heading) heading.innerHTML = FORMULA_COMPARE_HEADINGS[nextPhase] || FORMULA_COMPARE_HEADINGS[0];

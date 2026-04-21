@@ -86,16 +86,16 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
             onClick={onStartTour}
             className="w-full min-h-[56px] bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl px-5 py-4 font-semibold text-base active:from-blue-700 active:to-indigo-700 transition-colors"
           >
-            <div>Take a Guided Tour</div>
-            <div className="text-xs font-normal opacity-80 mt-0.5">New here? Start with a walkthrough</div>
+            <div>Tour the App</div>
+            <div className="text-xs font-normal opacity-80 mt-0.5">Learn the dashboard in 10 steps</div>
           </button>
         )}
         <button
           onClick={() => setShowEvidence(true)}
           className="w-full min-h-[56px] bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl px-5 py-4 font-semibold text-base active:from-emerald-700 active:to-teal-700 transition-colors"
         >
-          <div>See the Evidence</div>
-          <div className="text-xs font-normal opacity-80 mt-0.5">4 months of real data, 1,541 encounters</div>
+          <div>How It Works</div>
+          <div className="text-xs font-normal opacity-80 mt-0.5">How the formula routes 8 patients</div>
         </button>
         <div className="bg-slate-200 dark:bg-white/10 rounded-xl border border-slate-300 dark:border-white/10 overflow-hidden">
           <div className="text-center text-base font-semibold text-slate-800 dark:text-white py-2">Demo</div>

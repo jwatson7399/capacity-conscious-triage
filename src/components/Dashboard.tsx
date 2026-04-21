@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useShift } from '../context/ShiftContext';
 import type { TeamId } from '../types';
 import type { FloatAttending } from '../utils/scheduleParser';
-import { ACUITY_COLORS, STATUS_COLORS, ACUITY_LABELS, ACUITY_DESCRIPTORS, STATUS_LABELS, CAPACITY_TERMS, TRAUMA_TEAM_ID, CAPACITY_GRADIENT_CSS } from '../constants';
+import { ACUITY_COLORS, STATUS_COLORS, ACUITY_LABELS, ACUITY_DESCRIPTORS, STATUS_LABELS, TRAUMA_TEAM_ID, CAPACITY_GRADIENT_CSS } from '../constants';
 import TeamCard from './TeamCard';
 import AssignPatient from './AssignPatient';
 import HelpSection from './HelpSection';
@@ -231,14 +231,6 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
                   </div>
                 ))}
               </div>
-            </div>
-            <div className="flex mt-0.5">
-              <div className="flex-1 text-center text-[10px] font-semibold text-red-700">Red Zone</div>
-              {[...CAPACITY_TERMS].reverse().map(term => (
-                <div key={term.label} className={`flex-1 text-center text-[10px] font-semibold ${term.color}`}>
-                  {term.label}
-                </div>
-              ))}
             </div>
           </div>
         </div>

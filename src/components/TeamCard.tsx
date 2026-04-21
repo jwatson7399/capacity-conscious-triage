@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useShift } from '../context/ShiftContext';
 import type { TeamId, TeamScore, ProviderType } from '../types';
-import { ACUITY_LABELS, ACUITY_COLORS, ACUITY_DECAY, PROVIDER_TYPE_LABELS, PROVIDER_TYPE_SHORT, TRAUMA_TEAM_ID, TEAM_CLOSE_TRANSFER_MS, TEAM_CLOSE_TRANSFER_TARGETS, getCapacityTerm, getCapacityColor } from '../constants';
+import { ACUITY_DECAY, PROVIDER_TYPE_LABELS, PROVIDER_TYPE_SHORT, TRAUMA_TEAM_ID, TEAM_CLOSE_TRANSFER_MS, TEAM_CLOSE_TRANSFER_TARGETS, getCapacityColor } from '../constants';
 import { getActiveBuffers } from '../engine/recommendation';
 import ProviderStatusToggle from './ProviderStatusToggle';
 import PatientBadge from './PatientBadge';
@@ -72,7 +72,6 @@ export default function TeamCard({ teamId, score, recommendationRank, isClosed, 
       ? 'recommendation-second'
       : '';
 
-  const capacityTerm = getCapacityTerm(score.capacityRatio);
 
   // Provider composition summary
   const providerSummary = (() => {
@@ -143,13 +142,13 @@ export default function TeamCard({ teamId, score, recommendationRank, isClosed, 
         </div>
         <div className="text-right" {...(recommendationRank === 'first' ? { 'data-tour': 'capacity-ratio' } : {})}>
           <div className={`text-2xl font-bold ${teamProviders.length === 0 ? 'text-slate-300 dark:text-slate-600' : ''}`} style={teamProviders.length > 0 ? { color: getCapacityColor(score.capacityRatio) } : undefined}>{teamProviders.length === 0 ? '—' : score.capacityRatio === Infinity ? '∞' : score.capacityRatio.toFixed(1)}</div>
-          <div className={`text-lg font-bold ${teamProviders.length === 0 ? 'text-amber-500 dark:text-amber-400' : activeBuffers.length > 0 ? (allCandidatesBuffered && recommendationRank === 'first' ? 'text-blue-500' : 'text-slate-400 dark:text-slate-500') : ''}`} style={teamProviders.length > 0 && activeBuffers.length === 0 ? { color: getCapacityColor(score.capacityRatio) } : undefined}>
-            {teamProviders.length === 0
-              ? 'Add Providers'
-              : activeBuffers.length > 0
-                ? (allCandidatesBuffered && recommendationRank === 'first' ? 'Next Up' : 'Buffered')
-                : capacityTerm.label}
-          </div>
+          {(teamProviders.length === 0 || activeBuffers.length > 0) && (
+            <div className={`text-lg font-bold ${teamProviders.length === 0 ? 'text-amber-500 dark:text-amber-400' : (allCandidatesBuffered && recommendationRank === 'first' ? 'text-blue-500' : 'text-slate-400 dark:text-slate-500')}`}>
+              {teamProviders.length === 0
+                ? 'Add Providers'
+                : (allCandidatesBuffered && recommendationRank === 'first' ? 'Next Up' : 'Buffered')}
+            </div>
+          )}
           {allCandidatesBuffered && recommendationRank === 'first' && activeBuffers.length > 0 && (
             <div className="text-[10px] text-slate-400 dark:text-slate-500">(all teams buffered)</div>
           )}
@@ -157,53 +156,6 @@ export default function TeamCard({ teamId, score, recommendationRank, isClosed, 
           <div className="text-xs text-gray-400">Demand: {score.load.toFixed(1)}</div>
         </div>
       </div>
-
-      {/* Buffer bars */}
-      {activeBuffers.length > 0 && (
-        <div className="px-4 pt-2 space-y-1" data-tour="buffer-bar" data-tour-team={String(teamId)}>
-          {activeBuffers.map(buf => {
-            const remainingMs = Math.max(0, buf.expiresAt - now);
-            const mins = Math.floor(remainingMs / 60000);
-            const secs = Math.floor((remainingMs % 60000) / 1000);
-            const colors = ACUITY_COLORS[buf.tier];
-
-            const isMerged = (buf.mergedCount ?? 1) > 1;
-            const isDeceased = !!buf.deceasedPatientId;
-            const elapsedMs = now - buf.createdAt;
-            const effectiveTotal = elapsedMs + remainingMs;
-            const pct = effectiveTotal > 0 ? (remainingMs / effectiveTotal) * 100 : 0;
-
-            const barColor = isDeceased
-              ? 'bg-gray-400'
-              : isMerged
-                ? 'bg-gradient-to-r from-red-400 via-amber-400 to-violet-400 animate-pulse'
-                : colors.bar;
-
-            const timeStr = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-            const shortLabel = isDeceased ? 'Deceased' : isMerged ? `Merged (${buf.mergedCount})` : ACUITY_LABELS[buf.tier];
-            const fullLabel = isDeceased
-              ? `Recently deceased patient buffer`
-              : isMerged
-                ? `Merged buffer (${buf.mergedCount} combined)`
-                : `${ACUITY_LABELS[buf.tier]} buffer`;
-
-            return (
-              <div key={buf.id} className={`${isMerged ? 'h-7' : 'h-5'} rounded overflow-hidden bg-gray-200 dark:bg-gray-700 relative`} title={`${fullLabel} · ${timeStr} remaining`}>
-                <div
-                  className={`h-full ${barColor} absolute left-0 transition-[width] duration-1000 ease-linear`}
-                  style={{ width: `${pct}%` }}
-                />
-                <span className="absolute inset-0 flex items-center px-2 text-xs font-medium text-gray-900 dark:text-gray-100 z-10 overflow-hidden whitespace-nowrap">
-                  <span className="hidden sm:inline">{fullLabel}</span>
-                  <span className="sm:hidden">{shortLabel}</span>
-                  <span className="mx-1">&middot;</span>
-                  <span className="font-mono">{timeStr}</span>
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
 
       {/* Providers */}
       <div className="px-4 pt-2" data-tour="provider-list" data-tour-team={String(teamId)}>

@@ -133,22 +133,12 @@ export function buildTourSteps(helpers: {
         closeHelp();
       },
     },
-    // 6. The Buffer System
-    {
-      targetSelector: '[data-tour="buffer-bar"][data-tour-team="1"]',
-      title: 'The Buffer System',
-      description:
-        'After assignment, a cooldown buffer prevents back-to-back assignments. Duration depends on acuity (Red 35m, Yellow 25m, Purple 15m).',
-      onEnter: () => {
-        closeHelp();
-      },
-    },
-    // 7. Recommended Team
+    // 6. Recommended Team
     {
       targetSelector: '[data-tour="recommended-team"]',
       title: 'Recommended Team',
       description:
-        "Highest unbuffered capacity gets the yellow outline — the system's pick. Team 4 is never auto-recommended.",
+        "Highest capacity gets the yellow outline — the system's pick. Team 4 is never auto-recommended.",
       onEnter: () => {
         closeHelp();
       },

@@ -106,14 +106,6 @@ export default function HelpSection({ onClose, onShowBenchmark, onShowBacktest }
                 ))}
               </div>
             </div>
-            <div className="flex text-[9px] font-medium">
-              <div className="flex-1 text-center text-red-700 dark:text-red-400">Red Zone</div>
-              <div className="flex-1 text-center text-red-600 dark:text-red-400">High Demand</div>
-              <div className="flex-1 text-center text-orange-600 dark:text-orange-400">Very Busy</div>
-              <div className="flex-1 text-center text-yellow-600 dark:text-yellow-400">Busy</div>
-              <div className="flex-1 text-center text-green-600 dark:text-green-400">Manageable</div>
-              <div className="flex-1 text-center text-emerald-600 dark:text-emerald-400">Comfortable</div>
-            </div>
             <p className="text-xs text-gray-500 dark:text-gray-400">Cutoffs recalibrated under the recommended config (4:2:1 acuity weights, D6 linear decay, no buffers) from 1,000 simulated shifts run against 3 months of real NYU BK provider schedules (23,193 team-level observations). Boundaries placed at p5/p15/p33/p50/p75 of the empirical distribution.</p>
             <details className="mt-1">
               <summary className="text-xs text-blue-600 dark:text-blue-400 cursor-pointer">
