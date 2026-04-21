@@ -1,0 +1,3130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Capacity Conscious Triage — Walkthrough Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #fafafa;
+    --surface: #ffffff;
+    --ink: #1a1f2e;
+    --muted: #5f6b7d;
+    --border: #e5e7eb;
+    --grid: #eef0f3;
+    --t1: #1f8a8a; /* teal */
+    --t2: #7b3fa0; /* purple */
+    --t3: #4a5568; /* slate */
+    --red: #d32f2f;
+    --yellow: #fbc02d;
+    --purple: #7b1fa2;
+    --agree: #2e7d32;
+    --disagree: #c0392b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Inter', system-ui, sans-serif;
+    line-height: 1.5;
+  }
+  .serif { font-family: 'EB Garamond', Georgia, serif; }
+  header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .title-stack { display: flex; flex-direction: column; }
+  .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+  .step-title { font-family: 'EB Garamond', serif; font-size: 20px; font-weight: 500; }
+  .progress {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: center;
+  }
+  .section-chips {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .section-chip {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 4px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .section-chip:hover { color: var(--ink); border-color: var(--muted); }
+  .section-chip.done { color: var(--ink); border-color: var(--muted); }
+  .section-chip.current {
+    background: var(--t1);
+    color: white;
+    border-color: var(--t1);
+  }
+  .section-sep { color: var(--border); font-size: 10px; user-select: none; }
+  .phase-dots {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    min-height: 12px;
+  }
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex: 0 0 auto;
+  }
+  .dot.done { background: var(--muted); border-color: var(--muted); }
+  .dot.current { background: var(--t1); border-color: var(--t1); transform: scale(1.5); }
+
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 32px 24px 120px;
+  }
+  .step { display: none; }
+  .step.active { display: block; animation: fade 0.3s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .hero-title {
+    font-family: 'EB Garamond', serif;
+    font-size: 44px;
+    font-weight: 500;
+    line-height: 1.1;
+    margin: 32px 0 16px;
+  }
+  .lede {
+    font-size: 18px;
+    color: var(--muted);
+    max-width: 640px;
+    line-height: 1.55;
+  }
+
+  .chart-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin: 24px 0;
+  }
+  svg.chart { display: block; width: 100%; height: auto; }
+
+  .teams-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin: 24px 0;
+  }
+  .team-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .team-card.t1 { border-top: 3px solid var(--t1); }
+  .team-card.t2 { border-top: 3px solid var(--t2); }
+  .team-card.t3 { border-top: 3px solid var(--t3); }
+  .team-name { font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .team-stat-row { display: flex; justify-content: space-between; font-size: 14px; padding: 4px 0; }
+  .team-stat-row span:first-child { color: var(--muted); }
+  .team-stat-row span:last-child { font-variant-numeric: tabular-nums; font-weight: 500; }
+
+  .rules-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin: 24px 0; }
+  .rule { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .rule h3 { margin: 0 0 8px; font-family: 'EB Garamond', serif; font-size: 22px; font-weight: 500; }
+  .rule p { margin: 0; font-size: 14px; color: var(--muted); }
+
+  .patient-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 12px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 16px;
+  }
+  .pnum { font-family: 'EB Garamond', serif; font-size: 32px; font-weight: 500; }
+  .ptime { font-weight: 600; font-size: 15px; }
+  .acuity-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .acuity-pill.red { background: rgba(211, 47, 47, 0.1); color: var(--red); }
+  .acuity-pill.yellow { background: rgba(251, 192, 45, 0.15); color: #8a6400; }
+  .acuity-pill.purple { background: rgba(123, 31, 162, 0.1); color: var(--purple); }
+  .acuity-pill .dot-sm { width: 8px; height: 8px; border-radius: 50%; }
+  .acuity-pill.red .dot-sm { background: var(--red); }
+  .acuity-pill.yellow .dot-sm { background: var(--yellow); }
+  .acuity-pill.purple .dot-sm { background: var(--purple); }
+  .verdict { margin-left: auto; padding: 4px 12px; border-radius: 6px; font-weight: 700; font-size: 12px; letter-spacing: 0.05em; }
+  .verdict.agree { background: rgba(46, 125, 50, 0.12); color: var(--agree); }
+  .verdict.disagree { background: rgba(192, 57, 43, 0.12); color: var(--disagree); }
+
+  .ratios {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .ratio {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+  }
+  .ratio.rec { border: 2px solid var(--agree); background: rgba(46, 125, 50, 0.04); }
+  .ratio .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  .ratio .value { font-family: 'EB Garamond', serif; font-size: 34px; font-weight: 500; margin-top: 4px; line-height: 1; }
+  .ratio .sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  .narrative {
+    background: var(--surface);
+    border-left: 3px solid var(--t1);
+    padding: 16px 20px;
+    margin: 16px 0;
+    border-radius: 4px;
+    font-family: 'EB Garamond', serif;
+    font-size: 18px;
+    line-height: 1.55;
+  }
+  .decision {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+    font-family: 'Inter', sans-serif;
+  }
+
+  nav.controls {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 10;
+  }
+  nav.controls button {
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  nav.controls button:hover:not(:disabled) { background: var(--ink); color: white; border-color: var(--ink); }
+  nav.controls button:disabled { opacity: 0.4; cursor: not-allowed; }
+  nav.controls .step-counter { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .placeholder {
+    background: var(--surface);
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 64px 24px;
+    text-align: center;
+    color: var(--muted);
+  }
+  /* Slide layout — fills viewport, no scroll */
+  main { min-height: calc(100vh - 140px); display: flex; flex-direction: column; }
+  .step { flex: 1; display: none; }
+  .step.active { display: flex; flex-direction: column; }
+  .slide { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; animation: fade 0.35s ease; position: relative; }
+  .slide-title { font-family: 'EB Garamond', serif; font-weight: 500; font-size: 48px; line-height: 1.1; margin: 0 0 24px; max-width: 900px; }
+  .slide-sub { font-size: 18px; color: var(--muted); max-width: 640px; margin: 0 0 20px; line-height: 1.5; }
+
+  .problem-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--disagree);
+    margin-bottom: 14px;
+  }
+  .problem-eyebrow::before,
+  .problem-eyebrow::after {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 1.5px;
+    background: currentColor;
+    opacity: 0.5;
+  }
+
+  /* Intro step */
+  .intro-wrap { min-height: 70vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px 20px; }
+  .intro-q { font-family: 'EB Garamond', serif; font-size: 64px; font-weight: 500; line-height: 1.05; margin: 0 0 40px; max-width: 800px; }
+  .intro-q .fade-in { opacity: 0; animation: fadeUp 0.7s ease forwards; }
+  .intro-sub { font-size: 18px; color: var(--muted); max-width: 560px; margin: 0 auto 32px; line-height: 1.55; opacity: 0; animation: fadeUp 0.7s ease forwards; animation-delay: 0.15s; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  .rr-diagram { position: relative; width: 480px; height: 380px; margin: 16px auto; }
+  .rr-team {
+    position: absolute;
+    width: 150px;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 10px 10px;
+    display: flex; flex-direction: column; align-items: center;
+    font-family: 'EB Garamond', serif;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--ink);
+    z-index: 2;
+    box-shadow: 0 2px 8px rgba(26, 31, 46, 0.04);
+  }
+  .rr-team.t1 { top: 0; left: 50%; transform: translateX(-50%); border-color: var(--t1); }
+  .rr-team.t2 { bottom: 0; right: 0; border-color: var(--t2); }
+  .rr-team.t3 { bottom: 0; left: 0; border-color: var(--t3); }
+  .rr-team .docs { display: flex; align-items: flex-end; justify-content: center; gap: 2px; height: 66px; margin-bottom: 4px; }
+  .rr-team svg.doc { display: block; }
+  .rr-arrow-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; z-index: 1; pointer-events: none; }
+  .rr-track {
+    fill: none;
+    stroke: var(--border);
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+  .rr-flow {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-dasharray: 14 10;
+    stroke-opacity: 0.75;
+    animation: rrDash 3.2s linear infinite;
+  }
+  .rr-arrowhead { fill: var(--ink); }
+  @keyframes rrDash {
+    to { stroke-dashoffset: -72; }
+  }
+  .rr-caption {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    fill: var(--muted);
+    text-anchor: middle;
+    dominant-baseline: central;
+  }
+  .rr-caption-sub {
+    font-family: 'EB Garamond', Georgia, serif;
+    font-size: 15px;
+    font-style: italic;
+    fill: var(--muted);
+    text-anchor: middle;
+    dominant-baseline: central;
+    opacity: 0.75;
+  }
+
+  .reveal-stack { max-width: 640px; margin: 32px auto 0; text-align: left; }
+  .reveal-item {
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+    padding: 20px 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 14px;
+    font-size: 16px;
+    line-height: 1.55;
+  }
+  .reveal-item.show { opacity: 1; transform: translateY(0); }
+  .reveal-item strong { font-family: 'EB Garamond', serif; font-size: 20px; font-weight: 500; display: block; margin-bottom: 6px; color: var(--ink); }
+  .reveal-item.problem-1 strong { color: var(--disagree); }
+  .reveal-item.problem-2 strong { color: var(--disagree); }
+
+  /* Horizontal team row with inequality signs */
+  .teams-row { display: flex; align-items: center; justify-content: center; gap: 20px; flex-wrap: wrap; }
+  .teams-row .rr-team { position: static; transform: none; top: auto; left: auto; right: auto; bottom: auto; }
+  .neq { font-family: 'EB Garamond', serif; font-size: 48px; color: var(--ink); font-weight: 500; }
+
+  .patient-card {
+    background: transparent;
+    border: 1.5px solid var(--ink);
+    border-radius: 12px;
+    padding: 10px 16px;
+    min-width: 170px;
+    text-align: left;
+  }
+  .patient-card .pc-title {
+    font-family: 'EB Garamond', serif;
+    font-size: 18px;
+    font-weight: 500;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+  .patient-card ul { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.3; }
+  .patient-card li { margin: 0; }
+  .patient-card .pc-weight {
+    margin: 8px -16px -10px; padding: 6px 14px;
+    display: flex; align-items: baseline;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14px; font-weight: 600; color: #fff;
+    border-radius: 0 0 10px 10px;
+  }
+  .patient-card .pc-weight .dots { flex: 1; border-bottom: 1px dotted rgba(255,255,255,0.4); margin: 0 6px; transform: translateY(-3px); }
+  .patients-row { display: flex; align-items: center; justify-content: center; gap: 20px; flex-wrap: wrap; }
+
+  .team-list-card {
+    background: transparent;
+    border: 1.5px solid var(--ink);
+    border-radius: 12px;
+    padding: 16px 24px;
+    min-width: 160px;
+    text-align: left;
+  }
+  .team-list-card.t1 { border-color: var(--t1); }
+  .team-list-card.t2 { border-color: #d97706; }
+  .team-list-card.t3 { border-color: var(--t3); }
+  .team-list-card .tlc-title {
+    font-family: 'EB Garamond', serif;
+    font-size: 20px;
+    font-weight: 500;
+    text-align: center;
+    margin-bottom: 10px;
+    color: var(--ink);
+  }
+  .team-list-card ul { margin: 0; padding-left: 18px; font-size: 15px; font-weight: 600; line-height: 1.6; color: var(--ink); }
+  .team-list-card li { margin: 2px 0; }
+  .team-list-card ul.weighted { list-style: none; padding: 0; font-size: 13px; line-height: 1.3; }
+  .team-list-card ul.weighted li { display: flex; align-items: baseline; font-weight: 500; margin: 0; }
+  .team-list-card ul.weighted li .role { flex: 0 0 auto; }
+  .team-list-card ul.weighted li .w { flex: 0 0 auto; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; }
+  .team-list-card .dots { flex: 1; border-bottom: 1px dotted var(--border); margin: 0 6px; transform: translateY(-3px); min-width: 12px; }
+  .team-list-card .tlc-total {
+    margin: 8px -16px -10px; padding: 8px 16px;
+    display: flex; align-items: baseline; font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14px; font-weight: 600; color: #fff;
+    border-radius: 0 0 10px 10px;
+  }
+  .team-list-card .tlc-total .total-val { font-variant-numeric: tabular-nums; color: #fff; }
+  .team-list-card .tlc-total .dots { border-bottom-color: rgba(255,255,255,0.4); }
+  .team-list-card.t1 .tlc-total { background: var(--t1); }
+  .team-list-card.t2 .tlc-total { background: #d97706; }
+  .team-list-card.t3 .tlc-total { background: var(--t3); }
+  .strength-teams .team-list-card { padding: 10px 16px; min-width: 150px; }
+
+  .cap-row {
+    display: grid;
+    grid-template-columns: 180px 28px 120px 28px 100px;
+    align-items: end;
+    justify-content: center;
+    justify-items: center;
+    gap: 14px;
+  }
+  .cap-row .cap-team { display: flex; justify-content: center; }
+  .cap-row .cap-op { font-family: 'EB Garamond', serif; font-size: 34px; color: var(--muted); text-align: center; padding-bottom: 22px; }
+  .cap-row .cap-team-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .cap-row .cap-patients-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .cap-row .cap-patients { display: flex; align-items: flex-end; justify-content: center; gap: 6px; min-height: 64px; }
+  .cap-row .cap-stacked { text-align: center; }
+  .cap-row .cap-stacked .cap-num {
+    font-family: 'EB Garamond', serif; font-size: 28px; font-weight: 600; line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .cap-row .cap-stacked .cap-label {
+    font-family: 'Inter', system-ui, sans-serif; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.18em;
+    margin-top: 4px; font-weight: 600;
+  }
+  .cap-row .cap-team-wrap .team-list-card .tlc-total { display: none; }
+  .cap-row .cap-team-wrap .team-list-card { padding-bottom: 10px; }
+  .cap-row .cap-patients .pm {
+    width: 34px; border-radius: 4px; color: #fff;
+    border: 1.5px solid var(--ink);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Inter', system-ui, sans-serif; font-size: 11px; font-weight: 700;
+  }
+  .cap-row .cap-patients .pm span { line-height: 1; }
+  .cap-row .cap-score .cap-num, .cap-row .cap-score .cap-label { color: #1a3a7b; }
+  .cap-divider { border-top: 1px solid var(--border); margin: 2px 0; }
+  .strength-teams .team-list-card .tlc-title { font-size: 17px; margin-bottom: 4px; }
+
+  .formula-card, .group-card {
+    margin-top: 20px;
+    padding: 40px 56px;
+    background: linear-gradient(180deg, #ffffff 0%, #f5f7fa 100%);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(26, 58, 123, 0.08), 0 2px 6px rgba(0,0,0,0.04);
+  }
+  .formula-card { padding: 56px 80px; }
+  .formula {
+    font-family: 'EB Garamond', serif;
+    font-size: 72px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    color: var(--ink);
+  }
+  .f-frac {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    line-height: 1.2;
+  }
+  .f-frac .f-bar {
+    height: 3px;
+    background: var(--ink);
+    width: 100%;
+    min-width: 260px;
+    border-radius: 2px;
+    margin: 4px 0;
+  }
+  .f-term {
+    font-weight: 400;
+    display: inline-grid;
+  }
+  .f-term::before {
+    content: attr(data-text);
+    font-weight: 700;
+    visibility: hidden;
+    grid-area: 1 / 1;
+    height: 0;
+  }
+  .f-term > span {
+    grid-area: 1 / 1;
+  }
+  .f-strength { color: #2e7d32; animation: empTerm 1.2s ease-out forwards; animation-delay: 0.3s; }
+  .f-load     { color: #c0392b; animation: empTerm 1.2s ease-out forwards; animation-delay: 1.3s; }
+  .f-capacity { color: #1a3a7b; animation: empCap 1.2s ease-out forwards; animation-delay: 2.3s; }
+  .f-eq { color: var(--muted); font-weight: 300; margin: 0 8px; }
+
+  .formula-mini {
+    font-family: 'EB Garamond', serif;
+    font-size: 30px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+  .formula-mini .f-frac { gap: 4px; line-height: 1.15; }
+  .formula-mini .f-bar { height: 1.5px; min-width: 90px; background: currentColor; border-radius: 1px; margin: 2px 0; }
+  .formula-mini .fm-strength { color: #2e7d32; font-weight: 400; }
+  .formula-mini .fm-load { color: #c0392b; font-weight: 400; }
+  .formula-mini .fm-capacity { color: #1a3a7b; font-weight: 400; }
+
+  .formula-footnote {
+    position: absolute;
+    bottom: 28px;
+    left: 0; right: 0;
+    display: flex;
+    justify-content: center;
+    opacity: 0.55;
+  }
+  .formula-footnote .formula-mini { font-size: 22px; margin: 0; }
+  .formula-footnote .f-bar { min-width: 64px; }
+
+  .weights-table {
+    width: 100%;
+    max-width: 440px;
+    border-collapse: collapse;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 13px;
+  }
+  .weights-table th, .weights-table td {
+    padding: 2px 8px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    line-height: 1.3;
+  }
+  .weights-table th:last-child, .weights-table td:last-child { text-align: right; }
+  .weights-table th {
+    font-weight: 700;
+    color: var(--ink);
+    border-bottom: 1.5px solid var(--ink);
+  }
+  .weights-table td { color: var(--muted); }
+  .weights-table tr:last-child td { border-bottom: none; }
+  @keyframes empTerm {
+    0%, 100% { font-weight: 400; transform: scale(1); }
+    30%, 60% { font-weight: 700; transform: scale(1.08); }
+  }
+  @keyframes empCap {
+    0%   { font-weight: 400; transform: scale(1); }
+    100% { font-weight: 700; transform: scale(1.12); }
+  }
+
+  .interlude {
+    background: #fef3c7;
+    border-left: 3px solid #f59e0b;
+    padding: 12px 16px;
+    margin: 12px 0;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+
+  /* Slide 10 — 9:54 AM zero-state */
+  .s955-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+    gap: 16px;
+    align-items: start;
+  }
+  .s955-left { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .s955-right { min-width: 0; }
+  .s955-card { padding: 10px 14px !important; }
+  .s955-row {
+    display: grid !important;
+    grid-template-columns: 48px 1fr auto auto;
+    align-items: center;
+    gap: 12px !important;
+    justify-items: center;
+  }
+  .s955-row .dv-team { width: auto; font-size: 14px; text-align: right; justify-self: end; }
+  .s955-row .dv-fraction { min-width: 0; width: 100%; }
+  .s955-row .dv-num-wrap,
+  .s955-row .dv-den-wrap { gap: 10px; }
+  .s955-row .dv-num, .s955-row .dv-den { font-size: 22px; }
+  .s955-row .dv-eq { font-size: 24px; color: var(--muted); }
+  .s955-row .dv-cap { font-size: 34px; line-height: 1; }
+  .s955-row .dv-cap-lbl { font-size: 10px; margin-top: 2px; }
+  .s955-row .dv-mini-card { font-size: 10px; padding: 3px 6px; min-width: 0; }
+  .s955-row .dv-mini-card ul li { gap: 8px; white-space: nowrap; }
+  .s955-row .dv-mini-card ul li .w { min-width: 26px; text-align: right; }
+  .s955-row .dv-bar { margin: 4px 0; }
+  .s955-right .chart { width: 100%; height: auto; }
+  .s955-right .chart-wrap { margin: 0 !important; }
+  .s955-fadein { animation: s955FadeIn 0.5s ease forwards; }
+  @keyframes s955FadeIn {
+    from { opacity: 0; transform: translateY(2px); }
+    to   { opacity: 1; transform: none; }
+  }
+  /* Override patientArrive ring to yellow on slide 10 so the new chip pulses yellow. */
+  .s955-slide .dv-mp.just-arrived {
+    animation: s955PatientArrive 0.6s cubic-bezier(.2, .8, .2, 1.2);
+  }
+  @keyframes s955PatientArrive {
+    0%   { transform: scale(0.25); opacity: 0; box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.85); }
+    45%  { transform: scale(1.22); opacity: 1; box-shadow: 0 0 0 5px rgba(245, 158, 11, 0.45); }
+    100% { transform: scale(1);    opacity: 1; box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+  }
+
+  /* Animated Divide slide — numbers tumble into the formula template */
+  .dv-stack { display: flex; flex-direction: column; gap: 14px; }
+  .dv-row {
+    display: flex; align-items: center; justify-content: center;
+    gap: 24px;
+    font-family: 'EB Garamond', serif;
+  }
+  .dv-team {
+    font-size: 18px; font-weight: 500;
+    color: var(--muted);
+    width: 72px; text-align: right;
+    opacity: 0;
+    animation: dvFadeIn 0.5s ease forwards;
+    animation-delay: var(--dv-base);
+  }
+  .dv-fraction {
+    display: flex; flex-direction: column; align-items: stretch;
+    min-width: 140px;
+    text-align: center;
+  }
+  .dv-num, .dv-den {
+    font-size: 38px; line-height: 1;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+    opacity: 0;
+  }
+  .dv-strength { color: #2e7d32; }
+  .dv-load { color: #c0392b; }
+  .dv-num {
+    animation: dvNumIn 0.55s cubic-bezier(.2,.8,.2,1) forwards;
+    animation-delay: calc(var(--dv-base) + 0.2s);
+  }
+  .dv-den {
+    animation: dvDenIn 0.55s cubic-bezier(.2,.8,.2,1) forwards;
+    animation-delay: calc(var(--dv-base) + 0.8s);
+  }
+  .dv-bar {
+    height: 3px; width: 100%;
+    background: var(--ink);
+    border-radius: 2px;
+    margin: 8px 0;
+    transform: scaleX(0);
+    transform-origin: center;
+    animation: dvBarIn 0.45s cubic-bezier(.2,.8,.2,1) forwards;
+    animation-delay: calc(var(--dv-base) + 0.55s);
+  }
+  .dv-eq {
+    font-size: 40px;
+    color: var(--muted);
+    font-weight: 300;
+    opacity: 0;
+    animation: dvFadeIn 0.35s ease forwards;
+    animation-delay: calc(var(--dv-base) + 1.45s);
+  }
+  .dv-cap-wrap {
+    display: flex; flex-direction: column; align-items: center;
+    min-width: 108px;
+  }
+  .dv-cap {
+    font-size: 50px; font-weight: 600;
+    color: #1a3a7b;
+    opacity: 0;
+    transform: scale(0.5);
+    animation: dvCapIn 0.7s cubic-bezier(.2,.8,.2,1.2) forwards;
+    animation-delay: calc(var(--dv-base) + 1.75s);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    line-height: 1;
+  }
+  .dv-cap-lbl {
+    font-family: 'EB Garamond', Georgia, serif;
+    font-size: 18px;
+    color: #1a3a7b;
+    font-weight: 700;
+    margin-top: 2px;
+    line-height: 1;
+    opacity: 0;
+    animation: dvFadeIn 0.5s ease forwards;
+    animation-delay: calc(var(--dv-base) + 2.15s);
+  }
+  @keyframes dvFadeIn { to { opacity: 1; } }
+  @keyframes dvNumIn {
+    from { opacity: 0; transform: translateY(-22px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes dvDenIn {
+    from { opacity: 0; transform: translateY(22px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes dvBarIn {
+    to { transform: scaleX(1); }
+  }
+  @keyframes dvCapIn {
+    0% { opacity: 0; transform: scale(0.5); }
+    60% { opacity: 1; transform: scale(1.18); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+
+  /* Mini recap cards inside the fraction */
+  .dv-num-wrap, .dv-den-wrap {
+    display: flex; align-items: center; justify-content: center;
+    gap: 12px;
+  }
+  .dv-mini-card {
+    border: 1.2px solid var(--ink);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 10px;
+    line-height: 1.4;
+    color: var(--ink);
+    min-width: 104px;
+    text-align: left;
+    opacity: 0;
+    animation: dvFadeIn 0.5s ease forwards;
+    animation-delay: calc(var(--dv-base) + 0.55s);
+  }
+  .dv-mini-card.t1 { border-color: var(--t1); }
+  .dv-mini-card.t2 { border-color: #d97706; }
+  .dv-mini-card ul { list-style: none; margin: 0; padding: 0; }
+  .dv-mini-card li {
+    display: flex; justify-content: space-between; gap: 10px;
+  }
+  .dv-mini-card li .w {
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .dv-mini-card li.pgy1-highlight {
+    color: var(--t1);
+    font-weight: 700;
+    text-shadow: 0 0 6px rgba(31, 138, 138, 0.55);
+  }
+  .dv-mini-card li.pgy1-highlight .w {
+    color: var(--t1);
+  }
+  .dv-mini-patients {
+    display: flex; gap: 3px; align-items: center;
+    opacity: 0;
+    animation: dvFadeIn 0.5s ease forwards;
+    animation-delay: calc(var(--dv-base) + 1.15s);
+  }
+  .dv-mp {
+    height: 24px;
+    color: #fff;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 10px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 4px;
+    border: 1.2px solid var(--ink);
+  }
+  .dv-mp.red { background: #c0392b; }
+  .dv-mp.purple { background: #7b1fa2; }
+  .dv-mp.yellow { background: #b8a000; }
+
+  /* Capacity-cap shading — rendered into every chart that passes capShade,
+     but hidden by default. The parent slide adds `.slide-shades` to reveal. */
+  .cap-shade { opacity: 0; transition: opacity 500ms ease; }
+  .slide-shades .cap-shade { opacity: 1; }
+
+  /* Team-focus AUC mode — parent slide adds `.focus-T1|T2|T3` to fill the
+     focused team's area and dim the other two teams' lines + dots. */
+  .team-area { opacity: 0; transition: opacity 400ms ease; }
+  .focus-T1 .area-T1, .focus-T2 .area-T2, .focus-T3 .area-T3 { opacity: 0.32; }
+  .load-min-label { opacity: 0; transition: opacity 350ms ease; }
+  .focus-T1 .load-min-T1, .focus-T2 .load-min-T2, .focus-T3 .load-min-T3 { opacity: 1; }
+  .chart path.line-T1, .chart path.line-T2, .chart path.line-T3,
+  .chart .patient-dot, .chart .patient-dot-label { transition: opacity 350ms ease; }
+  .focus-T1 .line-T2, .focus-T1 .line-T3,
+  .focus-T1 .patient-dot[data-team="T2"], .focus-T1 .patient-dot[data-team="T3"],
+  .focus-T1 .patient-dot-label[data-team="T2"], .focus-T1 .patient-dot-label[data-team="T3"] { opacity: 0.07; }
+  .focus-T2 .line-T1, .focus-T2 .line-T3,
+  .focus-T2 .patient-dot[data-team="T1"], .focus-T2 .patient-dot[data-team="T3"],
+  .focus-T2 .patient-dot-label[data-team="T1"], .focus-T2 .patient-dot-label[data-team="T3"] { opacity: 0.07; }
+  .focus-T3 .line-T1, .focus-T3 .line-T2,
+  .focus-T3 .patient-dot[data-team="T1"], .focus-T3 .patient-dot[data-team="T2"],
+  .focus-T3 .patient-dot-label[data-team="T1"], .focus-T3 .patient-dot-label[data-team="T2"] { opacity: 0.07; }
+
+  /* Dynamic "Decide." slide — disables all fade-in animations, adds live card */
+  .dyn-slide .dv-team,
+  .dyn-slide .dv-num,
+  .dyn-slide .dv-den,
+  .dyn-slide .dv-bar,
+  .dyn-slide .dv-eq,
+  .dyn-slide .dv-cap,
+  .dyn-slide .dv-cap-lbl,
+  .dyn-slide .dv-mini-card,
+  .dyn-slide .dv-mini-patients {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .dyn-slide .dv-mp {
+    overflow: hidden;
+    white-space: nowrap;
+    min-width: 2px;
+  }
+  .dyn-slide .dv-mp.just-arrived {
+    animation: patientArrive 0.6s cubic-bezier(.2, .8, .2, 1.2);
+  }
+  @keyframes patientArrive {
+    0%   { transform: scale(0.25); opacity: 0; box-shadow: 0 0 0 0 rgba(46,125,50,0.8); }
+    45%  { transform: scale(1.22); opacity: 1; box-shadow: 0 0 0 5px rgba(46,125,50,0.38); }
+    100% { transform: scale(1);    opacity: 1; box-shadow: 0 0 0 0 rgba(46,125,50,0); }
+  }
+  .dyn-card {
+    transition: box-shadow 0.35s ease;
+  }
+  .dyn-card.dyn-winner {
+    box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.6), 0 12px 30px rgba(46, 125, 50, 0.22);
+  }
+  .dyn-card.dyn-winner.dyn-disagree {
+    box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.65), 0 12px 30px rgba(192, 57, 43, 0.25);
+  }
+  .dyn-card.dyn-winner.dyn-staffing {
+    box-shadow: 0 0 0 3px rgba(31, 138, 138, 0.65), 0 12px 30px rgba(31, 138, 138, 0.25);
+  }
+  .dyn-caption {
+    min-height: 24px;
+    font-family: 'EB Garamond', Georgia, serif;
+    font-size: 17px;
+    line-height: 1.3;
+    color: var(--ink);
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    margin-bottom: 8px;
+    padding: 0 12px;
+  }
+  .dyn-caption.visible { opacity: 1; }
+  .dyn-next-hint {
+    display: inline-block;
+    margin-left: 14px;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    opacity: 0.8;
+    animation: hintPulse 1.6s ease-in-out infinite;
+  }
+  @keyframes hintPulse {
+    0%, 100% { opacity: 0.45; }
+    50%      { opacity: 0.95; }
+  }
+
+  /* ============================================================
+     Mobile / iPhone — fit every slide in viewport without scrolling
+     ============================================================ */
+  @media (max-width: 600px) {
+    main { padding: 6px 8px 68px; min-height: calc(100vh - 110px); max-width: 100%; }
+
+    /* Compact header — one row, truncated title, no dots */
+    header { padding: 6px 12px; flex-wrap: nowrap; gap: 8px; }
+    .title-stack { flex: 1; min-width: 0; overflow: hidden; }
+    .eyebrow { font-size: 9px; letter-spacing: 0.08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .step-title { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.25; }
+    .progress { display: none; }
+
+    /* Compact bottom nav */
+    nav.controls { padding: 6px 10px; }
+    nav.controls button { padding: 6px 10px; font-size: 12px; }
+    nav.controls .step-counter { font-size: 11px; }
+
+    /* Slide scaffold */
+    .slide { padding: 6px 2px; justify-content: flex-start; }
+    .slide-title { font-size: 22px; margin: 0 0 8px; line-height: 1.1; }
+    .slide-sub { font-size: 12px; margin: 0 0 8px; line-height: 1.4; }
+    .problem-eyebrow { font-size: 9px; letter-spacing: 0.16em; margin-bottom: 4px; gap: 6px; }
+    .problem-eyebrow::before, .problem-eyebrow::after { width: 16px; }
+    .hero-title { font-size: 22px; margin: 4px 0 6px; line-height: 1.15; }
+    .lede { font-size: 12px; line-height: 1.4; }
+
+    /* Round-robin diagram */
+    .rr-diagram {
+      width: min(96vw, 340px);
+      height: auto;
+      aspect-ratio: 480 / 380;
+      margin: 4px auto;
+    }
+    .rr-team {
+      width: 31%;
+      padding: 5px 3px 4px;
+      font-size: 10px;
+      border-radius: 8px;
+    }
+    .rr-team .docs { height: 38px; gap: 1px; margin-bottom: 1px; }
+    .rr-team .docs svg.doc { transform: scale(0.58); transform-origin: bottom center; }
+    .rr-caption { font-size: 9px; letter-spacing: 0.1em; }
+    .rr-caption-sub { font-size: 10px; }
+    .rr-flow { stroke-width: 1.8; stroke-dasharray: 8 6; }
+
+    /* Group / formula cards */
+    .group-card, .formula-card {
+      padding: 10px 10px !important;
+      border-radius: 12px;
+      box-shadow: 0 4px 14px rgba(26, 58, 123, 0.05);
+      width: 100%;
+    }
+
+    /* Problem/strength/load rows — must stay side-by-side on mobile */
+    .teams-row, .patients-row { gap: 4px; flex-wrap: nowrap; width: 100%; }
+    .neq { font-size: 18px; }
+    .team-list-card, .patient-card { min-width: 0; padding: 6px 6px; flex: 1; }
+    .team-list-card .tlc-title, .patient-card .pc-title { font-size: 11px; margin-bottom: 3px; }
+    .team-list-card ul, .patient-card ul { font-size: 9px; padding-left: 10px; line-height: 1.25; }
+    .team-list-card ul.weighted { font-size: 9px; }
+    .team-list-card ul.weighted li .w { font-size: 8px; }
+    .team-list-card .tlc-total, .patient-card .pc-weight { font-size: 10px; padding: 4px 8px; margin: 6px -6px -4px; }
+    .pc-title { font-size: 12px; }
+
+    /* Formula slide */
+    .formula { font-size: 32px; gap: 10px; }
+    .formula .f-frac { gap: 8px; }
+    .formula .f-frac .f-bar { min-width: 110px; height: 2px; margin: 2px 0; }
+    .formula-footnote { bottom: 10px; }
+    .formula-footnote .formula-mini { font-size: 12px; }
+    .formula-mini { font-size: 18px; gap: 8px; margin-bottom: 8px; }
+    .formula-mini .f-bar { min-width: 60px; }
+
+    /* Weights table on Strength slide */
+    .weights-table { font-size: 10px; }
+    .weights-table th, .weights-table td { padding: 1px 4px; }
+
+    /* Scene / Teams / Rules slides */
+    .chart-wrap { padding: 8px 8px; margin: 8px 0; border-radius: 10px; }
+    .teams-grid { gap: 6px; margin: 8px 0; grid-template-columns: 1fr 1fr 1fr; }
+    .team-card { padding: 8px 6px; }
+    .team-card .team-name { font-size: 10px; margin-bottom: 4px; }
+    .team-card > div[style*="font-size:13px"] { font-size: 9px !important; margin-bottom: 6px !important; line-height: 1.3 !important; }
+    .team-stat-row { font-size: 10px; padding: 1px 0; }
+    .team-card > div[style*="font-size:12px"] { font-size: 9px !important; padding-top: 6px !important; margin-top: 6px !important; }
+    .rules-grid { gap: 6px; margin: 8px 0; grid-template-columns: 1fr; }
+    .rule { padding: 10px 12px; }
+    .rule h3 { font-size: 15px; margin: 0 0 4px; }
+    .rule p { font-size: 11px; line-height: 1.35; }
+
+    /* Patient slides — the biggest offender */
+    .patient-header { padding: 6px 8px; margin-bottom: 6px; gap: 6px; border-radius: 8px; }
+    .pnum { font-size: 20px; }
+    .ptime { font-size: 11px; }
+    .acuity-pill { font-size: 9px; padding: 2px 6px; }
+    .acuity-pill .dot-sm { width: 6px; height: 6px; }
+    .verdict { font-size: 9px; padding: 2px 6px; margin-left: auto; }
+    .interlude { font-size: 10px; padding: 6px 8px; margin: 4px 0; }
+    .ratios { gap: 4px; margin: 6px 0; }
+    .ratio { padding: 6px 4px; border-radius: 8px; }
+    .ratio .label { font-size: 9px; }
+    .ratio .value { font-size: 20px; margin-top: 2px; }
+    .ratio .sub { font-size: 8px; margin-top: 2px; line-height: 1.2; }
+    .narrative { font-size: 11px; padding: 8px 10px; margin: 6px 0; line-height: 1.4; border-radius: 4px; }
+    .decision { font-size: 9px; margin-top: 4px; padding-top: 4px; }
+
+    /* Placeholder slides */
+    .placeholder { padding: 32px 12px; font-size: 11px; }
+
+    /* Capacity / dynamic slides */
+    .cap-row {
+      grid-template-columns: 110px 16px 86px 16px 70px;
+      gap: 4px;
+    }
+    .cap-row .cap-op { font-size: 18px; padding-bottom: 14px; }
+    .cap-row .cap-stacked .cap-num { font-size: 16px; }
+    .cap-row .cap-stacked .cap-label { font-size: 8px; letter-spacing: 0.1em; }
+    .cap-row .cap-patients .pm { width: 22px; font-size: 8px; }
+    .strength-teams .team-list-card { min-width: 0; padding: 6px 6px; }
+    .strength-teams .team-list-card .tlc-title { font-size: 11px; }
+
+    /* Divide slide */
+    .dv-team { font-size: 10px; width: 44px; }
+    .dv-num, .dv-den { font-size: 20px; }
+    .dv-cap { font-size: 26px; }
+    .dv-cap-lbl { font-size: 10px; }
+    .dv-eq { font-size: 22px; }
+    .dv-row { gap: 8px; }
+    .dv-mini-card { min-width: 62px; font-size: 8px; padding: 3px 4px; }
+    .dv-mp { height: 14px; font-size: 8px; }
+    .dyn-caption { font-size: 11px; margin-bottom: 4px; }
+  }
+
+</style>
+</head>
+<body>
+<header>
+  <div class="title-stack">
+    <div class="eyebrow">Capacity Conscious Triage · Walkthrough</div>
+    <div class="step-title" id="stepTitle">Slide 1</div>
+  </div>
+  <div class="progress" id="progress"></div>
+</header>
+
+<main id="main"></main>
+
+<nav class="controls">
+  <button id="prevBtn">← Previous</button>
+  <span class="step-counter" id="counter">Step 1 of 14</span>
+  <button id="nextBtn">Next →</button>
+</nav>
+
+<script>
+// ============================================================
+// SCENARIO DATA — hard-coded from paper Section 2
+// ============================================================
+const DECAY = {
+  Red:    { w: 4, minutes: 180 },
+  Yellow: { w: 2, minutes: 180 },
+  Purple: { w: 1, minutes: 90 },
+};
+
+const TEAMS = {
+  T1: { name: 'Team 1', color: 'var(--t1)', strengthPre: 37.5, strengthPost: 42.5, roster: 'Attending (20) + Senior Resident (15.2) + Intern (6.6 at noon)' },
+  T2: { name: 'Team 2', color: 'var(--t2)', strength: 42.2, roster: 'Attending (20) + PA (11.4) + Junior Resident (10.8)' },
+  T3: { name: 'Team 3', color: 'var(--t3)', strength: 37.6, roster: 'Attending (20) + Senior Resident (15.2) + Rotator (2.4)' },
+};
+
+// Minutes from 09:55 (T+0)
+const PATIENTS = [
+  { n: 1, t: 0,   time: '09:55', acuity: 'Purple', actual: 'T1', formula: 'T1', verdict: 'AGREE',
+    ratios: { T1: '∞', T2: '∞', T3: '∞' },
+    narrative: 'The window opens. All three teams are empty with infinite capacity ratios. The first arrival is an ESI-3 Purple (weight 1.0). The formula routes to Team 1 by tiebreak (lowest team ID when all ratios are equal). The charge nurse also sends to Team 1. An easy call on an empty board.' },
+  { n: 2, t: 50,  time: '10:45', acuity: 'Yellow', actual: 'T1', formula: 'T2', verdict: 'DISAGREE',
+    ratios: { T1: '84.4', T2: '∞', T3: '∞' },
+    narrative: 'Fifty minutes of quiet. The first Yellow of the window. Team 1 has residual load from a nearly-decayed Purple. Teams 2 and 3 are both empty. The formula favors the empty teams. The charge nurse sends to the team that already has a patient. A minor difference on its own, but it sets up a compounding problem.' },
+  { n: 3, t: 51,  time: '10:46', acuity: 'Red',    actual: 'T2', formula: 'T2', verdict: 'AGREE',
+    ratios: { T1: '15.5', T2: '∞', T3: '∞' },
+    narrative: 'One minute later, the sickest patient of the morning arrives. Team 1 just absorbed Patient 2 and carries a combined load of about 2.4. Teams 2 and 3 are both still empty. Both the formula and the charge nurse agree: send the ESI-1 Red to an empty team. The right call by any measure.' },
+  { n: 4, t: 64,  time: '10:59', acuity: 'Yellow', actual: 'T1', formula: 'T3', verdict: 'DISAGREE',
+    ratios: { T1: '17.6', T2: '9.4', T3: '∞' },
+    narrative: 'Thirteen minutes later. Team 2 is weighed down by the ESI-1 Red (weight 3.71), pushing its ratio to 9.4. Team 1 carries two patients, but its stronger complement keeps its ratio at 17.6. Team 3 is still completely empty, 64 minutes into the window, with an infinite ratio. The formula sends to Team 3, the only team with zero patients. The charge nurse sends back to Team 1 instead, giving it a third patient. Team 3 remains idle.' },
+  { n: 5, t: 86,  time: '11:21', acuity: 'Yellow', actual: 'T2', formula: 'T3', verdict: 'DISAGREE',
+    ratios: { T1: '11.0', T2: '10.9', T3: '∞' },
+    narrative: 'Twenty-two minutes of quiet. The Red on Team 2 has decayed from 4.0 to about 3.22, improving Team 2\u2019s ratio to 10.9. Team 1 carries three patients and sits at 11.0. Team 3 is still empty with an infinite ratio. The formula again recommends Team 3. The charge nurse sends to Team 2. The attending and senior resident on Team 3 remain completely unused, 86 minutes into the window.' },
+  { n: 6, t: 127, time: '12:02', acuity: 'Yellow', actual: 'T2', formula: 'T3', verdict: 'DISAGREE',
+    ratios: { T1: '17.4', T2: '9.1', T3: '∞' }, interlude: true,
+    narrative: 'Forty-one minutes of quiet, and a staffing change: a PGY-1 intern has joined Team 1 at noon, pushing its strength from 37.5 to 42.5. Combined with decay reducing Team 1\u2019s load, its ratio climbs to 17.4. Team 2 sits at 9.1 with two patients. Team 3 is still empty, over two hours into the window, with an infinite ratio. For the third consecutive patient, the formula recommends Team 3. The charge nurse sends to Team 2, giving it a third patient.' },
+  { n: 7, t: 131, time: '12:06', acuity: 'Yellow', actual: 'T3', formula: 'T3', verdict: 'AGREE',
+    ratios: { T1: '18.0', T2: '6.2', T3: '∞' },
+    narrative: 'Four minutes later. Team 2 now carries three patients and its ratio has dropped to 6.2. Team 1 is at 18.0 with its enhanced strength. Team 3, with one of the most experienced residents in the department, is still empty, 131 minutes into the window, with an infinite ratio. Both the formula and the charge nurse finally agree: Team 3 gets its first patient.' },
+  { n: 8, t: 146, time: '12:21', acuity: 'Yellow', actual: 'T1', formula: 'T1', verdict: 'AGREE',
+    ratios: { T1: '21.0', T2: '7.0', T3: '19.1' },
+    narrative: 'The final patient of the window. By now all three teams carry load and all three ratios are finite for the first time. Team 1\u2019s enhanced strength (42.5) combined with significant decay on its older patients gives it the highest ratio at 21.0. Team 3, with only one patient and 15 minutes of decay, sits at 19.1. Team 2, carrying three patients including the aging Red, has the lowest ratio at 7.0. Both routing methods agree on Team 1.' },
+];
+
+const CHART_MIN = 0;
+const CHART_MAX = 150; // minutes from T+0 = 09:55
+
+// Compute a team's instantaneous load under an assignment history
+function loadAt(team, mins, assignments) {
+  // assignments: array of {patient, team, tArrive}
+  let load = 0;
+  for (const a of assignments) {
+    if (a.team !== team) continue;
+    if (a.tArrive > mins) continue;
+    const d = DECAY[a.acuity];
+    const age = mins - a.tArrive;
+    if (age >= d.minutes) continue;
+    load += d.w * (1 - age / d.minutes);
+  }
+  return load;
+}
+
+// "Formula from scratch" replay — routes each patient by picking the max
+// strength/load ratio team, using assignments made so far (not the historical
+// ones). Ties break by lowest team ID (T1 < T2 < T3).
+function formulaReplayAssignments() {
+  if (formulaReplayAssignments._cached) return formulaReplayAssignments._cached;
+  const assigns = [];
+  for (const p of PATIENTS) {
+    const t = p.t;
+    const load = { T1: 0, T2: 0, T3: 0 };
+    for (const a of assigns) {
+      if (a.tArrive > t) continue;
+      const d = DECAY[a.acuity];
+      const age = t - a.tArrive;
+      if (age >= d.minutes) continue;
+      load[a.team] += d.w * (1 - age / d.minutes);
+    }
+    const strengths = {
+      T1: t >= 125 ? 42.5 : 37.5,
+      T2: 42.2,
+      T3: 37.6,
+    };
+    let bestTeam = null, bestRatio = -Infinity;
+    for (const team of ['T1', 'T2', 'T3']) {
+      const ratio = load[team] === 0 ? Infinity : strengths[team] / load[team];
+      if (ratio > bestRatio) { bestRatio = ratio; bestTeam = team; }
+    }
+    assigns.push({ acuity: p.acuity, team: bestTeam, tArrive: p.t });
+  }
+  formulaReplayAssignments._cached = assigns;
+  return assigns;
+}
+
+// Build curves for a given assignment strategy up to step index (1-8)
+function curvesThrough(stepPatientIdx, strategy) {
+  let assignments;
+  if (strategy === 'formula-replay') {
+    assignments = formulaReplayAssignments().slice(0, stepPatientIdx);
+  } else {
+    assignments = PATIENTS.slice(0, stepPatientIdx).map(p => ({
+      acuity: p.acuity, team: strategy === 'actual' ? p.actual : p.formula, tArrive: p.t,
+    }));
+  }
+  const pts = [];
+  for (let m = -5; m <= CHART_MAX; m++) {
+    pts.push({ m, T1: loadAt('T1', m, assignments), T2: loadAt('T2', m, assignments), T3: loadAt('T3', m, assignments) });
+  }
+  return { pts, assignments };
+}
+
+// ============================================================
+// CHART RENDERING
+// ============================================================
+function renderChart({ patientsShown, currentPatient, strategy = 'actual', width = 980, height = 340, xStart = 0, xEnd = CHART_MAX, cutoffMinute = null, hideLegend = false, strokeOnly = false, fullDomain = false, restrictToTeam = null, capShade = null, areasControlled = false, aucLabels = null }) {
+  const { pts: allPts, assignments } = curvesThrough(patientsShown, strategy);
+  const effectiveCutoff = cutoffMinute == null ? xEnd : cutoffMinute;
+  // When fullDomain is true, we draw the whole path to CHART_MAX regardless
+  // of cutoffMinute — the caller animates visibility via stroke-dashoffset.
+  const pts = fullDomain
+    ? allPts.filter(p => p.m >= xStart && p.m <= xEnd)
+    : allPts.filter(p => p.m >= xStart && p.m <= effectiveCutoff);
+  const margin = { l: 44, r: 20, t: 20, b: 36 };
+  const W = width - margin.l - margin.r;
+  const H = height - margin.t - margin.b;
+  const xRange = xEnd - xStart;
+  const xScale = m => margin.l + ((m - xStart) / xRange) * W;
+  const maxY = 8;
+  const yScale = v => margin.t + H - (v / maxY) * H;
+
+  const pathFor = key => pts.map((p,i) => `${i===0?'M':'L'}${xScale(p.m).toFixed(1)},${yScale(p[key]).toFixed(1)}`).join(' ');
+  const areaFor = key => {
+    if (!pts.length) return '';
+    return pathFor(key) + ` L${xScale(pts[pts.length-1].m).toFixed(1)},${yScale(0).toFixed(1)} L${xScale(pts[0].m).toFixed(1)},${yScale(0).toFixed(1)} Z`;
+  };
+
+  // X gridlines every 30 min
+  const allXTicks = [-5, 0, 30, 60, 90, 120, 150];
+  const allTimeLabels = { [-5]: '09:50', 0: '09:55', 30: '10:25', 60: '10:55', 90: '11:25', 120: '11:55', 150: '12:25' };
+  const xTicks = allXTicks.filter(x => x >= xStart && x <= xEnd)
+    // Suppress the 09:50 tick whenever the chart starts at -5 — at any plot
+    // width it ends up crowding the 09:55 label to the point of overlap.
+    .filter(x => !(x === -5 && xStart === -5));
+  const timeLabels = allTimeLabels;
+
+  const noonX = xScale(125); // T+125 = noon
+
+  let svg = `<svg class="chart" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`;
+  // y-axis label (rotated), centered vertically along the plot area
+  svg += `<text x="${margin.l - 30}" y="${margin.t + H / 2}" text-anchor="middle" font-size="11" fill="var(--muted)" transform="rotate(-90, ${margin.l - 30}, ${margin.t + H / 2})" style="letter-spacing:0.08em; text-transform:uppercase;">Team load</text>`;
+  // grid
+  for (let y = 0; y <= maxY; y += 2) {
+    svg += `<line x1="${margin.l}" x2="${margin.l+W}" y1="${yScale(y)}" y2="${yScale(y)}" stroke="var(--grid)" />`;
+    svg += `<text x="${margin.l-8}" y="${yScale(y)+4}" text-anchor="end" font-size="11" fill="var(--muted)">${y}</text>`;
+  }
+  for (const x of xTicks) {
+    svg += `<line x1="${xScale(x)}" x2="${xScale(x)}" y1="${margin.t}" y2="${margin.t+H}" stroke="var(--grid)" />`;
+    svg += `<text x="${xScale(x)}" y="${margin.t+H+18}" text-anchor="middle" font-size="11" fill="var(--muted)">${timeLabels[x]}</text>`;
+  }
+  // capacity-cap shading (top region above a load threshold) — always emitted
+  // when capShade is provided, but visibility is controlled by `.slide-shades`
+  // on the parent slide so steps can fade the shade in/out without re-render.
+  if (capShade) {
+    const yCap = yScale(capShade.threshold);
+    svg += `<rect class="cap-shade" x="${margin.l}" y="${margin.t}" width="${W}" height="${yCap - margin.t}" fill="${capShade.fill}" />`;
+    svg += `<line class="cap-shade" x1="${margin.l}" x2="${margin.l+W}" y1="${yCap}" y2="${yCap}" stroke="${capShade.stroke}" stroke-dasharray="5,4" stroke-width="1.4" />`;
+    if (capShade.label) {
+      svg += `<text class="cap-shade" x="${margin.l+W-8}" y="${yCap-6}" text-anchor="end" font-size="11" font-weight="700" fill="${capShade.stroke}">${capShade.label}</text>`;
+    }
+  }
+  // noon marker — always emitted so the walkthrough can fade it in/out with
+  // the staffing-change phase. Visibility managed by setupWalkthroughChart.
+  if (patientsShown >= 6) {
+    svg += `<line class="noon-marker" x1="${noonX}" x2="${noonX}" y1="${margin.t}" y2="${margin.t+H}" stroke="#f59e0b" stroke-dasharray="4,3" stroke-width="1.2" opacity="0" />`;
+    svg += `<text class="noon-label" x="${noonX-6}" y="${margin.t+14}" text-anchor="end" font-size="10" fill="#b45309" opacity="0">noon · intern joins <tspan font-weight="700" fill="var(--t1)">T1</tspan></text>`;
+  }
+  // areas (skipped in strokeOnly mode — e.g. during the early walkthrough
+  // where we haven't introduced load-minutes / area-under-curve yet). When
+  // `areasControlled` is true, emit paths with the `team-area` CSS hook
+  // so the parent slide can fade them in via a `.focus-T{N}` class.
+  if (areasControlled) {
+    svg += `<path class="team-area area-T1" data-team="T1" d="${areaFor('T1')}" fill="var(--t1)" />`;
+    svg += `<path class="team-area area-T2" data-team="T2" d="${areaFor('T2')}" fill="var(--t2)" />`;
+    svg += `<path class="team-area area-T3" data-team="T3" d="${areaFor('T3')}" fill="var(--t3)" />`;
+  } else if (!strokeOnly) {
+    svg += `<path d="${areaFor('T1')}" fill="var(--t1)" opacity="0.08" />`;
+    svg += `<path d="${areaFor('T2')}" fill="var(--t2)" opacity="0.08" />`;
+    svg += `<path d="${areaFor('T3')}" fill="var(--t3)" opacity="0.08" />`;
+  }
+  // lines
+  const showLine = (tid) => !restrictToTeam || restrictToTeam === tid;
+  if (showLine('T1')) svg += `<path class="line-T1" data-team="T1" d="${pathFor('T1')}" fill="none" stroke="var(--t1)" stroke-width="2" />`;
+  if (showLine('T2')) svg += `<path class="line-T2" data-team="T2" d="${pathFor('T2')}" fill="none" stroke="var(--t2)" stroke-width="2" />`;
+  if (showLine('T3')) svg += `<path class="line-T3" data-team="T3" d="${pathFor('T3')}" fill="none" stroke="var(--t3)" stroke-width="2" />`;
+
+  // AUC labels for team-focus mode — three stacked team-colored labels in
+  // the top-left of the plot area (clear of the noon marker on the right).
+  // Visibility is controlled by `.focus-T{N}` on the parent slide.
+  if (aucLabels) {
+    const lx = margin.l + 12;
+    const ly = margin.t + 22;
+    ['T1', 'T2', 'T3'].forEach(tid => {
+      if (aucLabels[tid] != null) {
+        svg += `<text class="load-min-label load-min-${tid}" x="${lx}" y="${ly}" text-anchor="start" font-size="18" font-weight="700" fill="var(--${tid.toLowerCase()})">${aucLabels[tid]} load-minutes</text>`;
+      }
+    });
+  }
+
+  // patient dots
+  for (let i = 0; i < patientsShown; i++) {
+    const p = PATIENTS[i];
+    const team = strategy === 'actual' ? p.actual
+               : (assignments[i] ? assignments[i].team : p.formula);
+    if (restrictToTeam && team !== restrictToTeam) continue;
+    const colorMap = { Red: 'var(--red)', Yellow: 'var(--yellow)', Purple: 'var(--purple)' };
+    const isCurrent = (i + 1) === currentPatient;
+    const r = isCurrent ? 8 : 5;
+    const y = yScale(loadAt(team, p.t, assignments.slice(0, i+1)));
+    svg += `<circle class="patient-dot" data-patient="${p.n}" data-team="${team}" data-minute="${p.t}" cx="${xScale(p.t)}" cy="${y}" r="${r}" fill="${colorMap[p.acuity]}" stroke="white" stroke-width="${isCurrent ? 2.5 : 1.5}" />`;
+    svg += `<text class="patient-dot-label" data-patient="${p.n}" data-team="${team}" data-minute="${p.t}" x="${xScale(p.t)}" y="${y - r - 4}" text-anchor="middle" font-size="10" font-weight="600" fill="var(--ink)">${p.n}</text>`;
+  }
+
+  // legend
+  if (!hideLegend) {
+  const lg = margin.l + W - 200;
+  svg += `<g transform="translate(${lg}, ${margin.t})">`;
+  ['T1','T2','T3'].forEach((t,i) => {
+    svg += `<line x1="0" x2="16" y1="${i*16}" y2="${i*16}" stroke="var(--${t.toLowerCase()})" stroke-width="2.5" />`;
+    svg += `<text x="22" y="${i*16+4}" font-size="11" fill="var(--ink)">${t}</text>`;
+  });
+  svg += `</g>`;
+  }
+
+  svg += `</svg>`;
+  return svg;
+}
+
+// ============================================================
+// STEP RENDERERS
+// ============================================================
+function stepScene() {
+  return `
+    <h1 class="hero-title">Saturday morning. Three teams.<br/>Eight patients between 9:55 AM and 12:21 PM.</h1>
+    <p class="lede">The morning the rest of the walkthrough explores. Everything from here forward is real data from the historical replay of December 29, 2025 — one 146-minute sliver of the 1,541 arrivals this formula was tested against.</p>
+    <div class="chart-wrap">${renderChart({ patientsShown: 0, currentPatient: null, strokeOnly: true })}</div>
+  `;
+}
+
+function stepNYUBK() {
+  return `
+    <div class="slide">
+      <h1 class="hero-title serif" style="text-wrap:balance">Let’s use a real-life example.</h1>
+      <p class="lede" style="width: 640px; margin: 18px 0">One morning, 146 minutes, eight critical patients arrived to NYU BK.<br>
+Here’s how capacity-conscious routing would have compared to what actually occurred. These were the teams that day:</p>
+      <div class="group-card strength-teams" style="padding:16px 24px; margin-top:12px"><div class="teams-row" style="gap:14px">
+        ${tsCard('Team 1', [['Attending',20],['Senior Resident',15.2],['Intern',6.6]], 't1')}
+        ${tsCard('Team 2', [['Attending',20],['PA',11.4],['Junior Resident',10.8]], 't2')}
+        ${tsCard('Team 3', [['Attending',20],['Senior Resident',15.2],['Rotator',2.4]], 't3')}
+      </div></div>
+      <p style="margin-top:20px;font-size:12px;color:var(--muted);font-style:italic;text-align:center">
+        Actual provider schedules on this day; names replaced with role titles.
+      </p>
+    </div>
+  `;
+}
+
+// ---- Slide 10 helpers (phased patient arrivals) ----
+// Tracks cumulative state per phase. Phase 0 = empty board (9:54).
+// Phase N = after patient N arrives.
+const S955_TEAMS = {
+  T1: { name: 'Team 1', cls: 't1', strength: 37.5,
+        providers: [['Attending',20],['Senior Resident',15.2],['Rotator',2.3]] },
+  T2: { name: 'Team 2', cls: 't2', strength: 42.2,
+        providers: [['Attending',20],['PA',11.4],['Junior Resident',10.8]] },
+  T3: { name: 'Team 3', cls: 't3', strength: 37.6,
+        providers: [['Attending',20],['Senior Resident',15.2],['Rotator',2.4]] },
+};
+
+// Each phase defines: time label, heading, subtitle, which team(s) to highlight,
+// and a map of team-id → list of patient chips currently on that team
+// (each chip = { tone: 'red'|'yellow'|'purple', w: number }).
+const S955_PHASES = [
+  {
+    time: '09:54 AM',
+    heading: 'All three teams start with zero patients.',
+    subtitle: 'Infinite capacities all around, no wrong decision.',
+    highlights: [],
+    chips: { T1: [], T2: [], T3: [] },
+    patientsShown: 0,
+    currentPatient: null,
+    cutoffMinute: -1,
+  },
+  {
+    time: '09:55 · <span style="color:var(--purple)">PATIENT 1</span>',
+    heading: 'A <span style="color:var(--purple)">purple</span> patient arrives.',
+    subtitle: '<span style="color:#2e7d32">Formula recommends any of these teams.</span>',
+    highlights: ['T1', 'T2', 'T3'],
+    chips: { T1: [], T2: [], T3: [] },
+    patientsShown: 0,
+    currentPatient: null,
+    cutoffMinute: -1,
+  },
+  {
+    time: '09:55 · <span style="color:var(--purple)">PATIENT 1</span>',
+    heading: 'A <span style="color:var(--purple)">purple</span> patient arrives.',
+    subtitle: 'Historical routing sends it to Team 1. No disagreements here.<br><span style="color:#2e7d32">Formula recommends any of these teams.</span>',
+    highlights: ['T1'],
+    chips: { T1: [{ tone: 'purple', w: 1.0 }], T2: [], T3: [] },
+    patientsShown: 1,
+    currentPatient: 1,
+    cutoffMinute: 0,
+  },
+  {
+    time: '10:45 · <span style="color:#b8a000">PATIENT 2</span>',
+    heading: 'Fifty minutes of quiet, then a <span style="color:#b8a000">yellow</span> patient arrives.',
+    subtitle: 'Team 1\'s purple has decayed to 0.4. T1\'s ratio is high but finite; T2 and T3 are still empty.<br><span style="color:#2e7d32">Formula recommends Team 2.</span>',
+    highlights: ['T2'],
+    chips: { T1: [{ tone: 'purple', w: 0.444 }], T2: [], T3: [] },
+    patientsShown: 1,
+    currentPatient: 1,
+    cutoffMinute: 50,
+  },
+  {
+    time: '10:45 · <span style="color:#b8a000">PATIENT 2</span>',
+    heading: 'The <span style="color:#b8a000">Yellow</span> goes to Team 1. <span style="color:var(--red)">Methods disagree.</span>',
+    subtitle: 'T1 now carries two patients while T2 and T3 sit empty.<br>A minor difference on its own —<br>but it sets up a compounding problem.',
+    highlights: ['T1'],
+    disagree: true,
+    chips: { T1: [{ tone: 'purple', w: 0.433 }, { tone: 'yellow', w: 1.989 }], T2: [], T3: [] },
+    patientsShown: 2,
+    currentPatient: 2,
+    cutoffMinute: 51,
+  },
+  {
+    time: '10:46 · <span style="color:var(--red)">PATIENT 3</span>',
+    heading: 'A minute later, a <span style="color:var(--red)">red</span> patient arrives, the sickest of the morning.',
+    subtitle: 'Team 1 just absorbed Patient 2, dropping its ratio to 15.5. Teams 2 and 3 are still empty.<br><span style="color:#2e7d32">Formula recommends Team 2.</span>',
+    highlights: ['T2'],
+    chips: { T1: [{ tone: 'purple', w: 0.433 }, { tone: 'yellow', w: 1.989 }], T2: [], T3: [] },
+    patientsShown: 2,
+    currentPatient: 2,
+    cutoffMinute: 51,
+  },
+  {
+    time: '10:46 · <span style="color:var(--red)">PATIENT 3</span>',
+    heading: 'The <span style="color:var(--red)">Red</span> goes to Team 2. <span style="color:#2e7d32">Both agree.</span>',
+    subtitle: 'The right call by any measure, the sickest patient goes to an empty team.',
+    highlights: ['T2'],
+    chips: { T1: [{ tone: 'purple', w: 0.422 }, { tone: 'yellow', w: 1.978 }], T2: [{ tone: 'red', w: 4.0 }], T3: [] },
+    patientsShown: 3,
+    currentPatient: 3,
+    cutoffMinute: 52,
+  },
+  {
+    time: '10:59 · <span style="color:#b8a000">PATIENT 4</span>',
+    heading: 'Thirteen minutes later, another <span style="color:#b8a000">yellow</span> patient arrives.',
+    subtitle: 'Team 2\'s Red (weight 3.71) is pushing its capacity to 9.4. T1 still carries two, now at 17.6.<br>Team 3 is still empty, 64 minutes in.<br><span style="color:#2e7d32">Formula recommends Team 3.</span>',
+    highlights: ['T3'],
+    chips: { T1: [{ tone: 'purple', w: 0.289 }, { tone: 'yellow', w: 1.844 }], T2: [{ tone: 'red', w: 3.711 }], T3: [] },
+    capOverride: { T2: '9.4' },
+    patientsShown: 3,
+    currentPatient: 3,
+    cutoffMinute: 64,
+  },
+  {
+    time: '10:59 · <span style="color:#b8a000">PATIENT 4</span>',
+    heading: 'The <span style="color:#b8a000">Yellow</span> goes to Team 1. <span style="color:var(--red)">Methods disagree.</span>',
+    subtitle: 'Historical routing lands the Yellow on Team 1, now at three patients. Team 3 stays idle.',
+    highlights: ['T1'],
+    disagree: true,
+    chips: { T1: [{ tone: 'purple', w: 0.278 }, { tone: 'yellow', w: 1.833 }, { tone: 'yellow', w: 2.0 }], T2: [{ tone: 'red', w: 3.689 }], T3: [] },
+    capOverride: { T2: '9.4' },
+    patientsShown: 4,
+    currentPatient: 4,
+    cutoffMinute: 65,
+  },
+  {
+    time: '11:21 · <span style="color:#b8a000">PATIENT 5</span>',
+    heading: 'Twenty-two minutes of quiet, then another <span style="color:#b8a000">yellow</span> patient arrives.',
+    subtitle: 'Team 2\'s Red has decayed from 4.0 to about 3.22, improving its ratio to 10.9.<br>Team 1 carries three patients at 11.0. Team 3 is still empty with an infinite ratio.<br><span style="color:#2e7d32">Formula again recommends Team 3.</span>',
+    highlights: ['T3'],
+    chips: { T1: [{ tone: 'purple', w: 0.044 }, { tone: 'yellow', w: 1.6 }, { tone: 'yellow', w: 1.756 }], T2: [{ tone: 'red', w: 3.222 }], T3: [] },
+    capOverride: { T2: '10.9' },
+    patientsShown: 4,
+    currentPatient: 4,
+    cutoffMinute: 85,
+  },
+  {
+    time: '11:21 · <span style="color:#b8a000">PATIENT 5</span>',
+    heading: 'Historical routing sends to Team 2, <span style="color:var(--red)">another disagreement.</span>',
+    subtitle: 'The attending and senior resident on Team 3 remain unused, 86 minutes into the window.',
+    highlights: ['T2'],
+    disagree: true,
+    chips: { T1: [{ tone: 'purple', w: 0.033 }, { tone: 'yellow', w: 1.589 }, { tone: 'yellow', w: 1.744 }], T2: [{ tone: 'red', w: 3.2 }, { tone: 'yellow', w: 2.0 }], T3: [] },
+    patientsShown: 5,
+    currentPatient: 5,
+    cutoffMinute: 87,
+  },
+  {
+    time: '12:00 PM · NOON',
+    heading: 'A <span style="color:var(--t1)">PGY-1 intern</span> joins Team 1.',
+    subtitle: 'Team 1\'s strength rises from 37.5 to 42.5.',
+    highlights: ['T1'],
+    staffing: true,
+    chips: { T1: [{ tone: 'yellow', w: 1.167 }, { tone: 'yellow', w: 1.322 }], T2: [{ tone: 'red', w: 2.356 }, { tone: 'yellow', w: 1.567 }], T3: [] },
+    patientsShown: 5,
+    currentPatient: 5,
+    cutoffMinute: 125,
+    teamOverrides: { T1: { strength: 42.5, providers: [['Attending', 20], ['Senior Resident', 15.2], ['PGY-1 Intern', 5.0], ['Rotator', 2.3]] } },
+  },
+  {
+    time: '12:02 · <span style="color:#b8a000">PATIENT 6</span>',
+    heading: 'Forty-one minutes of quiet, then another <span style="color:#b8a000">yellow</span> patient arrives.',
+    subtitle: 'With the intern on board and the Yellows decaying, Team 1\'s capacity climbs to 17.4.<br>Team 2 sits at 9.1 with two patients. Team 3 is still empty, over two hours in.<br><span style="color:#2e7d32">Formula recommends Team 3.</span>',
+    highlights: ['T3'],
+    chips: { T1: [{ tone: 'yellow', w: 1.144 }, { tone: 'yellow', w: 1.3 }], T2: [{ tone: 'red', w: 2.311 }, { tone: 'yellow', w: 1.544 }], T3: [] },
+    capOverride: { T2: '9.1' },
+    patientsShown: 5,
+    currentPatient: 5,
+    cutoffMinute: 127,
+    teamOverrides: { T1: { strength: 42.5, providers: [['Attending', 20], ['Senior Resident', 15.2], ['PGY-1 Intern', 5.0], ['Rotator', 2.3]] } },
+  },
+  {
+    time: '12:02 · <span style="color:#b8a000">PATIENT 6</span>',
+    heading: 'Historical routing sends to Team 2 again, <span style="color:var(--red)">a fourth disagreement.</span>',
+    subtitle: 'Team 2 now carries three patients. Team 3 stays idle for the <strong>6th consecutive patient</strong>.',
+    highlights: ['T2'],
+    disagree: true,
+    chips: { T1: [{ tone: 'yellow', w: 1.133 }, { tone: 'yellow', w: 1.289 }], T2: [{ tone: 'red', w: 2.289 }, { tone: 'yellow', w: 1.533 }, { tone: 'yellow', w: 1.989 }], T3: [] },
+    patientsShown: 6,
+    currentPatient: 6,
+    cutoffMinute: 128,
+    teamOverrides: { T1: { strength: 42.5, providers: [['Attending', 20], ['Senior Resident', 15.2], ['PGY-1 Intern', 5.0], ['Rotator', 2.3]] } },
+  },
+  {
+    time: '12:06 · <span style="color:#b8a000">PATIENT 7</span>',
+    heading: 'Four minutes later, another <span style="color:#b8a000">yellow</span> patient arrives.',
+    subtitle: 'Team 2 now carries three patients, dropping its capacity to 6.2.<br>Team 1 sits at 18.0 with its enhanced strength. Team 3 is still empty, 131 minutes in.<br><span style="color:#2e7d32">Formula recommends Team 3.</span>',
+    highlights: ['T3'],
+    chips: { T1: [{ tone: 'yellow', w: 1.1 }, { tone: 'yellow', w: 1.256 }], T2: [{ tone: 'red', w: 2.22 }, { tone: 'yellow', w: 1.5 }, { tone: 'yellow', w: 1.956 }], T3: [] },
+    capOverride: { T2: '6.2' },
+    patientsShown: 6,
+    currentPatient: 6,
+    cutoffMinute: 131,
+    teamOverrides: { T1: { strength: 42.5, providers: [['Attending', 20], ['Senior Resident', 15.2], ['PGY-1 Intern', 5.0], ['Rotator', 2.3]] } },
+  },
+  {
+    time: '12:06 · <span style="color:#b8a000">PATIENT 7</span>',
+    heading: 'Team 3 gets its first patient. <span style="color:#2e7d32">Both agree.</span>',
+    subtitle: 'One of the most experienced residents in the ER finally gets put to work...<br><strong>132 minutes into the window.</strong>',
+    highlights: ['T3'],
+    chips: { T1: [{ tone: 'yellow', w: 1.089 }, { tone: 'yellow', w: 1.244 }], T2: [{ tone: 'red', w: 2.197 }, { tone: 'yellow', w: 1.489 }, { tone: 'yellow', w: 1.944 }], T3: [{ tone: 'yellow', w: 2.0 }] },
+    patientsShown: 7,
+    currentPatient: 7,
+    cutoffMinute: 132,
+    teamOverrides: { T1: { strength: 42.5, providers: [['Attending', 20], ['Senior Resident', 15.2], ['PGY-1 Intern', 5.0], ['Rotator', 2.3]] } },
+  },
+  {
+    time: '12:21 · <span style="color:#b8a000">PATIENT 8</span>',
+    heading: 'Fifteen minutes later, the final <span style="color:#b8a000">yellow</span> patient arrives.',
+    subtitle: 'All three ratios are finite for the first time — T1 at 21.0, T3 at 19.1, T2 at 7.0.<br><span style="color:#2e7d32">Formula recommends Team 1.</span>',
+    highlights: ['T1'],
+    chips: { T1: [{ tone: 'yellow', w: 0.933 }, { tone: 'yellow', w: 1.089 }], T2: [{ tone: 'red', w: 1.877 }, { tone: 'yellow', w: 1.333 }, { tone: 'yellow', w: 1.789 }], T3: [{ tone: 'yellow', w: 1.844 }] },
+    capOverride: { T2: '7.0', T3: '19.1' },
+    patientsShown: 7,
+    currentPatient: 7,
+    cutoffMinute: 146,
+    teamOverrides: { T1: { strength: 42.5, providers: [['Attending', 20], ['Senior Resident', 15.2], ['PGY-1 Intern', 5.0], ['Rotator', 2.3]] } },
+  },
+  {
+    time: '12:21 · <span style="color:#b8a000">PATIENT 8</span>',
+    heading: 'The final patient goes to Team 1. <span style="color:#2e7d32">Both agree.</span>',
+    subtitle: '146 minutes, 8 patients, 4 disagreements.<br>T1 saw 4, T2 saw 3, T3 saw 1.',
+    highlights: ['T1'],
+    chips: { T1: [{ tone: 'yellow', w: 0.922 }, { tone: 'yellow', w: 1.078 }, { tone: 'yellow', w: 2.0 }], T2: [{ tone: 'red', w: 1.854 }, { tone: 'yellow', w: 1.322 }, { tone: 'yellow', w: 1.778 }], T3: [{ tone: 'yellow', w: 1.833 }] },
+    patientsShown: 8,
+    currentPatient: 8,
+    cutoffMinute: 147,
+    teamOverrides: { T1: { strength: 42.5, providers: [['Attending', 20], ['Senior Resident', 15.2], ['PGY-1 Intern', 5.0], ['Rotator', 2.3]] } },
+  },
+];
+
+function stepStart955(phase = 0) {
+  const ph = S955_PHASES[phase] || S955_PHASES[0];
+
+  const miniTeamCard = (cls, providers, highlightPgy1) => {
+    const rows = providers.map(([role, w]) => {
+      const liCls = highlightPgy1 && /pgy-?1 intern/i.test(role) ? ' class="pgy1-highlight"' : '';
+      return `<li${liCls}><span>${role}</span><span class="w">${w}</span></li>`;
+    }).join('');
+    return `<div class="dv-mini-card ${cls}"><ul>${rows}</ul></div>`;
+  };
+
+  const chipHtml = ({ tone, w }) => {
+    const scale = 18;
+    return `<div class="dv-mp ${tone}" style="width:${w * scale}px">${w.toFixed(1)}</div>`;
+  };
+
+  const row = (tid) => {
+    const base = S955_TEAMS[tid];
+    const ov = ph.teamOverrides && ph.teamOverrides[tid];
+    const t = ov ? { ...base, ...ov } : base;
+    const chips = ph.chips[tid] || [];
+    const load = chips.reduce((s, c) => s + c.w, 0);
+    const computed = load === 0 ? '∞' : (t.strength / load).toFixed(1);
+    const override = ph.capOverride && ph.capOverride[tid];
+    const capacity = override || computed;
+    const isWinner = ph.highlights.includes(tid);
+    const disagreeCls = isWinner && ph.disagree ? ' dyn-disagree' : '';
+    const staffingCls = isWinner && ph.staffing ? ' dyn-staffing' : '';
+    return `
+      <div class="group-card s955-card ${isWinner ? 'dyn-winner dyn-card' : 'dyn-card'}${disagreeCls}${staffingCls}" style="padding:12px 18px; margin:0">
+        <div class="dv-row s955-row" style="--dv-base:0s">
+          <div class="dv-team">${t.name}</div>
+          <div class="dv-fraction">
+            <div class="dv-num-wrap">
+              <span class="dv-strength dv-num">${t.strength.toFixed(1)}</span>
+              ${miniTeamCard(t.cls, t.providers, !!ph.staffing && tid === 'T1')}
+            </div>
+            <div class="dv-bar"></div>
+            <div class="dv-den-wrap">
+              <span class="dv-load dv-den">${load.toFixed(1)}</span>
+              <div class="dv-mini-patients" style="min-height:22px">${chips.map(chipHtml).join('')}</div>
+            </div>
+          </div>
+          <span class="dv-eq">=</span>
+          <div class="dv-cap-wrap">
+            <span class="dv-cap">${capacity}</span>
+            <div class="dv-cap-lbl">Capacity</div>
+          </div>
+        </div>
+      </div>`;
+  };
+
+  const eyebrow = ph.time
+    ? `<div class="problem-eyebrow" style="color:#1a3a7b;margin-bottom:6px">${ph.time}</div>`
+    : '';
+  const subtitle = `<p class="slide-sub" style="margin:0 0 14px; font-size:15px; max-width:820px; min-height:68px">${ph.subtitle || ''}</p>`;
+
+  return `
+    <div class="slide dyn-slide s955-slide">
+      ${eyebrow}
+      <h1 class="slide-title serif" style="margin:0 0 6px; font-size:30px; color:#000">${ph.heading}</h1>
+      ${subtitle}
+      <div class="s955-grid">
+        <div class="s955-left">
+          ${row('T1')}
+          ${row('T2')}
+          ${row('T3')}
+        </div>
+        <div class="s955-right">
+          <div class="chart-wrap" style="padding:10px 14px 6px">
+            <div class="chart-title" style="font-size:13px;font-weight:600;text-align:center;margin-bottom:6px;color:var(--ink)">
+              A 146-minute window of actual A-side patient assignments
+            </div>
+            ${renderChart({
+              patientsShown: 8,            // emit dots for every patient in this walkthrough window (through P8)
+              currentPatient: null,        // no dot emphasis — all walkthrough dots same size
+              width: 560,
+              height: 340,
+              xStart: -5,
+              hideLegend: true,
+              strokeOnly: true,            // no area fills — introduced later when we talk AUC
+              fullDomain: true,            // draw paths edge-to-edge; visibility via stroke-dashoffset
+            })}
+            <div class="chart-legend" style="display:flex;gap:14px;justify-content:center;margin-top:4px;font-size:11px;color:var(--muted);flex-wrap:wrap">
+              <span><span style="display:inline-block;width:14px;height:2px;background:var(--t1);vertical-align:middle;margin-right:4px"></span>Team 1</span>
+              <span><span style="display:inline-block;width:14px;height:2px;background:var(--t2);vertical-align:middle;margin-right:4px"></span>Team 2</span>
+              <span><span style="display:inline-block;width:14px;height:2px;background:var(--t3);vertical-align:middle;margin-right:4px"></span>Team 3</span>
+              <span style="color:#c0392b">● Red (+4)</span>
+              <span style="color:#b8a000">● Yellow (+2)</span>
+              <span style="color:#7b1fa2">● Purple (+1)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Partial update for slide 10 phase transitions — keeps DOM intact so
+// elements can animate in rather than the whole page re-rendering.
+// ---- Walkthrough chart stroke-dashoffset setup ------------------------
+// Given a chart-wrap and a target cutoffMinute (what minute the data lines
+// should be drawn up to), set stroke-dasharray/offset on each team path so
+// the line is "drawn" with a pen up to that x-position. Patient dots are
+// shown/hidden based on their arrival minute + the current phase's
+// patientsShown count (so a dot appears only once its patient has been
+// routed).
+//
+// When animate:true with a prevCutoff, the change is transitioned. Forward
+// (new > prev) extends the line and dots fade in after the pen passes them.
+// Reverse (new < prev) fades the departing dot first, THEN retracts the line.
+function setupWalkthroughChart(chartWrap, phase, opts = {}) {
+  if (!chartWrap) return;
+  const svg = chartWrap.querySelector('svg.chart');
+  if (!svg) return;
+  const ph = S955_PHASES[phase] || S955_PHASES[0];
+  const animate = !!opts.animate;
+  const prevPhase = opts.prevPhase;
+  const prev = prevPhase != null ? S955_PHASES[prevPhase] : null;
+
+  const W = 560, marginL = 44, marginR = 20, xStart = -5, xEnd = 150;
+  const plotW = W - marginL - marginR;
+  const xScale = m => marginL + ((m - xStart) / (xEnd - xStart)) * plotW;
+
+  // Binary-search the path length at which path(x)=targetX. Paths are
+  // monotonically increasing in x, so bisection is safe.
+  function lengthAtX(path, targetX) {
+    const total = path.getTotalLength();
+    if (!isFinite(total) || total <= 0) return 0;
+    let lo = 0, hi = total;
+    for (let i = 0; i < 24; i++) {
+      const mid = (lo + hi) / 2;
+      const pt = path.getPointAtLength(mid);
+      if (pt.x < targetX) lo = mid; else hi = mid;
+    }
+    return (lo + hi) / 2;
+  }
+
+  const paths = [...svg.querySelectorAll('path[data-team]')];
+  const cutoffX = xScale(ph.cutoffMinute);
+  const prevCutoffX = prev ? xScale(prev.cutoffMinute) : cutoffX;
+
+  // Compute the target d-string for each team based on the current phase's
+  // routed-patient count. For phase K the line should only reflect patients
+  // actually routed so far — otherwise a Yellow/Red "jump" appears at the
+  // pen tip before the corresponding routing decision has been announced.
+  const computePathD = (patientsShown) => {
+    const { pts: allPts } = curvesThrough(patientsShown, 'actual');
+    const xS = -5, xE = 150;
+    const ptsArr = allPts.filter(p => p.m >= xS && p.m <= xE);
+    const margin = { l: marginL, r: marginR, t: 20, b: 36 };
+    const Wplot = W - margin.l - margin.r;
+    const H = 340 - margin.t - margin.b;
+    const maxY = 8;
+    const yS = v => margin.t + H - (v / maxY) * H;
+    const xS2 = m => margin.l + ((m - xS) / (xE - xS)) * Wplot;
+    return (key) => ptsArr.map((p, i) =>
+      `${i === 0 ? 'M' : 'L'}${xS2(p.m).toFixed(1)},${yS(p[key]).toFixed(1)}`
+    ).join(' ');
+  };
+
+  const newPathFor = computePathD(ph.patientsShown);
+  const oldPathFor = prev ? computePathD(prev.patientsShown) : null;
+  const reverse = prev ? ph.cutoffMinute < prev.cutoffMinute : false;
+
+  // Rebuild-timing strategy:
+  // - No prev (initial render): swap d immediately, no animation.
+  // - Forward: keep d as OLD for a moment to anchor the pen at its last
+  //   visible position, then swap to NEW and re-anchor the pen at the
+  //   equivalent PRE-JUMP position on the new path (one tick before the
+  //   new patient's arrival). This way the ~900ms transition sweeps the
+  //   pen ACROSS the new jump, drawing it gradually.
+  // - Reverse: keep d as OLD throughout the retraction so any jump being
+  //   "un-routed" shrinks visibly, then swap to NEW after retraction
+  //   completes.
+
+  if (!prev) {
+    // Initial render — just set new paths, no animation.
+    paths.forEach(path => {
+      const tid = path.getAttribute('data-team');
+      const d = newPathFor(tid);
+      if (path.getAttribute('d') !== d) path.setAttribute('d', d);
+    });
+  }
+
+  paths.forEach(path => {
+    if (!animate || !prev) {
+      const total = path.getTotalLength();
+      if (!isFinite(total) || total <= 0) return;
+      const lenAtNew = lengthAtX(path, cutoffX);
+      path.style.transition = 'none';
+      path.style.strokeDasharray = total + 'px';
+      path.style.strokeDashoffset = (total - lenAtNew) + 'px';
+      return;
+    }
+
+    const tid = path.getAttribute('data-team');
+    const dOld = oldPathFor(tid);
+    const dNew = newPathFor(tid);
+
+    if (reverse) {
+      // d stays as OLD during retraction. Ensure it is the old path.
+      if (path.getAttribute('d') !== dOld) path.setAttribute('d', dOld);
+      const totalOld = path.getTotalLength();
+      if (!isFinite(totalOld) || totalOld <= 0) return;
+
+      // If a patient is being un-routed to THIS team and the jump sits
+      // at or after the new cutoff, the retraction would otherwise stop
+      // with the jump still visible on the old path — and swapping to the
+      // new (jump-less) path would snap the line down. Extend retraction
+      // one minute past the jump so the pen visibly "erases" it, then
+      // silently swap paths in the matching pre-jump region and settle
+      // forward to the new cutoff on the new path.
+      const tid = path.getAttribute('data-team');
+      const removedIdx = ph.patientsShown < prev.patientsShown ? prev.patientsShown - 1 : -1;
+      const removed = removedIdx >= 0 ? PATIENTS[removedIdx] : null;
+      const jumpM = (removed && removed.actual === tid) ? removed.t : null;
+      const needsOvershoot = jumpM != null && ph.cutoffMinute >= jumpM;
+
+      const lenPrev = lengthAtX(path, prevCutoffX);
+      path.style.transition = 'none';
+      path.style.strokeDasharray = totalOld + 'px';
+      path.style.strokeDashoffset = (totalOld - lenPrev) + 'px';
+      void path.getBoundingClientRect();
+
+      const delay = 280;
+      if (needsOvershoot) {
+        const overshootX = xScale(jumpM - 1);
+        const lenOvershoot = lengthAtX(path, overshootX);
+        const dur1 = 550;
+        path.style.transition = `stroke-dashoffset ${dur1}ms cubic-bezier(0.22, 0.9, 0.35, 1) ${delay}ms`;
+        requestAnimationFrame(() => {
+          path.style.strokeDashoffset = (totalOld - lenOvershoot) + 'px';
+        });
+        setTimeout(() => {
+          path.setAttribute('d', dNew);
+          const newTotal = path.getTotalLength();
+          if (!isFinite(newTotal) || newTotal <= 0) return;
+          const lenOvershootNew = lengthAtX(path, overshootX);
+          path.style.transition = 'none';
+          path.style.strokeDasharray = newTotal + 'px';
+          path.style.strokeDashoffset = (newTotal - lenOvershootNew) + 'px';
+          void path.getBoundingClientRect();
+          const lenFinalNew = lengthAtX(path, cutoffX);
+          const dur2 = 180;
+          path.style.transition = `stroke-dashoffset ${dur2}ms ease-out`;
+          requestAnimationFrame(() => {
+            path.style.strokeDashoffset = (newTotal - lenFinalNew) + 'px';
+          });
+        }, delay + dur1 + 20);
+      } else {
+        const lenNew = lengthAtX(path, cutoffX);
+        const dur = 650;
+        path.style.transition = `stroke-dashoffset ${dur}ms cubic-bezier(0.22, 0.9, 0.35, 1) ${delay}ms`;
+        requestAnimationFrame(() => {
+          path.style.strokeDashoffset = (totalOld - lenNew) + 'px';
+        });
+        setTimeout(() => {
+          if (dOld === dNew) return;
+          path.setAttribute('d', dNew);
+          const newTotal = path.getTotalLength();
+          if (!isFinite(newTotal) || newTotal <= 0) return;
+          const newLen = lengthAtX(path, cutoffX);
+          path.style.transition = 'none';
+          path.style.strokeDasharray = newTotal + 'px';
+          path.style.strokeDashoffset = (newTotal - newLen) + 'px';
+        }, dur + delay + 20);
+      }
+      return;
+    }
+
+    // Forward path ----------------------------------------------------
+    // Swap d to the NEW path first so the pen draws over it for the whole
+    // animation. We anchor the starting dashoffset at the equivalent of
+    // the previous cutoff on the new path — but if a new patient was
+    // added at or near prev.cutoffMinute, the arc-length at that x on the
+    // new path is AFTER the jump (the point at x=prevCutoff is post-jump).
+    // To ensure the animation sweeps across the jump, rewind the anchor
+    // one minute earlier when a patient was added.
+    if (path.getAttribute('d') !== dNew) path.setAttribute('d', dNew);
+    const totalNew = path.getTotalLength();
+    if (!isFinite(totalNew) || totalNew <= 0) return;
+    const addsPatient = ph.patientsShown > prev.patientsShown;
+    const anchorMinute = addsPatient
+      ? Math.max(-5, prev.cutoffMinute - 1)
+      : prev.cutoffMinute;
+    const anchorX = xScale(anchorMinute);
+    const lenStartOnNew = lengthAtX(path, anchorX);
+    const lenEndOnNew = lengthAtX(path, cutoffX);
+
+    // Set starting offset with transition disabled, then flush style so
+    // the browser commits it as the baseline.
+    path.style.transition = 'none';
+    path.style.strokeDasharray = totalNew + 'px';
+    path.style.strokeDashoffset = (totalNew - lenStartOnNew) + 'px';
+    // Force style recalc to lock in the starting offset.
+    void path.getBoundingClientRect();
+    // eslint-disable-next-line no-unused-expressions
+    getComputedStyle(path).strokeDashoffset;
+
+    const dur = 900;
+    path.style.transition = `stroke-dashoffset ${dur}ms cubic-bezier(0.22, 0.9, 0.35, 1)`;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        path.style.strokeDashoffset = (totalNew - lenEndOnNew) + 'px';
+      });
+    });
+  });
+
+  // Dot visibility. A dot is visible when (a) its minute <= cutoff AND
+  // (b) its patient index is within phase.patientsShown (i.e. it has been
+  // routed, not merely arrived). Iterate over each (circle, label) pair.
+  const dots = [...svg.querySelectorAll('.patient-dot')];
+  const labels = [...svg.querySelectorAll('.patient-dot-label')];
+  const shouldShow = (minute, n) => (minute <= ph.cutoffMinute) && (n <= ph.patientsShown);
+  const shouldShowPrev = (minute, n) => prev
+    ? (minute <= prev.cutoffMinute) && (n <= prev.patientsShown)
+    : false;
+
+  const setDotState = (el, visible, { fadeDelay = 0, fadeDur = 250 } = {}) => {
+    el.style.transition = `opacity ${fadeDur}ms ease ${fadeDelay}ms`;
+    el.style.opacity = visible ? '1' : '0';
+  };
+
+  [...dots, ...labels].forEach(el => {
+    const minute = parseFloat(el.getAttribute('data-minute'));
+    const n = parseInt(el.getAttribute('data-patient'), 10);
+    const now = shouldShow(minute, n);
+    if (!animate || !prev) {
+      el.style.transition = 'none';
+      el.style.opacity = now ? '1' : '0';
+      return;
+    }
+    const was = shouldShowPrev(minute, n);
+    if (was === now) {
+      el.style.transition = 'none';
+      el.style.opacity = now ? '1' : '0';
+      return;
+    }
+    if (now && !was) {
+      // Fade IN — wait until the line has drawn past this dot's x.
+      // Start from 0, then delay-in based on how far along the reveal is.
+      el.style.transition = 'none';
+      el.style.opacity = '0';
+      void el.getBoundingClientRect();
+      // Rough timing: reveal animates over ~900ms; fade-in near its end.
+      setDotState(el, true, { fadeDelay: 700, fadeDur: 300 });
+    } else if (!now && was) {
+      // Fade OUT first (before the line retracts).
+      setDotState(el, false, { fadeDelay: 0, fadeDur: 240 });
+    }
+  });
+
+  // Noon marker visibility: fade in as the pen reaches noon (T+125), fade
+  // out on reverse that pulls the pen back before noon.
+  const noonEls = [svg.querySelector('.noon-marker'), svg.querySelector('.noon-label')].filter(Boolean);
+  const NOON_MINUTE = 125;
+  const showNoon = ph.cutoffMinute >= NOON_MINUTE;
+  const wasNoon = prev ? prev.cutoffMinute >= NOON_MINUTE : false;
+  noonEls.forEach(el => {
+    if (!animate || !prev) {
+      el.style.transition = 'none';
+      el.style.opacity = showNoon ? '1' : '0';
+      return;
+    }
+    if (showNoon === wasNoon) {
+      el.style.transition = 'none';
+      el.style.opacity = showNoon ? '1' : '0';
+      return;
+    }
+    if (showNoon && !wasNoon) {
+      // Fade in just as the pen reaches noon.
+      el.style.transition = 'none';
+      el.style.opacity = '0';
+      void el.getBoundingClientRect();
+      el.style.transition = 'opacity 320ms ease 650ms';
+      requestAnimationFrame(() => { el.style.opacity = '1'; });
+    } else {
+      // Fade out ahead of the line retracting below noon.
+      el.style.transition = 'opacity 240ms ease';
+      el.style.opacity = '0';
+    }
+  });
+}
+
+
+function updateStart955(prevPhase, newPhase) {
+  const slide = main.querySelector('.s955-slide');
+  if (!slide) return false;
+  if (prevPhase === newPhase) return true;
+
+  const prev = S955_PHASES[prevPhase];
+  const next = S955_PHASES[newPhase];
+  if (!prev || !next) return false;
+
+  // --- Determine chart animation mode based on transition shape --- //
+  const chartHost = slide.querySelector('.chart-wrap');
+
+  // --- Text helpers --- //
+  const fadeSwapText = (el, newText) => {
+    if (!el) return;
+    if (el.textContent === newText) return;
+    el.style.transition = 'opacity 0.2s ease';
+    el.style.opacity = '0';
+    setTimeout(() => { el.textContent = newText; el.style.opacity = '1'; }, 200);
+  };
+  const fadeSwapHTML = (el, newHTML) => {
+    if (!el) return;
+    if (el.innerHTML === newHTML) return;
+    el.style.transition = 'opacity 0.22s ease';
+    el.style.opacity = '0';
+    setTimeout(() => { el.innerHTML = newHTML; el.style.opacity = '1'; }, 220);
+  };
+
+  // --- Eyebrow --- //
+  let eyebrow = slide.querySelector('.problem-eyebrow');
+  if (next.time) {
+    if (!eyebrow) {
+      eyebrow = document.createElement('div');
+      eyebrow.className = 'problem-eyebrow s955-fadein';
+      eyebrow.style.cssText = 'color:#1a3a7b;margin-bottom:6px';
+      eyebrow.innerHTML = next.time;
+      const h = slide.querySelector('.slide-title');
+      if (h) h.parentNode.insertBefore(eyebrow, h);
+    } else {
+      fadeSwapHTML(eyebrow, next.time);
+    }
+  } else if (eyebrow) {
+    eyebrow.style.transition = 'opacity 0.2s ease';
+    eyebrow.style.opacity = '0';
+    setTimeout(() => eyebrow && eyebrow.remove(), 220);
+  }
+
+  // --- Heading --- //
+  const heading = slide.querySelector('.slide-title');
+  fadeSwapHTML(heading, next.heading);
+
+  // --- Subtitle --- //
+  let subEl = slide.querySelector('.slide-sub');
+  if (!next.subtitle) {
+    if (subEl) {
+      subEl.style.transition = 'opacity 0.2s ease';
+      subEl.style.opacity = '0';
+      setTimeout(() => { if (subEl) subEl.innerHTML = ''; subEl.style.opacity = '1'; }, 220);
+    }
+  } else if (!subEl) {
+    subEl = document.createElement('p');
+    subEl.className = 'slide-sub s955-fadein';
+    subEl.style.cssText = 'margin:0 0 14px; font-size:15px; max-width:820px; min-height:68px';
+    heading.parentNode.insertBefore(subEl, heading.nextSibling);
+    subEl.innerHTML = next.subtitle;
+  } else {
+    const prevSub = prev.subtitle || '';
+    const nextSub = next.subtitle;
+    if (prevSub === nextSub) {
+      // No change — make sure DOM matches the canonical text.
+      if (subEl.innerHTML !== nextSub) subEl.innerHTML = nextSub;
+    } else if (nextSub.startsWith(prevSub) && prevSub.length > 0) {
+      // Additive: keep the shared prefix on screen, fade in only the suffix.
+      // Normalize DOM to the clean prev text, then append a faded-in span.
+      subEl.innerHTML = prevSub;
+      const suffix = nextSub.slice(prevSub.length);
+      const span = document.createElement('span');
+      span.innerHTML = suffix;
+      span.style.opacity = '0';
+      span.style.transition = 'opacity 0.35s ease';
+      subEl.appendChild(span);
+      requestAnimationFrame(() => { span.style.opacity = '1'; });
+    } else if (prevSub.startsWith(nextSub) && nextSub.length > 0) {
+      // Subtractive: the tail is going away. Wrap the part to remove in a
+      // span, fade it out, then normalize DOM to the clean next text.
+      const suffix = prevSub.slice(nextSub.length);
+      subEl.innerHTML = nextSub + '<span class="__s955-dying">' + suffix + '</span>';
+      const dying = subEl.querySelector('.__s955-dying');
+      if (dying) {
+        dying.style.transition = 'opacity 0.25s ease';
+        requestAnimationFrame(() => { dying.style.opacity = '0'; });
+        setTimeout(() => { if (subEl) subEl.innerHTML = nextSub; }, 280);
+      } else {
+        subEl.innerHTML = nextSub;
+      }
+    } else {
+      // No shared prefix — fall back to a full fade swap.
+      fadeSwapHTML(subEl, nextSub);
+    }
+  }
+
+  // --- Team outlines / numbers / chips --- //
+  const cards = slide.querySelectorAll('.s955-card');
+  const teamIds = ['T1', 'T2', 'T3'];
+  const effTeam = (phase, tid) => {
+    const base = S955_TEAMS[tid];
+    const ov = phase && phase.teamOverrides && phase.teamOverrides[tid];
+    return ov ? { ...base, ...ov } : base;
+  };
+  teamIds.forEach((tid, idx) => {
+    const card = cards[idx];
+    if (!card) return;
+
+    const prevT = effTeam(prev, tid);
+    const nextT = effTeam(next, tid);
+
+    // outline
+    const shouldWin = next.highlights.includes(tid);
+    card.classList.toggle('dyn-winner', shouldWin);
+    card.classList.toggle('dyn-disagree', shouldWin && !!next.disagree);
+    card.classList.toggle('dyn-staffing', shouldWin && !!next.staffing);
+
+    // strength tween + provider list swap (when team composition changes)
+    const strengthEl = card.querySelector('.dv-strength');
+    if (strengthEl && prevT.strength !== nextT.strength) {
+      const start = performance.now();
+      const dur = 700;
+      const from = prevT.strength, to = nextT.strength;
+      const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
+      const tick = (now) => {
+        const t = Math.min(1, (now - start) / dur);
+        const v = from + (to - from) * easeOutCubic(t);
+        strengthEl.textContent = v.toFixed(1);
+        if (t < 1) requestAnimationFrame(tick);
+        else strengthEl.textContent = to.toFixed(1);
+      };
+      requestAnimationFrame(tick);
+    }
+    const miniCard = card.querySelector('.dv-mini-card');
+    const highlightPgy1 = !!next.staffing && tid === 'T1';
+    if (miniCard && JSON.stringify(prevT.providers) !== JSON.stringify(nextT.providers)) {
+      const newHTML = '<ul>' + nextT.providers.map(([r, w]) => {
+        const liCls = highlightPgy1 && /pgy-?1 intern/i.test(r) ? ' class="pgy1-highlight"' : '';
+        return `<li${liCls}><span>${r}</span><span class="w">${w}</span></li>`;
+      }).join('') + '</ul>';
+      miniCard.style.transition = 'opacity 0.22s ease';
+      miniCard.style.opacity = '0';
+      setTimeout(() => { miniCard.innerHTML = newHTML; miniCard.style.opacity = '1'; }, 220);
+    } else if (miniCard) {
+      miniCard.querySelectorAll('li').forEach(li => {
+        const roleEl = li.querySelector('span');
+        const isPgy1 = roleEl && /pgy-?1 intern/i.test(roleEl.textContent);
+        li.classList.toggle('pgy1-highlight', highlightPgy1 && isPgy1);
+      });
+    }
+
+    // load + capacity numbers
+    const chips = next.chips[tid] || [];
+    const load = chips.reduce((s, c) => s + c.w, 0);
+    const computed = load === 0 ? '∞' : (nextT.strength / load).toFixed(1);
+    const override = next.capOverride && next.capOverride[tid];
+    const capacity = override || computed;
+    const loadEl = card.querySelector('.dv-den');
+    const capEl = card.querySelector('.dv-cap');
+    const newLoad = load.toFixed(1);
+    if (loadEl && loadEl.textContent !== newLoad) {
+      loadEl.classList.remove('s955-fadein'); void loadEl.offsetWidth;
+      loadEl.textContent = newLoad; loadEl.classList.add('s955-fadein');
+    }
+    if (capEl && capEl.textContent !== capacity) {
+      // If transitioning between two finite numeric values, tween the
+      // number upward/downward rather than the fade-swap (nicer for the
+      // "capacity climbing as load decays" beats). Fall back to fade-swap
+      // when either side is non-numeric (e.g. "∞").
+      const fromNum = parseFloat(capEl.textContent);
+      const toNum = parseFloat(capacity);
+      const bothFinite = isFinite(fromNum) && isFinite(toNum)
+                      && /^-?[0-9.]+$/.test(capEl.textContent.trim())
+                      && /^-?[0-9.]+$/.test(String(capacity).trim());
+      if (bothFinite) {
+        const start = performance.now();
+        const dur = 700;
+        const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
+        const tick = (now) => {
+          const t = Math.min(1, (now - start) / dur);
+          const v = fromNum + (toNum - fromNum) * easeOutCubic(t);
+          capEl.textContent = v.toFixed(1);
+          if (t < 1) requestAnimationFrame(tick);
+          else capEl.textContent = capacity; // snap to canonical format
+        };
+        requestAnimationFrame(tick);
+      } else {
+        capEl.classList.remove('s955-fadein'); void capEl.offsetWidth;
+        capEl.textContent = capacity; capEl.classList.add('s955-fadein');
+      }
+    }
+
+    // chips reconciliation
+    const container = card.querySelector('.dv-mini-patients');
+    if (!container) return;
+    const existing = [...container.querySelectorAll('.dv-mp')];
+    // Extend chips with placeholder tone/w parsed from DOM.
+    const existingData = existing.map(el => ({
+      el,
+      tone: [...el.classList].find(c => ['red','yellow','purple'].includes(c)) || '',
+      w: parseFloat(el.textContent),
+    }));
+
+    // Align by tone, in order. Simple diff: pair up same-tone chips by index.
+    const nextByTone = {};
+    chips.forEach(c => { (nextByTone[c.tone] ||= []).push(c); });
+    const oldByTone = {};
+    existingData.forEach(d => { (oldByTone[d.tone] ||= []).push(d); });
+
+    // Remove old chips that don't have a match.
+    Object.keys(oldByTone).forEach(tone => {
+      const remaining = (nextByTone[tone] || []).length;
+      const extra = oldByTone[tone].slice(remaining);
+      extra.forEach(d => {
+        d.el.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
+        d.el.style.opacity = '0';
+        d.el.style.transform = 'scale(0.5)';
+        setTimeout(() => d.el.remove(), 260);
+      });
+    });
+
+    // For each new chip, either update existing (same tone, same index) or add.
+    Object.keys(nextByTone).forEach(tone => {
+      const news = nextByTone[tone];
+      const olds = oldByTone[tone] || [];
+      news.forEach((c, i) => {
+        const scale = 18;
+        const targetWidth = (c.w * scale) + 'px';
+        const targetLabel = c.w.toFixed(1);
+        if (olds[i]) {
+          const d = olds[i];
+          d.el.style.transition = 'width 0.5s ease';
+          d.el.style.width = targetWidth;
+          if (d.el.textContent !== targetLabel) {
+            d.el.classList.remove('s955-fadein'); void d.el.offsetWidth;
+            d.el.textContent = targetLabel;
+            d.el.classList.add('s955-fadein');
+          }
+        } else {
+          // Add a new chip.
+          const chip = document.createElement('div');
+          chip.className = 'dv-mp ' + tone + ' just-arrived';
+          chip.style.width = targetWidth;
+          chip.textContent = targetLabel;
+          container.appendChild(chip);
+        }
+      });
+    });
+  });
+
+  // --- Chart --- //
+  if (chartHost) {
+    // No SVG swap. The chart is rendered once with full-domain paths; we
+    // animate stroke-dashoffset to reveal/retract along the line, and fade
+    // patient dots in/out at the right moments.
+    setupWalkthroughChart(chartHost, newPhase, { animate: true, prevPhase });
+  }
+
+  return true;
+}
+
+function stepTeams() {
+  const card = (key, t, roster, strength, note) => `
+    <div class="team-card ${key.toLowerCase()}">
+      <div class="team-name">${t}</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.4">${roster}</div>
+      <div class="team-stat-row"><span>Strength</span><span>${strength}</span></div>
+      <div class="team-stat-row"><span>Patients</span><span>0</span></div>
+      <div class="team-stat-row"><span>Load</span><span>0.00</span></div>
+      ${note ? `<div style="font-size:12px;color:#b45309;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border)">${note}</div>` : ''}
+    </div>`;
+  return `
+    <h1 class="hero-title serif">Meet the teams.</h1>
+    <p class="lede">Representative A-side staffing at the start of the window. Each team has an attending plus two other providers. Strength is the sum of provider weights.</p>
+    <div class="teams-grid">
+      ${card('t1', 'Team 1', 'Attending + Senior Resident', 37.5, 'An intern joins at noon, raising strength to 42.5.')}
+      ${card('t2', 'Team 2', 'Attending + PA + Junior Resident', 42.2, null)}
+      ${card('t3', 'Team 3', 'Attending + Senior Resident + Rotator', 37.6, null)}
+    </div>
+  `;
+}
+
+function stepRules() {
+  return `
+    <h1 class="hero-title serif">The rules, briefly.</h1>
+    <p class="lede">The only concepts you need. Everything after this is application.</p>
+    <div class="rules-grid">
+      <div class="rule">
+        <h3>Acuity is weighted 4 : 2 : 1</h3>
+        <p><strong style="color:var(--red)">Red</strong> (ESI-1) = 4 &nbsp;·&nbsp; <strong style="color:#8a6400">Yellow</strong> (ESI-2) = 2 &nbsp;·&nbsp; <strong style="color:var(--purple)">Purple</strong> (ESI-3) = 1. One Red contributes as much load as four Purples.</p>
+      </div>
+      <div class="rule">
+        <h3>Attention decays linearly</h3>
+        <p>A patient's load drops to zero over 180 minutes (Red, Yellow) or 90 minutes (Purple). Older patients weigh less on the team.</p>
+      </div>
+      <div class="rule">
+        <h3>Highest ratio wins</h3>
+        <p><strong>Capacity Ratio = Team Strength ÷ Acuity-Weighted Load.</strong> The team with the most unused capacity gets the next patient.</p>
+      </div>
+    </div>
+  `;
+}
+
+function stepPatient(idx) {
+  const p = PATIENTS[idx];
+  const acuityClass = p.acuity.toLowerCase();
+  const recTeam = p.formula;
+  const ratioCard = (team) => {
+    const isRec = team === recTeam;
+    const isActual = team === p.actual;
+    const val = p.ratios[team];
+    let sub = '';
+    if (isRec && isActual) sub = 'formula & actual';
+    else if (isRec) sub = 'formula pick';
+    else if (isActual) sub = 'actual pick';
+    return `<div class="ratio ${isRec ? 'rec' : ''}">
+      <div class="label">${team}</div>
+      <div class="value">${val}</div>
+      <div class="sub">${sub || '&nbsp;'}</div>
+    </div>`;
+  };
+  const decision = p.verdict === 'AGREE'
+    ? `Both sent to ${p.actual}.`
+    : `Formula recommended ${p.formula}. Charge nurse sent to ${p.actual}.`;
+  return `
+    <div class="patient-header">
+      <div class="pnum">${p.n}</div>
+      <div>
+        <div class="ptime">Patient ${p.n} · ${p.time} · T+${p.t}m</div>
+        <div style="margin-top:4px"><span class="acuity-pill ${acuityClass}"><span class="dot-sm"></span>${p.acuity} (+${DECAY[p.acuity].w} load)</span></div>
+      </div>
+      <div class="verdict ${p.verdict === 'AGREE' ? 'agree' : 'disagree'}">${p.verdict}</div>
+    </div>
+    ${p.interlude ? `<div class="interlude">⏰ Noon staffing change: a PGY-1 intern joins Team 1. Strength rises from 37.5 to 42.5.</div>` : ''}
+    <div class="chart-wrap">${renderChart({ patientsShown: p.n, currentPatient: p.n, strategy: 'actual', strokeOnly: true })}</div>
+    <div class="ratios">${ratioCard('T1')}${ratioCard('T2')}${ratioCard('T3')}</div>
+    <div class="narrative">${p.narrative}<div class="decision">${decision}</div></div>
+  `;
+}
+
+function stepAUC() {
+  return `
+    <h1 class="hero-title serif">Step 12 — The AUC perspective</h1>
+    <p class="lede">Six-panel isolated view (Figure 2.3). Actual vs formula routing, side by side. Placeholder — wire up isolated team charts here.</p>
+    <div class="placeholder">Six-panel small-multiple chart goes here.<br/>Top row: T1/T2/T3 under actual routing.<br/>Bottom row: same teams under formula routing.</div>
+  `;
+}
+
+function stepNumbers() {
+  return `
+    <h1 class="hero-title serif">Step 13 — The numbers, side by side</h1>
+    <p class="lede">Load-minutes, patient counts, peak spread, min/avg capacity ratio.</p>
+    <div class="placeholder">Metric comparison dashboard goes here.<br/>Load-minutes: actual 488/371/55 &nbsp;vs&nbsp; formula 250/302/362. Both total 914.</div>
+  `;
+}
+
+function stepScale() {
+  return `
+    <h1 class="hero-title serif">Step 14 — What this means at scale</h1>
+    <p class="lede">This exact analysis ran on every one of the 1,541 patient arrivals across 121 days.</p>
+    <div class="placeholder">Compact preview of Figure 6.1 (cumulative imbalance) goes here.</div>
+  `;
+}
+
+// Little doctor SVG — stylized head + shoulders. Variants encode role.
+function doc(role) {
+  // role: attending, senior, junior, pa, intern, rotator
+  const V = {
+    attending: { h: 62, bodyW: 42, bodyColor: '#ffffff', coatStripe: '#1f8a8a', face: '#fcd9b8', hair: '#3a2a1f', stethoscope: true, badge: 'A' },
+    senior:    { h: 58, bodyW: 40, bodyColor: '#ffffff', coatStripe: '#4a5568', face: '#f5c2a0', hair: '#2d2018', stethoscope: false, badge: 'S' },
+    junior:    { h: 54, bodyW: 38, bodyColor: '#e6eef7', coatStripe: '#7b3fa0', face: '#f8d4b5', hair: '#1a1a1a', stethoscope: false, badge: 'J' },
+    pa:        { h: 56, bodyW: 38, bodyColor: '#e8f4f0', coatStripe: '#1f8a8a', face: '#f5c9a3', hair: '#5a3a22', stethoscope: false, badge: 'PA' },
+    intern:    { h: 50, bodyW: 34, bodyColor: '#f3f4f6', coatStripe: '#9ca3af', face: '#fad5b8', hair: '#1f1208', stethoscope: false, badge: 'I' },
+    rotator:   { h: 48, bodyW: 34, bodyColor: '#f9fafb', coatStripe: '#cbd5e1', face: '#fcd9b8', hair: '#2a1d12', stethoscope: false, badge: 'R' },
+  }[role];
+  const H = V.h;
+  const W = V.bodyW + 4;
+  const headR = 9;
+  const headCY = 14;
+  return `<svg class="doc" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+    <!-- hair back -->
+    <ellipse cx="${W/2}" cy="${headCY-3}" rx="${headR+1}" ry="${headR-1}" fill="${V.hair}" />
+    <!-- head -->
+    <circle cx="${W/2}" cy="${headCY}" r="${headR}" fill="${V.face}" />
+    <!-- hair front -->
+    <path d="M ${W/2 - headR} ${headCY - 2} Q ${W/2} ${headCY - headR - 2} ${W/2 + headR} ${headCY - 2} L ${W/2 + headR - 2} ${headCY - 4} Q ${W/2} ${headCY - headR} ${W/2 - headR + 2} ${headCY - 4} Z" fill="${V.hair}" />
+    <!-- body/coat -->
+    <path d="M ${(W-V.bodyW)/2} ${H} L ${(W-V.bodyW)/2 + 4} ${headCY + headR + 2} Q ${W/2} ${headCY + headR - 1} ${(W+V.bodyW)/2 - 4} ${headCY + headR + 2} L ${(W+V.bodyW)/2} ${H} Z" fill="${V.bodyColor}" stroke="${V.coatStripe}" stroke-width="1.5" />
+    <!-- collar V -->
+    <path d="M ${W/2 - 5} ${headCY + headR} L ${W/2} ${headCY + headR + 8} L ${W/2 + 5} ${headCY + headR}" fill="none" stroke="${V.coatStripe}" stroke-width="1.2" />
+    ${V.stethoscope ? `<path d="M ${W/2 - 7} ${headCY + headR + 4} Q ${W/2 - 10} ${headCY + headR + 16} ${W/2} ${headCY + headR + 20} Q ${W/2 + 10} ${headCY + headR + 16} ${W/2 + 7} ${headCY + headR + 4}" fill="none" stroke="#1a1f2e" stroke-width="1.2" /><circle cx="${W/2}" cy="${headCY + headR + 22}" r="2" fill="#1a1f2e" />` : ''}
+    <!-- badge -->
+    <rect x="${W/2 + 2}" y="${headCY + headR + 6}" width="10" height="7" rx="1.5" fill="${V.coatStripe}" />
+    <text x="${W/2 + 7}" y="${headCY + headR + 12}" text-anchor="middle" font-size="6" font-weight="700" fill="white" font-family="Inter, sans-serif">${V.badge}</text>
+  </svg>`;
+}
+
+function rrTeam(cls, name, roles) {
+  return `<div class="rr-team ${cls}">
+    <div class="docs">${roles.map(doc).join('')}</div>
+    <div>${name}</div>
+  </div>`;
+}
+
+function slideIntro() {
+  return `
+    <div class="slide">
+      <h1 class="slide-title">What's wrong with round robin?</h1>
+      <div class="group-card"><div class="rr-diagram">
+        ${rrTeam('t1', 'Team 1', ['attending', 'senior'])}
+        ${rrTeam('t2', 'Team 2', ['attending', 'pa', 'junior'])}
+        ${rrTeam('t3', 'Team 3', ['attending', 'senior', 'rotator'])}
+        <svg class="rr-arrow-svg" viewBox="0 0 480 380">
+          <defs>
+            <marker id="rrhead" viewBox="0 0 16 16" refX="13" refY="8" markerWidth="11" markerHeight="11" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
+              <path class="rr-arrowhead" d="M 1 1 L 15 8 L 1 15 L 5 8 Z" />
+            </marker>
+            <path id="rrOrbitPath" d="M 298 98 Q 430 170 360 280 Q 240 340 120 280 Q 50 170 182 98 Q 240 80 298 98 Z" />
+          </defs>
+
+          <!-- three graceful arcs between teams with marching ants -->
+          <!-- T1 (top) → T2 (bottom-right) -->
+          <path class="rr-track" d="M 315 112 Q 400 184 360 260" />
+          <path class="rr-flow" d="M 315 112 Q 400 184 360 260" marker-end="url(#rrhead)" />
+          <!-- T2 (bottom-right) → T3 (bottom-left) -->
+          <path class="rr-track" d="M 326 326 Q 240 360 156 326" />
+          <path class="rr-flow" d="M 326 326 Q 240 360 156 326" style="animation-delay: -1.07s" marker-end="url(#rrhead)" />
+          <!-- T3 (bottom-left) → T1 (top) -->
+          <path class="rr-track" d="M 120 260 Q 80 184 165 112" />
+          <path class="rr-flow" d="M 120 260 Q 80 184 165 112" style="animation-delay: -2.13s" marker-end="url(#rrhead)" />
+
+          <!-- center caption -->
+          <text class="rr-caption" x="240" y="215">Round robin</text>
+          <text class="rr-caption-sub" x="240" y="240">one patient, next team, repeat</text>
+        </svg>
+      </div></div>
+    </div>
+  `;
+}
+
+function slideProblem1() {
+  const tcard = (label, roles, cls) => `
+    <div class="team-list-card ${cls}">
+      <div class="tlc-title">${label}</div>
+      <ul>${roles.map(r => `<li>${r}</li>`).join('')}</ul>
+    </div>`;
+  return `
+    <div class="slide">
+      <div class="problem-eyebrow">Problem 1</div>
+      <h1 class="slide-title" style="margin:0 0 16px">All teams are not equal.</h1>
+      <p class="slide-sub">Some teams have more providers and/or more experience than others.</p>
+      <div class="group-card"><div class="teams-row">
+        ${tcard('Team 1', ['Attending', 'PGY4', 'PGY2', 'PA'], 't1')}
+        <div class="neq">≠</div>
+        ${tcard('Team 2', ['Attending', 'PA', 'Intern'], 't2')}
+        <div class="neq">≠</div>
+        ${tcard('Team 3', ['Attending', 'Rotator'], 't3')}
+      </div></div>
+    </div>
+  `;
+}
+
+function slideProblem2() {
+  const colorMap = { red: '#c0392b', yellow: '#b8a000', purple: '#7b1fa2' };
+  const pcard = (title, items, tone) => `
+    <div class="patient-card" style="border-color:${colorMap[tone]}">
+      <div class="pc-title" style="color:${colorMap[tone]}">${title}</div>
+      <ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>
+    </div>`;
+  return `
+    <div class="slide">
+      <div class="problem-eyebrow">Problem 2</div>
+      <h1 class="slide-title" style="margin:0 0 16px">All patients are not equal.</h1>
+      <p class="slide-sub">Some patients require much more attention than others.</p>
+      <div class="group-card"><div class="patients-row">
+        ${pcard('Patient 1', ['Labs', 'Rapid Transfusion', 'A-line', 'Central Line', 'Pressors', 'Intubation', 'CTA', 'MICU Consult', 'GI Consult', 'Admit ICU'], 'red')}
+        <div class="neq">≠</div>
+        ${pcard('Patient 2', ['Labs', 'Antibiotics', 'HFNC', 'CXR', 'Admit Floors'], 'yellow')}
+        <div class="neq">≠</div>
+        ${pcard('Patient 3', ['Sedation', 'End Tidal-CO2', 'Discharge'], 'purple')}
+      </div></div>
+    </div>
+  `;
+}
+
+function slideFormula() {
+  return `
+    <div class="slide">
+      <div class="problem-eyebrow" style="color:var(--agree)">The Fix</div>
+      <h1 class="slide-title" style="margin:0 0 16px">One formula fixes both.</h1>
+      <p class="slide-sub">Weigh the team, weigh the patients, divide.</p>
+      <div class="formula-card"><div class="formula">
+        <div class="f-frac">
+          <span class="f-term f-strength" data-text="Strength"><span>Strength</span></span>
+          <div class="f-bar"></div>
+          <span class="f-term f-load" data-text="Load"><span>Load</span></span>
+        </div>
+        <span class="f-eq">=</span>
+        <span class="f-term f-capacity" data-text="Capacity"><span>Capacity</span></span>
+      </div></div>
+    </div>
+  `;
+}
+
+function slideStrength() {
+  const rows = [
+    ['Attending', '20'],
+    ['Senior Resident (PGY 3-4)', '15.2'],
+    ['PA', '11.6'],
+    ['Junior Resident (PGY-2)', '10.9'],
+    ['Intern (PGY-1)', '6.7'],
+    ['Rotator', '2.3'],
+  ].map(([t,w]) => `<tr><td>${t}</td><td>${w}</td></tr>`).join('');
+  return `
+    <div class="slide">
+      <div class="problem-eyebrow" style="color:var(--agree)">Strength</div>
+      <h1 class="slide-title" style="margin:0 0 6px; font-size:36px">Weigh each provider by role.</h1>
+      <p class="slide-sub" style="margin:0 0 10px; font-size:15px">A team's strength is the sum of its provider weights.</p>
+      <div class="group-card" style="padding:14px 24px; margin: 8px 0 12px">
+        <table class="weights-table">
+          <thead><tr><th>Role</th><th>Weight</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div class="group-card strength-teams" style="padding:16px 24px"><div class="teams-row" style="gap:14px">
+        ${tsCard('Team 1', [['Attending',20],['PGY4',15.2],['PGY2',10.9],['PA',11.6]], 't1')}
+        ${tsCard('Team 2', [['Attending',20],['PA',11.6],['Intern',6.7]], 't2')}
+        ${tsCard('Team 3', [['Attending',20],['Rotator',2.3]], 't3')}
+      </div></div>
+    </div>
+  `;
+}
+
+function tsCard(label, roles, cls) {
+  const total = roles.reduce((s,[,w]) => s+w, 0).toFixed(1);
+  const items = roles.map(([r,w]) => `<li><span class="role">${r}</span><span class="dots"></span><span class="w">${w}</span></li>`).join('');
+  return `
+    <div class="team-list-card ${cls}">
+      <div class="tlc-title">${label}</div>
+      <ul class="weighted">${items}</ul>
+      <div class="tlc-total"><span>Strength</span><span class="dots"></span><span class="total-val">${total}</span></div>
+    </div>`;
+}
+
+function slideLoad() {
+  const colorMap = { red: '#c0392b', yellow: '#b8a000', purple: '#7b1fa2' };
+  const rows = [
+    ['red',    'Red (ESI-1)',    '4.0', 'Cardiac arrest, intubation, anaphylaxis'],
+    ['yellow', 'Yellow (ESI-2)', '2.0', 'Chest pain, stroke alert, sepsis'],
+    ['purple', 'Purple (ESI-3)', '1.0', 'Complex but stable, requires closer monitoring'],
+  ].map(([tone,tier,w,ex]) => `<tr><td style="color:${colorMap[tone]};font-weight:600">${tier}</td><td>${w}</td><td>${ex}</td></tr>`).join('');
+  const pcard = (title, items, tone, weight) => `
+    <div class="patient-card p-${tone}" style="border-color:${colorMap[tone]}">
+      <div class="pc-title" style="color:${colorMap[tone]}">${title}</div>
+      <ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>
+      <div class="pc-weight" style="background:${colorMap[tone]}"><span>Weight</span><span class="dots"></span><span>${weight}</span></div>
+    </div>`;
+  return `
+    <div class="slide">
+      <div class="problem-eyebrow" style="color:#c0392b">Load</div>
+      <h1 class="slide-title" style="margin:0 0 6px; font-size:36px">Weigh each patient by acuity.</h1>
+      <p class="slide-sub" style="margin:0 0 10px; font-size:15px">A team's load is the sum of its patients' acuity weights.</p>
+      <div class="group-card" style="padding:14px 24px; margin: 8px 0 12px">
+        <table class="weights-table" style="max-width:620px">
+          <thead><tr><th>Acuity Tier</th><th>Initial Weight</th><th>Clinical Examples</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div class="group-card strength-teams" style="padding:16px 24px"><div class="patients-row" style="gap:14px">
+        ${pcard('Red', ['Labs', 'Rapid Transfusion', 'A-line', 'Central Line', 'Pressors', 'Intubation', 'CTA', 'MICU Consult', 'Admit ICU'], 'red', '4.0')}
+        ${pcard('Yellow', ['Labs', 'Antibiotics', 'HFNC', 'CXR', 'Admit Floors'], 'yellow', '2.0')}
+        ${pcard('Purple', ['Sedation', 'End Tidal-CO2', 'Discharge'], 'purple', '1.0')}
+      </div></div>
+    </div>
+  `;
+}
+
+function slideCapacity() {
+  const miniTeamCard = (cls, providers) => {
+    const rows = providers.map(([role, w]) =>
+      `<li><span>${role}</span><span class="w">${w}</span></li>`
+    ).join('');
+    return `<div class="dv-mini-card ${cls}"><ul>${rows}</ul></div>`;
+  };
+  const mp = (tone, w) => {
+    const scale = 18;
+    return `<div class="dv-mp ${tone}" style="width:${w * scale}px">${w.toFixed(1)}</div>`;
+  };
+
+  const row = ({ team, teamCls, providers, patients, strength, load, capacity, baseDelay }) => `
+    <div class="group-card" style="padding:14px 32px; margin:0">
+      <div class="dv-row" style="--dv-base:${baseDelay}s">
+        <div class="dv-team">${team}</div>
+        <div class="dv-fraction">
+          <div class="dv-num-wrap">
+            <span class="dv-strength dv-num">${strength}</span>
+            ${miniTeamCard(teamCls, providers)}
+          </div>
+          <div class="dv-bar"></div>
+          <div class="dv-den-wrap">
+            <span class="dv-load dv-den">${load}</span>
+            <div class="dv-mini-patients">${patients.map(([t, w]) => mp(t, w)).join('')}</div>
+          </div>
+        </div>
+        <span class="dv-eq">=</span>
+        <div class="dv-cap-wrap">
+          <span class="dv-cap">${capacity}</span>
+          <div class="dv-cap-lbl">Capacity</div>
+        </div>
+      </div>
+    </div>`;
+
+  return `
+    <div class="slide">
+      <div class="problem-eyebrow" style="color:#1a3a7b">Capacity</div>
+      <h1 class="slide-title" style="margin:0 0 6px; font-size:38px">Divide.</h1>
+      <p class="slide-sub" style="margin:0 0 14px; font-size:15px">
+        <span style="color:#2e7d32;font-weight:600">Strength</span> of providers
+        <span style="font-family:'EB Garamond',serif;margin:0 6px;color:var(--muted)">÷</span>
+        <span style="color:#c0392b;font-weight:600">Load</span> of patients
+      </p>
+      <div class="dv-stack">
+        ${row({
+          team: 'Team 1', teamCls: 't1',
+          providers: [['Attending', 20], ['PGY4', 15.2], ['PGY2', 10.9], ['PA', 11.6]],
+          patients: [['red', 4.0], ['purple', 1.0]],
+          strength: '57.7', load: '5.0', capacity: '11.5', baseDelay: 0,
+        })}
+        ${row({
+          team: 'Team 2', teamCls: 't2',
+          providers: [['Attending', 20], ['PA', 11.6], ['Intern', 6.7]],
+          patients: [['yellow', 2.0], ['yellow', 2.0]],
+          strength: '38.3', load: '4.0', capacity: '9.6', baseDelay: 2.5,
+        })}
+      </div>
+    </div>
+  `;
+}
+
+function slideDynamicCapacity() {
+  const miniTeamCard = (cls, providers) => {
+    const rows = providers.map(([role, w]) =>
+      `<li><span>${role}</span><span class="w">${w}</span></li>`
+    ).join('');
+    return `<div class="dv-mini-card ${cls}"><ul>${rows}</ul></div>`;
+  };
+
+  const row = ({ id, label, cls, providers, strength }) => `
+    <div class="group-card dyn-card" data-team-card="${id}" style="padding:12px 28px; margin:0">
+      <div class="dv-row" data-team="${id}">
+        <div class="dv-team">${label}</div>
+        <div class="dv-fraction">
+          <div class="dv-num-wrap">
+            <span class="dv-strength dv-num">${strength}</span>
+            ${miniTeamCard(cls, providers)}
+          </div>
+          <div class="dv-bar"></div>
+          <div class="dv-den-wrap">
+            <span class="dv-load dv-den dyn-load">—</span>
+            <div class="dv-mini-patients dyn-patients"></div>
+          </div>
+        </div>
+        <span class="dv-eq">=</span>
+        <div class="dv-cap-wrap">
+          <span class="dv-cap dyn-cap">—</span>
+          <div class="dv-cap-lbl">Capacity</div>
+        </div>
+      </div>
+    </div>`;
+
+  return `
+    <div class="slide dyn-slide">
+      <div class="problem-eyebrow" style="color:#1a3a7b">Capacity</div>
+      <h1 class="slide-title" style="margin:0 0 6px; font-size:38px">Decide.</h1>
+      <p class="slide-sub" style="margin:0 0 8px; font-size:15px">
+        Patients decay. Capacity recovers. Each arrival lands where there is most room.
+      </p>
+      <div class="dyn-caption"></div>
+      <div class="dv-stack" style="gap:10px">
+        ${row({ id:'T1', label:'Team 1', cls:'t1', providers:[['Attending',20],['PGY4',15.2],['PGY2',10.9],['PA',11.6]], strength:'57.7' })}
+        ${row({ id:'T2', label:'Team 2', cls:'t2', providers:[['Attending',20],['PA',11.6],['Intern',6.7]], strength:'38.3' })}
+        ${row({ id:'T3', label:'Team 3', cls:'t3', providers:[['Attending',20],['Senior Resident',15.2],['Rotator',2.3]], strength:'37.5' })}
+      </div>
+    </div>
+  `;
+}
+
+function startDynamicCapacity() {
+  const container = document.querySelector('.dyn-slide');
+  if (!container) return () => {};
+
+  // Compressed decay times (real seconds)
+  const DECAY = { red: 6, yellow: 6, purple: 3 };
+  const P_SCALE = 20; // px per weight unit
+
+  const teams = [
+    { id: 'T1', strength: 57.7, patients: [
+      { acuity: 'red',    weight: 4.0, arrivedAt: 0 },
+      { acuity: 'purple', weight: 1.0, arrivedAt: 0 },
+    ]},
+    { id: 'T2', strength: 38.3, patients: [
+      { acuity: 'yellow', weight: 2.0, arrivedAt: 0 },
+      { acuity: 'yellow', weight: 2.0, arrivedAt: 0 },
+    ]},
+    { id: 'T3', strength: 37.5, patients: [
+      { acuity: 'yellow', weight: 2.0, arrivedAt: 0 },
+    ]},
+  ];
+
+  // Scheduled arrivals (simulation seconds)
+  const arrivals = [
+    { at: 2.0, acuity: 'yellow', weight: 2.0 },
+    { at: 4.5, acuity: 'red',    weight: 4.0 },
+    { at: 6.2, acuity: 'yellow', weight: 2.0 },
+    { at: 7.4, acuity: 'purple', weight: 1.0 },
+  ];
+
+  const ACUITY_COLORS = { red: '#c0392b', yellow: '#b8a000', purple: '#7b1fa2' };
+  const ACUITY_NAMES  = { red: 'Red',     yellow: 'Yellow',  purple: 'Purple'  };
+  const TEAM_NAMES    = { T1: 'Team 1',   T2: 'Team 2',      T3: 'Team 3'      };
+
+  let simTime = 0;
+  let lastFrame = performance.now();
+  let paused = false;
+  let processed = 0;
+  let currentWinnerId = null;
+  let pendingArrival = null;
+  let freshPatient = null;
+  let freshTimer = null;
+  let raf = null;
+  let stopped = false;
+
+  const currentWeight = (p, t) => {
+    const age = t - p.arrivedAt;
+    if (age < 0) return 0;
+    const win = DECAY[p.acuity];
+    if (age >= win) return 0;
+    return p.weight * (1 - age / win);
+  };
+  const teamLoad = (team, t) => team.patients.reduce((s, p) => s + currentWeight(p, t), 0);
+
+  function setOutline(teamId, on) {
+    const card = container.querySelector(`[data-team-card="${teamId}"]`);
+    if (card) card.classList.toggle('dyn-winner', on);
+  }
+  function showCaption(acuity, teamId) {
+    const cap = container.querySelector('.dyn-caption');
+    if (!cap) return;
+    const a = ACUITY_NAMES[acuity];
+    const t = TEAM_NAMES[teamId];
+    cap.innerHTML = `A <span style="color:${ACUITY_COLORS[acuity]};font-weight:600">${a}</span> patient arrives &nbsp;→&nbsp; <strong>${t}</strong> has the most room<span class="dyn-next-hint">Press Next →</span>`;
+    cap.classList.add('visible');
+  }
+  function hideCaption() {
+    const cap = container.querySelector('.dyn-caption');
+    if (cap) cap.classList.remove('visible');
+  }
+
+  function tick() {
+    if (stopped) return;
+    const now = performance.now();
+    if (!paused) simTime += (now - lastFrame) / 1000;
+    lastFrame = now;
+
+    while (!paused && processed < arrivals.length && arrivals[processed].at <= simTime) {
+      const a = arrivals[processed];
+      let best = null;
+      for (const team of teams) {
+        const l = teamLoad(team, simTime);
+        const cap = l === 0 ? Infinity : team.strength / l;
+        if (!best || cap > best.cap) best = { team, cap };
+      }
+      // Defer actual assignment until the user advances, so the paused view
+      // shows the pre-arrival capacities that justified the choice.
+      pendingArrival = { acuity: a.acuity, weight: a.weight, winnerId: best.team.id };
+      currentWinnerId = best.team.id;
+      setOutline(currentWinnerId, true);
+      showCaption(a.acuity, currentWinnerId);
+      paused = true;
+      processed++;
+    }
+
+    for (const team of teams) {
+      const l = teamLoad(team, simTime);
+      const lRounded = Math.round(l * 10) / 10;
+      const capFromShown = lRounded === 0 ? Infinity : team.strength / lRounded;
+      const row = container.querySelector(`[data-team="${team.id}"]`);
+      if (!row) continue;
+      const loadEl = row.querySelector('.dyn-load');
+      const capEl = row.querySelector('.dyn-cap');
+      const patientsEl = row.querySelector('.dyn-patients');
+      if (loadEl) loadEl.textContent = lRounded.toFixed(1);
+      if (capEl) capEl.textContent = isFinite(capFromShown) ? capFromShown.toFixed(1) : '∞';
+      if (patientsEl) {
+        const active = team.patients
+          .map(p => ({ p, w: currentWeight(p, simTime) }))
+          .filter(x => x.w > 0.15);
+        if (patientsEl.children.length !== active.length) {
+          patientsEl.innerHTML = active.map(({ p, w }) => {
+            const fresh = p === freshPatient ? ' just-arrived' : '';
+            return `<div class="dv-mp ${p.acuity}${fresh}" style="width:${(w * P_SCALE).toFixed(1)}px">${w >= 0.8 ? w.toFixed(1) : ''}</div>`;
+          }).join('');
+        } else {
+          [...patientsEl.children].forEach((el, i) => {
+            const item = active[i];
+            if (!item) return;
+            el.style.width = (item.w * P_SCALE).toFixed(1) + 'px';
+            el.textContent = item.w >= 0.8 ? item.w.toFixed(1) : '';
+          });
+        }
+      }
+    }
+
+    raf = requestAnimationFrame(tick);
+  }
+
+  const nextHandler = () => {
+    if (paused) {
+      if (pendingArrival) {
+        const winner = teams.find(t => t.id === pendingArrival.winnerId);
+        if (winner) {
+          const newPatient = {
+            acuity: pendingArrival.acuity,
+            weight: pendingArrival.weight,
+            arrivedAt: simTime,
+          };
+          winner.patients.push(newPatient);
+          freshPatient = newPatient;
+          if (freshTimer) clearTimeout(freshTimer);
+          freshTimer = setTimeout(() => { freshPatient = null; }, 700);
+        }
+        pendingArrival = null;
+      }
+      if (currentWinnerId) setOutline(currentWinnerId, false);
+      currentWinnerId = null;
+      hideCaption();
+      paused = false;
+      return true;
+    }
+    if (processed < arrivals.length) {
+      // Fast-forward to the next arrival
+      simTime = arrivals[processed].at;
+      return true;
+    }
+    // Simulation done — release the handler so default advance fires
+    slideNextHandler = null;
+    return false;
+  };
+  slideNextHandler = nextHandler;
+
+  raf = requestAnimationFrame(tick);
+
+  return () => {
+    stopped = true;
+    if (slideNextHandler === nextHandler) slideNextHandler = null;
+    if (raf) cancelAnimationFrame(raf);
+    if (freshTimer) clearTimeout(freshTimer);
+  };
+}
+
+function stepIntro(phase) {
+  if (phase === 0) return slideIntro();
+  if (phase === 1) return slideProblem1();
+  if (phase === 2) return slideProblem2();
+  if (phase === 3) return slideFormula();
+  if (phase === 4) return slideStrength();
+  if (phase === 5) return slideLoad();
+  if (phase === 6) return slideCapacity();
+  if (phase === 7) return slideDynamicCapacity();
+  return slideIntro();
+}
+
+function teamAUC(team, strategy) {
+  const key = `${team}|${strategy}`;
+  teamAUC._cache = teamAUC._cache || {};
+  if (teamAUC._cache[key] != null) return teamAUC._cache[key];
+  const { pts } = curvesThrough(PATIENTS.length, strategy);
+  const inRange = pts.filter(p => p.m >= 0 && p.m <= 146);
+  let auc = 0;
+  for (let i = 0; i < inRange.length - 1; i++) {
+    auc += (inRange[i][team] + inRange[i+1][team]) / 2;
+  }
+  teamAUC._cache[key] = Math.round(auc);
+  return teamAUC._cache[key];
+}
+
+function loadMinDefinition() {
+  const total = teamAUC('T1', 'actual') + teamAUC('T2', 'actual') + teamAUC('T3', 'actual');
+  return `<strong>Load-minutes</strong> measure a team's total workload over the window &mdash; the area under its load curve.<br>
+    One unit of acuity-weighted load sustained for one minute.<br>
+    Same <strong>${total} load-minutes</strong>, only redistributed.`;
+}
+
+const FORMULA_COMPARE_HEADINGS = {
+  0: 'What the formula would have done.',
+  1: 'Formula caps every team at <span style="color:#c0392b">4.3</span>.',
+  2: '<span style="color:var(--t1)">Team 1\'s workload:</span> Historical vs. Formula.',
+  3: '<span style="color:var(--t2)">Team 2\'s workload:</span> Historical vs. Formula.',
+  4: '<span style="color:var(--t3)">Team 3\'s workload:</span> Historical vs. Formula.',
+};
+const FORMULA_COMPARE_SUBS = {
+  0: `Same 8 patients, same 146 minutes, routed by <span style="color:#2e7d32">capacity formula</span> from the very first patient.<br>
+      <span style="display:inline-flex; align-items:center; gap:48px; margin-top:4px">
+        <span><strong>Historical</strong>
+          <span style="color:var(--t1)">&nbsp;●&nbsp;4</span>
+          <span style="color:var(--t2)">&nbsp;●&nbsp;3</span>
+          <span style="color:var(--t3)">&nbsp;●&nbsp;1</span>
+        </span>
+        <span><strong>Formula</strong>
+          <span style="color:var(--t1)">&nbsp;●&nbsp;3</span>
+          <span style="color:var(--t2)">&nbsp;●&nbsp;3</span>
+          <span style="color:var(--t3)">&nbsp;●&nbsp;2</span>
+        </span>
+      </span>`,
+  1: `Historical routing lets Team 2's load spike to <strong style="color:#c0392b">5.9</strong> at noon.<br>
+      Formula routing holds every team below the same ceiling for the full 146-minute window.`,
+  2: loadMinDefinition(),
+  3: loadMinDefinition(),
+  4: loadMinDefinition(),
+};
+const FORMULA_COMPARE_FOCUS = { 2: 'T1', 3: 'T2', 4: 'T3' };
+
+function stepFormulaCompare(phase = 0) {
+  const legend = `
+    <div class="chart-legend" style="display:flex;gap:14px;justify-content:center;margin-top:4px;font-size:11px;color:var(--muted);flex-wrap:wrap">
+      <span><span style="display:inline-block;width:14px;height:2px;background:var(--t1);vertical-align:middle;margin-right:4px"></span>Team 1</span>
+      <span><span style="display:inline-block;width:14px;height:2px;background:var(--t2);vertical-align:middle;margin-right:4px"></span>Team 2</span>
+      <span><span style="display:inline-block;width:14px;height:2px;background:var(--t3);vertical-align:middle;margin-right:4px"></span>Team 3</span>
+      <span style="color:#c0392b">● Red (+4)</span>
+      <span style="color:#b8a000">● Yellow (+2)</span>
+      <span style="color:#7b1fa2">● Purple (+1)</span>
+    </div>`;
+  const chartTitle = (color, label) =>
+    `<div class="chart-title" style="font-size:13px;font-weight:600;text-align:center;margin-bottom:6px;color:${color}">${label}</div>`;
+
+  const threshold = 4.3;
+  const slideClasses = ['compare-slide'];
+  if (phase === 1) slideClasses.push('slide-shades');
+  if (FORMULA_COMPARE_FOCUS[phase]) slideClasses.push('focus-' + FORMULA_COMPARE_FOCUS[phase]);
+
+  const histAUC = { T1: teamAUC('T1', 'actual'), T2: teamAUC('T2', 'actual'), T3: teamAUC('T3', 'actual') };
+  const formAUC = { T1: teamAUC('T1', 'formula-replay'), T2: teamAUC('T2', 'formula-replay'), T3: teamAUC('T3', 'formula-replay') };
+
+  return `
+    <div class="slide ${slideClasses.join(' ')}">
+      <div class="problem-eyebrow" style="color:#1a3a7b;margin-bottom:6px">COMPARISON</div>
+      <h1 class="slide-title serif compare-heading" style="margin:0 0 6px; font-size:30px; color:#000">${FORMULA_COMPARE_HEADINGS[phase] || FORMULA_COMPARE_HEADINGS[0]}</h1>
+      <p class="slide-sub compare-sub" style="margin:0 0 18px; font-size:15px; max-width:820px; min-height:68px">${FORMULA_COMPARE_SUBS[phase] || FORMULA_COMPARE_SUBS[0]}</p>
+      <div style="display:flex; gap:20px; align-items:flex-start">
+        <div class="chart-wrap" style="flex:1 1 0; padding:10px 14px 6px">
+          ${chartTitle('var(--muted)', 'Historical routing')}
+          ${renderChart({
+            patientsShown: 8, currentPatient: null, strategy: 'actual',
+            width: 560, height: 340, xStart: -5,
+            hideLegend: true, strokeOnly: true, fullDomain: true,
+            areasControlled: true,
+            aucLabels: histAUC,
+            capShade: { threshold, fill: 'rgba(192, 57, 43, 0.14)', stroke: '#c0392b' },
+          })}
+          ${legend}
+        </div>
+        <div class="chart-wrap formula-chart-wrap" style="flex:1 1 0; padding:10px 14px 6px">
+          ${chartTitle('#2e7d32', 'What formula recommended')}
+          ${renderChart({
+            patientsShown: 8, currentPatient: null, strategy: 'formula-replay',
+            width: 560, height: 340, xStart: -5,
+            hideLegend: true, strokeOnly: true, fullDomain: true,
+            areasControlled: true,
+            aucLabels: formAUC,
+            capShade: { threshold, fill: 'rgba(46, 125, 50, 0.12)', stroke: '#2e7d32' },
+          })}
+          ${legend}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function updateFormulaCompare(prevPhase, nextPhase) {
+  const slide = main.querySelector('.compare-slide');
+  if (!slide) return false;
+  slide.classList.toggle('slide-shades', nextPhase === 1);
+  ['T1', 'T2', 'T3'].forEach(tid => slide.classList.remove('focus-' + tid));
+  const focus = FORMULA_COMPARE_FOCUS[nextPhase];
+  if (focus) slide.classList.add('focus-' + focus);
+  const heading = slide.querySelector('.compare-heading');
+  const sub = slide.querySelector('.compare-sub');
+  if (heading) heading.innerHTML = FORMULA_COMPARE_HEADINGS[nextPhase] || FORMULA_COMPARE_HEADINGS[0];
+  if (sub) sub.innerHTML = FORMULA_COMPARE_SUBS[nextPhase] || FORMULA_COMPARE_SUBS[0];
+  return true;
+}
+
+function animateFormulaReveal(wrap, durationMs = 4500) {
+  if (!wrap) return () => {};
+  const svg = wrap.querySelector('svg.chart');
+  if (!svg) return () => {};
+
+  const paths = [...svg.querySelectorAll('path[data-team]')];
+  const dots = [...svg.querySelectorAll('.patient-dot')];
+  const labels = [...svg.querySelectorAll('.patient-dot-label')];
+  const noonMarker = svg.querySelector('.noon-marker');
+  const noonLabel = svg.querySelector('.noon-label');
+
+  paths.forEach(p => {
+    const total = p.getTotalLength();
+    if (!isFinite(total) || total <= 0) return;
+    p.style.transition = 'none';
+    p.style.strokeDasharray = total + 'px';
+    p.style.strokeDashoffset = total + 'px';
+  });
+  [...dots, ...labels].forEach(el => { el.style.opacity = '0'; el.style.transition = 'none'; });
+  if (noonMarker) { noonMarker.style.opacity = '0'; noonMarker.style.transition = 'none'; }
+  if (noonLabel)  { noonLabel.style.opacity  = '0'; noonLabel.style.transition  = 'none'; }
+
+  void svg.getBoundingClientRect();
+
+  paths.forEach(p => {
+    p.style.transition = `stroke-dashoffset ${durationMs}ms linear`;
+    p.style.strokeDashoffset = '0px';
+  });
+
+  const timeouts = [];
+  const schedule = (el, delay) => {
+    if (!el) return;
+    const t = setTimeout(() => {
+      el.style.transition = 'opacity 250ms ease';
+      el.style.opacity = '1';
+    }, Math.max(0, delay));
+    timeouts.push(t);
+  };
+
+  PATIENTS.forEach((p, i) => {
+    const delay = (p.t / CHART_MAX) * durationMs;
+    schedule(dots[i], delay);
+    schedule(labels[i], delay);
+  });
+  // Noon marker at t=125
+  const noonDelay = (125 / CHART_MAX) * durationMs;
+  schedule(noonMarker, noonDelay);
+  schedule(noonLabel, noonDelay);
+
+  return () => timeouts.forEach(clearTimeout);
+}
+
+const STEPS = [
+  { section: 'Intro',       title: 'What\'s wrong with round robin?', render: stepIntro, phases: 8 },
+  { section: 'Walkthrough', title: 'A real-life example', render: stepNYUBK },
+  { section: 'Walkthrough', title: 'T+0: all teams empty', render: stepStart955, phases: 18, update: updateStart955 },
+  { section: 'Comparison',  title: 'Formula comparison', render: stepFormulaCompare, phases: 5, update: updateFormulaCompare },
+];
+
+// ============================================================
+// ROUTING / STATE
+// ============================================================
+let current = 0;
+let phase = 0;
+let cleanupActiveSlide = null;
+let slideNextHandler = null;
+const main = document.getElementById('main');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+const counter = document.getElementById('counter');
+const stepTitleEl = document.getElementById('stepTitle');
+const progressEl = document.getElementById('progress');
+
+let prevPhase = null;
+let prevCurrent = null;
+function render() {
+  if (cleanupActiveSlide) { cleanupActiveSlide(); cleanupActiveSlide = null; }
+  const step = STEPS[current];
+  const phases = step.phases || 1;
+  const canUpdate = step.update && prevCurrent === current && prevPhase != null
+                 && step.update(prevPhase, phase);
+  if (!canUpdate) {
+    main.innerHTML = `<div class="step active">${step.render(phase)}</div>`;
+    // Post-render hooks for steps that use persistent-SVG transitions.
+    const s955slide = main.querySelector('.s955-slide');
+    if (s955slide) {
+      setupWalkthroughChart(s955slide.querySelector('.chart-wrap'), phase, { animate: false });
+    }
+    if (current === 3) {
+      const wraps = main.querySelectorAll('.chart-wrap');
+      const histWrap = wraps[0];
+      if (histWrap) {
+        const nm = histWrap.querySelector('.noon-marker');
+        const nl = histWrap.querySelector('.noon-label');
+        if (nm) nm.style.opacity = '1';
+        if (nl) nl.style.opacity = '1';
+      }
+      const formulaWrap = main.querySelector('.formula-chart-wrap');
+      if (phase === 0) {
+        cleanupActiveSlide = animateFormulaReveal(formulaWrap);
+      } else {
+        // Cold-start on phase >= 1 — skip animation, just reveal the formula chart.
+        const svg = formulaWrap && formulaWrap.querySelector('svg.chart');
+        if (svg) {
+          svg.querySelectorAll('.noon-marker, .noon-label').forEach(el => el.style.opacity = '1');
+        }
+      }
+    }
+  }
+  prevCurrent = current;
+  prevPhase = phase;
+
+  // Global slide index: count every phase as its own slide.
+  const totalSlides = STEPS.reduce((a, s) => a + (s.phases || 1), 0);
+  let slideBefore = 0;
+  for (let i = 0; i < current; i++) slideBefore += (STEPS[i].phases || 1);
+  const globalSlide = slideBefore + phase + 1;
+
+  counter.textContent = `Slide ${globalSlide} of ${totalSlides}`;
+  stepTitleEl.textContent = `Slide ${globalSlide} · ${step.title}`;
+  prevBtn.disabled = current === 0 && phase === 0;
+  nextBtn.disabled = current === STEPS.length - 1 && phase === phases - 1;
+
+  // Group consecutive steps by section label so multiple steps can fold
+  // under one chip (e.g. Brooklyn intro + Walkthrough share "Walkthrough").
+  const sections = [];
+  STEPS.forEach((s, stepIdx) => {
+    const label = s.section || s.title;
+    const last = sections[sections.length - 1];
+    if (last && last.label === label) last.stepIndices.push(stepIdx);
+    else sections.push({ label, stepIndices: [stepIdx] });
+  });
+
+  const chips = sections.map(sec => {
+    const isCurrent = sec.stepIndices.includes(current);
+    const isDone = sec.stepIndices[sec.stepIndices.length - 1] < current;
+    const cls = `section-chip${isCurrent ? ' current' : ''}${isDone ? ' done' : ''}`;
+    return `<div class="${cls}" data-first-step="${sec.stepIndices[0]}">${sec.label}</div>`;
+  }).join('<span class="section-sep">·</span>');
+
+  const currentSection = sections.find(sec => sec.stepIndices.includes(current));
+  const phaseDots = [];
+  currentSection.stepIndices.forEach(stepIdx => {
+    const s = STEPS[stepIdx];
+    const ph = s.phases || 1;
+    for (let p = 0; p < ph; p++) {
+      const isCurrentDot = stepIdx === current && p === phase;
+      const isDoneDot = stepIdx < current || (stepIdx === current && p < phase);
+      phaseDots.push(`<div class="dot ${isDoneDot ? 'done' : ''} ${isCurrentDot ? 'current' : ''}" data-step="${stepIdx}" data-phase="${p}" title="${s.title}${ph > 1 ? ` (${p + 1}/${ph})` : ''}"></div>`);
+    }
+  });
+
+  progressEl.innerHTML = `
+    <div class="section-chips">${chips}</div>
+    <div class="phase-dots">${phaseDots.join('')}</div>
+  `;
+  progressEl.querySelectorAll('.section-chip').forEach(c => c.addEventListener('click', () => {
+    current = +c.dataset.firstStep;
+    phase = 0;
+    render();
+  }));
+  progressEl.querySelectorAll('.dot').forEach(d => d.addEventListener('click', () => {
+    current = +d.dataset.step;
+    phase = +d.dataset.phase;
+    render();
+  }));
+  localStorage.setItem('walkthrough-step', current);
+  localStorage.setItem('walkthrough-phase', phase);
+  window.location.hash = `slide-${globalSlide}`;
+  if (current === 0 && phase === 7) {
+    cleanupActiveSlide = startDynamicCapacity();
+  }
+}
+
+function go(i) {
+  if (i < 0 || i >= STEPS.length) return;
+  current = i;
+  phase = 0;
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function advance() {
+  if (slideNextHandler) {
+    const handled = slideNextHandler();
+    if (handled !== false) return;
+  }
+  const phases = STEPS[current].phases || 1;
+  if (phase < phases - 1) { phase++; render(); }
+  else go(current + 1);
+}
+function retreat() {
+  if (phase > 0) { phase--; render(); }
+  else if (current > 0) {
+    current--;
+    const prevPhases = STEPS[current].phases || 1;
+    phase = prevPhases - 1;
+    render();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
+prevBtn.addEventListener('click', retreat);
+nextBtn.addEventListener('click', advance);
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight') advance();
+  else if (e.key === 'ArrowLeft') retreat();
+});
+
+// restore state
+const hashMatch = window.location.hash.match(/step-(\d+)/);
+if (hashMatch) current = Math.max(0, Math.min(STEPS.length - 1, parseInt(hashMatch[1]) - 1));
+else {
+  const saved = parseInt(localStorage.getItem('walkthrough-step') || '0');
+  if (!isNaN(saved)) current = Math.max(0, Math.min(STEPS.length - 1, saved));
+  const savedPhase = parseInt(localStorage.getItem('walkthrough-phase') || '0');
+  const maxPhase = (STEPS[current].phases || 1) - 1;
+  if (!isNaN(savedPhase)) phase = Math.max(0, Math.min(maxPhase, savedPhase));
+}
+render();
+</script>
+</body>
+</html>
