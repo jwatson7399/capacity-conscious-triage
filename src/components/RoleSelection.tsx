@@ -56,7 +56,7 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
   if (showBenchmark) return <BenchmarkReport onBack={() => setShowBenchmark(false)} />;
   if (showRealBenchmark) return <RealScheduleBenchmarkReport onBack={() => setShowRealBenchmark(false)} />;
   if (showDelphi) return <DelphiSurvey onCancel={() => setShowDelphi(false)} startOnResults={showDelphi === 'results'} />;
-  if (showEvidence) return <EvidenceWalkthrough onBack={() => setShowEvidence(false)} />;
+  if (showEvidence) return <EvidenceWalkthrough onBack={() => setShowEvidence(false)} darkMode={darkMode} />;
 
   return (
     <div className="dashboard-bg flex flex-col items-center justify-center p-6">

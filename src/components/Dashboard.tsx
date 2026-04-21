@@ -41,6 +41,16 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
   const [compactMenuOpen, setCompactMenuOpen] = useState(false);
   const [scheduleHour, setScheduleHour] = useState(() => state.scheduleData?.currentHour ?? new Date().getHours());
   const compactMode = globalCollapseProviders && globalCollapsePatients && globalHideStabilized;
+  const isSandbox = state.demoMode === 'sandbox';
+  const inDemo = state.demoMode != null;
+  const [sandboxTipDismissed, setSandboxTipDismissed] = useState(() => {
+    if (typeof localStorage === 'undefined') return true;
+    return localStorage.getItem('sandbox-tip-dismissed') === '1';
+  });
+  const dismissSandboxTip = () => {
+    localStorage.setItem('sandbox-tip-dismissed', '1');
+    setSandboxTipDismissed(true);
+  };
 
   const roleLabel = state.currentRole === 'triage_nurse' ? 'Charge / Triage Nurse'
     : state.currentRole === 'charge_nurse' ? 'Charge / Triage Nurse'
@@ -55,16 +65,28 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
       <div data-tour="header" className={`sticky ${state.simulation?.active ? 'top-1' : 'top-0'} header-bar px-4 py-3 z-10 flex items-center justify-between`}>
         <div>
           <h1 className="text-xl font-bold text-white">
-            {state.scheduleData ? 'Real Schedule Demo' : state.simulation?.active ? 'ER Triage Simulator' : 'ER Triage'}
+            {isSandbox ? 'Sandbox' : state.scheduleData ? 'Real Schedule Demo' : state.simulation?.active ? 'ER Triage Simulator' : 'ER Triage'}
           </h1>
           <div className="flex items-center gap-2">
+            {isSandbox && (
+              <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-medium">DEMO</span>
+            )}
             {state.simulation?.active && (
               <span className="text-xs bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full font-medium">SIM</span>
             )}
             <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full font-medium">{roleLabel}</span>
+            {isSandbox && (
+              <button
+                onClick={() => dispatch({ type: 'LOAD_DEMO' })}
+                className="text-xs text-amber-300 hover:text-amber-200 font-medium"
+                title="Reshuffle sandbox"
+              >
+                ↻ Reshuffle
+              </button>
+            )}
             <button
               onClick={() => {
-                if (state.patients.length > 0 && !state.simulation?.active) {
+                if (state.patients.length > 0 && !state.simulation?.active && !inDemo) {
                   if (!confirm('Return to main menu? Current shift data will be lost.')) return;
                 }
                 dispatch({ type: 'RESET' });
@@ -164,6 +186,25 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
 
       {/* Simulation Controls */}
       {state.simulation?.active && <SimulationControls />}
+
+      {/* Sandbox first-time tip */}
+      {isSandbox && !sandboxTipDismissed && (
+        <div className="mx-4 mt-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded-xl px-4 py-3 flex items-start gap-3">
+          <div className="flex-1 text-sm text-amber-900 dark:text-amber-100 leading-snug">
+            <div className="font-semibold mb-0.5">Welcome to the sandbox</div>
+            <div className="text-xs text-amber-800 dark:text-amber-200">
+              Fake providers & patients. Tap <span className="font-semibold">+ New Patient</span> to try an assignment, or <span className="font-semibold">↻ Reshuffle</span> for a new layout.
+            </div>
+          </div>
+          <button
+            onClick={dismissSandboxTip}
+            className="text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 text-lg leading-none px-1"
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* No-providers banner */}
       {state.shiftStarted && state.providers.length === 0 && !state.simulation?.active && (

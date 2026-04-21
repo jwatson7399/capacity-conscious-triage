@@ -144,6 +144,7 @@ export interface ShiftState {
   simulation?: SimulationState;
   floatAttendings: string[];
   scheduleData?: ScheduleDemoData;
+  demoMode?: 'sandbox' | 'real-schedule';
 }
 
 export interface TeamScore {

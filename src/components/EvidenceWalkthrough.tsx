@@ -1,4 +1,5 @@
-export default function EvidenceWalkthrough({ onBack }: { onBack: () => void }) {
+export default function EvidenceWalkthrough({ onBack, darkMode }: { onBack: () => void; darkMode: boolean }) {
+  const src = `${import.meta.env.BASE_URL}walkthrough-v4.html?dark=${darkMode ? '1' : '0'}`;
   return (
     <div className="fixed inset-0 z-40 bg-white dark:bg-slate-900">
       <button
@@ -9,7 +10,7 @@ export default function EvidenceWalkthrough({ onBack }: { onBack: () => void }) 
         ← Back
       </button>
       <iframe
-        src={`${import.meta.env.BASE_URL}walkthrough-v4.html`}
+        src={src}
         title="Evidence walkthrough"
         className="w-full h-full border-0"
       />

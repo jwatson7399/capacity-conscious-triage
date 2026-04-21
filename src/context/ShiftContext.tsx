@@ -516,16 +516,11 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
 
       // Build providers per team with randomized compositions
       type PType = Provider['type'];
-      type PStatus = Provider['status'];
       const nonAttendingTypes: PType[] = ['senior_resident', 'junior_resident', 'intern', 'pa', 'rotator'];
-      const nonActiveStatuses: PStatus[] = ['in_procedure', 'taking_signout', 'off_floor'];
       let pId = 0;
 
       const makeProvider = (teamId: 1 | 2 | 3 | 4, type: PType): Provider => {
-        const isActive = Math.random() > 0.2;
-        const status: PStatus = isActive ? 'active' : pick(nonActiveStatuses);
-        const statusExpiresAt = status === 'active' ? null : demoNow + randInt(5, 25) * min;
-        return { id: `p${++pId}`, name: nextName(), type, status, statusExpiresAt, teamId };
+        return { id: `p${++pId}`, name: nextName(), type, status: 'active', statusExpiresAt: null, teamId };
       };
 
       const demoProviders: Provider[] = [];
@@ -562,8 +557,6 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
       let cCount = 0;
       let fCount = 0;
       let simPatients: Patient[] = [];
-      let simBuffers: Buffer[] = [];
-      let bId = 0;
 
       for (const arrivedAt of arrivalTimes) {
         const tier = pick(tiers);
@@ -578,37 +571,24 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
           teamId = 4;
         } else {
           // Run the recommendation engine at the time of arrival
-          const rec = getRecommendation(demoProviders, simPatients, simBuffers, arrivedAt);
+          const rec = getRecommendation(demoProviders, simPatients, [], arrivedAt);
           teamId = rec.first ?? pick([1, 2, 3] as const);
         }
 
         simPatients.push({ id, acuity: tier, assignedTeamId: teamId, assignedAt: arrivedAt });
-
-        // Create buffer (will be filtered by expiry at the end)
-        const buf: Buffer = {
-          id: `b${++bId}`,
-          teamId,
-          tier,
-          createdAt: arrivedAt,
-          expiresAt: arrivedAt + BUFFER_DURATIONS_MS[tier],
-        };
-        simBuffers.push(buf);
       }
-
-      const demoPatients = simPatients;
-      // Only keep buffers that are still active at demoNow
-      const demoBuffers = simBuffers.filter(b => b.expiresAt > demoNow);
 
       return {
         ...state,
         providers: demoProviders,
-        patients: demoPatients,
-        buffers: demoBuffers,
+        patients: simPatients,
+        buffers: [],
         patientCounter: { C: cCount, F: fCount },
         currentRole: 'charge_nurse',
         shiftStarted: true,
         now: demoNow,
         closedTeams: {},
+        demoMode: 'sandbox',
       };
     }
 
@@ -663,6 +643,7 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
         simulation: simState,
         floatAttendings: action.floatAttendings,
         scheduleData: action.scheduleData,
+        demoMode: 'real-schedule',
       };
     }
 

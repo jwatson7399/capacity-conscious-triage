@@ -24,6 +24,27 @@
     --agree: #2e7d32;
     --disagree: #c0392b;
   }
+  body.dark {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --ink: #f1f5f9;
+    --muted: #94a3b8;
+    --border: #334155;
+    --grid: #273449;
+    --t3: #a5b4cc;
+  }
+  .mode-toggle {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    width: 34px; height: 34px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 15px;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  .mode-toggle:hover { color: var(--ink); border-color: var(--muted); }
   * { box-sizing: border-box; }
   body {
     margin: 0;
@@ -1030,6 +1051,7 @@
     <div class="step-title" id="stepTitle">Slide 1</div>
   </div>
   <div class="progress" id="progress"></div>
+  <button class="mode-toggle" id="modeToggle" aria-label="Toggle dark mode" title="Toggle dark mode">🌙</button>
 </header>
 
 <main id="main"></main>
@@ -3119,6 +3141,21 @@ nextBtn.addEventListener('click', advance);
 document.addEventListener('keydown', e => {
   if (e.key === 'ArrowRight') advance();
   else if (e.key === 'ArrowLeft') retreat();
+});
+
+// dark-mode preference — query-param wins (set by parent app), then localStorage.
+const urlParams = new URLSearchParams(window.location.search);
+const queryDark = urlParams.get('dark');
+const storedDark = localStorage.getItem('walkthrough-dark');
+const initialDark = queryDark != null ? queryDark === '1' : storedDark === '1';
+if (initialDark) document.body.classList.add('dark');
+const modeToggle = document.getElementById('modeToggle');
+const syncToggleIcon = () => { modeToggle.textContent = document.body.classList.contains('dark') ? '☀️' : '🌙'; };
+syncToggleIcon();
+modeToggle.addEventListener('click', () => {
+  const on = document.body.classList.toggle('dark');
+  localStorage.setItem('walkthrough-dark', on ? '1' : '0');
+  syncToggleIcon();
 });
 
 // restore state
