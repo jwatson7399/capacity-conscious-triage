@@ -36,7 +36,7 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [capacityWeights, team1Providers]);
   const [globalCollapseProviders, setGlobalCollapseProviders] = useState(true);
-  const [globalCollapsePatients, setGlobalCollapsePatients] = useState(true);
+  const [globalCollapsePatients, setGlobalCollapsePatients] = useState(false);
   const [globalHideStabilized, setGlobalHideStabilized] = useState(true);
   const [compactMenuOpen, setCompactMenuOpen] = useState(false);
   const [scheduleHour, setScheduleHour] = useState(() => state.scheduleData?.currentHour ?? new Date().getHours());

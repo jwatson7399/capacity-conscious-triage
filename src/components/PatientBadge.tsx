@@ -74,7 +74,7 @@ export default function PatientBadge({ patient, now, canManage, onUpgrade, onRea
           </span>
         )}
         {!isDeceased && !isStabilized && (
-          <span className="text-xs text-gray-500 dark:text-gray-500 font-medium">(demand: {currentWeight})</span>
+          <span className="text-xs text-gray-500 dark:text-gray-500 font-medium">(demand: {currentWeight.toFixed(2)})</span>
         )}
         {!isDeceased && !isStabilized && (
           <span className="ml-auto text-right text-xs text-gray-500 dark:text-gray-500 leading-tight">
