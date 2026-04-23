@@ -889,59 +889,10 @@ Per-condition ratio-clip rate (rawRatio > 1000 triggers a clip). Flagged rows ex
 
 ## Run Provenance
 
-- **Run date:** 2026-04-23 12:10:12 (local TZ)
-- **Git SHA:** a623a22
-- **Git status:** dirty (42 modified files)
-
-<details><summary>Modified files</summary>
-
-```
-METHODS.md
-scripts/historical-replay.ts
-src/components/Dashboard.tsx
-src/components/PatientBadge.tsx
-src/components/ProviderStatusToggle.tsx
-src/components/TeamCard.tsx
-src/constants.ts
-src/index.css
-.claude/
-CLAUDE_CODE_HANDOFF_decay_v3.md
-DECAY_SCHEDULE_BENCHMARK_RESULTS_V2.md
-data/
-design-export/
-docs/
-font-preview.html
-for_later/
-paper/
-patient-decay-designs.html
-"public/schedules/January 19_Weekly Schedule (1).xlsx"
-"public/schedules/January 5_Weekly Schedule.xlsx"
-"public/schedules/March 16_Weekly Schedule.xlsx"
-"public/schedules/March 23_Weekly Schedule.xlsx"
-"public/schedules/March 30_Weekly Schedule_Updated.xlsx"
-"public/schedules/March 9_Weekly Schedule.xlsx"
-"public/schedules/Week of 2.23.2026 - BK ED Schedule.xlsx"
-scripts/buffer-duration-benchmark-results.json
-scripts/buffer-duration-benchmark.ts
-scripts/build-pdf.ts
-scripts/compare-weights.ts
-scripts/comprehensive-benchmark-results.json
-scripts/comprehensive-benchmark.ts
-scripts/decay-schedule-benchmark-results.json
-scripts/decay-schedule-benchmark.ts
-scripts/dispo-stats.ts
-scripts/load-minutes-analysis.ts
-scripts/test-log-back-loaded.ts
-team-card-colors.html
-team-card-designs.html
-team-card-provider-layouts.html
-walkthrough-prototype-v2.html
-walkthrough-prototype.html
-walkthrough-prototype.prev.html
-```
-
-</details>
+- **Run date:** 2026-04-23 19:29:01 (local TZ)
+- **Git SHA:** 89ab82f
+- **Git status:** clean
 - **RNG seed:** N/A (deterministic replay)
 - **Sample size:** 1541 encounters, 121 days, 21 conditions
 - **Script:** `scripts/decay-schedule-benchmark.ts`
-- **Output JSON:** `data/decay-benchmark-runs/decay-benchmark-results-v3-20260423-121012.json`
+- **Output JSON:** `data/decay-benchmark-runs/decay-benchmark-results-v3-20260423-192901.json`
