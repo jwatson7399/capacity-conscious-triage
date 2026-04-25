@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import * as XLSX from 'xlsx';
 import * as fs from 'fs';
 import * as path from 'path';
-import { parseWeeklySchedule, getProvidersForShift, extractPgyKey } from './scheduleParser';
+import { fileURLToPath } from 'url';
+import { parseWeeklySchedule, getProvidersForShift } from './scheduleParser';
 
 /** Helper: build a workbook from a 2D array */
 function makeWorkbook(cells: (string | number | null)[][]): ArrayBuffer {
@@ -12,19 +13,13 @@ function makeWorkbook(cells: (string | number | null)[][]): ArrayBuffer {
   return XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
 }
 
-// ── Real file integration test ────────────────────────────────────────────────
-const REAL_FILE = path.resolve(
-  process.env.HOME ?? '',
-  'Downloads/Week of 2.23.2026 - BK ED Schedule.xlsx',
-);
-const hasRealFile = fs.existsSync(REAL_FILE);
+const FIXTURE_FILE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '__fixtures__/schedule.xlsx');
+const REAL_FILE = FIXTURE_FILE;
 
-describe('scheduleParser — real xlsx (Feb 23 week)', () => {
-  const describeReal = hasRealFile ? describe : describe.skip;
-
+describe('scheduleParser — fixture xlsx (Feb 23 week)', () => {
   let result: ReturnType<typeof parseWeeklySchedule>;
 
-  describeReal('parse results', () => {
+  describe('parse results', () => {
     it('parses without errors', () => {
       const buf = fs.readFileSync(REAL_FILE);
       result = parseWeeklySchedule(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
@@ -55,123 +50,122 @@ describe('scheduleParser — real xlsx (Feb 23 week)', () => {
     it('extracts PGY map', () => {
       const buf = fs.readFileSync(REAL_FILE);
       result = parseWeeklySchedule(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
-      expect(result.pgyMap['luce']).toEqual({ year: 1 });
-      expect(result.pgyMap['friend']).toEqual({ year: 2 });
-      expect(result.pgyMap['fetterolf']).toEqual({ year: 4 });
-      expect(result.pgyMap['jakupco']).toEqual({ year: 3 });
+      expect(result.pgyMap['intern_t1']).toEqual({ year: 1 });
+      expect(result.pgyMap['junior_t2']).toEqual({ year: 2 });
+      expect(result.pgyMap['senior_t3']).toEqual({ year: 4 });
+      expect(result.pgyMap['jr_bside']).toEqual({ year: 2 });
     });
 
-    it('Monday 9 AM: Team 1 has SINDKAR (attending)', () => {
+    it('Monday 9 AM: Team 1 has a day attending', () => {
       const buf = fs.readFileSync(REAL_FILE);
       result = parseWeeklySchedule(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
       const monday = result.days[0];
       const { providers } = getProvidersForShift(monday, 9);
       const team1 = providers.filter(p => p.teamId === 1);
       const names = team1.map(p => p.name);
-      expect(names).toContain('SINDKAR');
-      const sindkar = team1.find(p => p.name === 'SINDKAR')!;
-      expect(sindkar.type).toBe('attending');
-      expect(sindkar.shiftStart).toBe('7A');
-      expect(sindkar.shiftEnd).toBe('3P');
+      expect(names).toContain('ATTENDING_T1_DAY');
+      const attending = team1.find(p => p.name === 'ATTENDING_T1_DAY')!;
+      expect(attending.type).toBe('attending');
+      expect(attending.shiftStart).toBe('7A');
+      expect(attending.shiftEnd).toBe('3P');
     });
 
-    it('Monday 9 AM: Team 2 has SENA (attending)', () => {
+    it('Monday 9 AM: Team 2 has a day attending', () => {
       const buf = fs.readFileSync(REAL_FILE);
       result = parseWeeklySchedule(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
       const monday = result.days[0];
       const { providers } = getProvidersForShift(monday, 9);
       const team2 = providers.filter(p => p.teamId === 2);
-      expect(team2.map(p => p.name)).toContain('SENA');
+      expect(team2.map(p => p.name)).toContain('ATTENDING_T2_DAY');
     });
 
-    it('Monday 9 AM: Team 1 has Flores (PA)', () => {
+    it('Monday 9 AM: Team 1 has a PA', () => {
       const buf = fs.readFileSync(REAL_FILE);
       result = parseWeeklySchedule(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
       const monday = result.days[0];
       const { providers } = getProvidersForShift(monday, 9);
       const team1PAs = providers.filter(p => p.teamId === 1 && p.type === 'pa');
-      expect(team1PAs.map(p => p.name)).toContain('Flores');
+      expect(team1PAs.map(p => p.name)).toContain('PA_T1_DAY');
     });
 
-    it('Monday 9 AM: Team 1 has LUCE (resident, intern PGY-1)', () => {
+    it('Monday 9 AM: Team 1 has an intern resident', () => {
       const buf = fs.readFileSync(REAL_FILE);
       result = parseWeeklySchedule(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
       const monday = result.days[0];
       const { providers } = getProvidersForShift(monday, 9);
-      const luce = providers.find(p => p.name === 'LUCE' && p.teamId === 1);
-      expect(luce).toBeDefined();
-      expect(luce!.type).toBe('intern'); // PGY-1
+      const intern = providers.find(p => p.name === 'INTERN_T1' && p.teamId === 1);
+      expect(intern).toBeDefined();
+      expect(intern!.type).toBe('intern'); // PGY-1
     });
 
-    it('Monday: no A-Side providers (GAZZOLA should not appear on teams 1-4)', () => {
+    it('Monday: no A-Side providers should appear on teams 1-4', () => {
       const buf = fs.readFileSync(REAL_FILE);
       result = parseWeeklySchedule(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
       const monday = result.days[0];
-      // GAZZOLA is listed under A-Side — should be excluded
-      const gazzola = monday.providers.filter(p => p.name === 'GAZZOLA');
-      expect(gazzola).toHaveLength(0);
+      const aSideProviders = monday.providers.filter(p => p.name === 'ASIDE_SKIP');
+      expect(aSideProviders).toHaveLength(0);
     });
 
-    it('Monday: has float attendings PIRES and FRANCK', () => {
+    it('Monday: has morning and evening float attendings', () => {
       const buf = fs.readFileSync(REAL_FILE);
       result = parseWeeklySchedule(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
       const monday = result.days[0];
       const floatNames = monday.floatAttendings.map(f => f.name);
-      expect(floatNames).toContain('PIRES');
-      expect(floatNames).toContain('FRANCK');
+      expect(floatNames).toContain('FLOAT_AM');
+      expect(floatNames).toContain('FLOAT_PM');
       // Verify shift times are captured
-      const pires = monday.floatAttendings.find(f => f.name === 'PIRES')!;
-      expect(pires.shiftStart).toBe('10A');
-      expect(pires.shiftEnd).toBe('6P');
-      const franck = monday.floatAttendings.find(f => f.name === 'FRANCK')!;
-      expect(franck.shiftStart).toBe('2P');
-      expect(franck.shiftEnd).toBe('10P');
+      const morningFloat = monday.floatAttendings.find(f => f.name === 'FLOAT_AM')!;
+      expect(morningFloat.shiftStart).toBe('10A');
+      expect(morningFloat.shiftEnd).toBe('6P');
+      const eveningFloat = monday.floatAttendings.find(f => f.name === 'FLOAT_PM')!;
+      expect(eveningFloat.shiftStart).toBe('2P');
+      expect(eveningFloat.shiftEnd).toBe('10P');
     });
 
     it('Monday: float attendings filtered by shift time', () => {
       const buf = fs.readFileSync(REAL_FILE);
       result = parseWeeklySchedule(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
       const monday = result.days[0];
-      // PIRES is 10A-6P, FRANCK is 2P-10P
+      // FLOAT_AM is 10A-6P, FLOAT_PM is 2P-10P
 
       // At 9 AM: neither float should be present
       const am9 = getProvidersForShift(monday, 9);
-      expect(am9.floatAttendings).not.toContain('PIRES');
-      expect(am9.floatAttendings).not.toContain('FRANCK');
+      expect(am9.floatAttendings).not.toContain('FLOAT_AM');
+      expect(am9.floatAttendings).not.toContain('FLOAT_PM');
 
-      // At 11 AM: PIRES yes, FRANCK no
+      // At 11 AM: morning float yes, evening float no
       const am11 = getProvidersForShift(monday, 11);
-      expect(am11.floatAttendings).toContain('PIRES');
-      expect(am11.floatAttendings).not.toContain('FRANCK');
+      expect(am11.floatAttendings).toContain('FLOAT_AM');
+      expect(am11.floatAttendings).not.toContain('FLOAT_PM');
 
       // At 3 PM: both present
       const pm3 = getProvidersForShift(monday, 15);
-      expect(pm3.floatAttendings).toContain('PIRES');
-      expect(pm3.floatAttendings).toContain('FRANCK');
+      expect(pm3.floatAttendings).toContain('FLOAT_AM');
+      expect(pm3.floatAttendings).toContain('FLOAT_PM');
 
-      // At 7 PM: FRANCK yes, PIRES no
+      // At 7 PM: evening float yes, morning float no
       const pm7 = getProvidersForShift(monday, 19);
-      expect(pm7.floatAttendings).toContain('FRANCK');
-      expect(pm7.floatAttendings).not.toContain('PIRES');
+      expect(pm7.floatAttendings).toContain('FLOAT_PM');
+      expect(pm7.floatAttendings).not.toContain('FLOAT_AM');
 
       // At 11 PM: neither
       const pm11 = getProvidersForShift(monday, 23);
-      expect(pm11.floatAttendings).not.toContain('PIRES');
-      expect(pm11.floatAttendings).not.toContain('FRANCK');
+      expect(pm11.floatAttendings).not.toContain('FLOAT_AM');
+      expect(pm11.floatAttendings).not.toContain('FLOAT_PM');
     });
 
-    it('Monday 7 PM: evening attending CHU on Team 1', () => {
+    it('Monday 7 PM: evening attending is on Team 1', () => {
       const buf = fs.readFileSync(REAL_FILE);
       result = parseWeeklySchedule(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
       const monday = result.days[0];
       const { providers } = getProvidersForShift(monday, 19);
       const team1Eve = providers.filter(p => p.teamId === 1 && p.type === 'attending');
-      expect(team1Eve.map(p => p.name)).toContain('CHU');
-      // Morning attending SINDKAR should NOT be present at 7PM
-      expect(team1Eve.map(p => p.name)).not.toContain('SINDKAR');
+      expect(team1Eve.map(p => p.name)).toContain('ATTENDING_T1_EVE');
+      // Morning attending should NOT be present at 7PM
+      expect(team1Eve.map(p => p.name)).not.toContain('ATTENDING_T1_DAY');
     });
 
-    it('Friday: has providers (right grid)', () => {
+    it('Friday: has providers in the right grid layout', () => {
       const buf = fs.readFileSync(REAL_FILE);
       result = parseWeeklySchedule(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
       const friday = result.days.find(d => d.dayOfWeek === 'Friday');
@@ -179,40 +173,38 @@ describe('scheduleParser — real xlsx (Feb 23 week)', () => {
       expect(friday!.providers.length).toBeGreaterThan(0);
       const { providers } = getProvidersForShift(friday!, 9);
       const team1Names = providers.filter(p => p.teamId === 1).map(p => p.name);
-      expect(team1Names).toContain('WITTMAN');
+      expect(team1Names).toContain('ATTENDING_T1_FRIDAY');
     });
 
-    it('Thursday: Team 1 has BEHAN attending, Team 4 has MARSHALL attending', () => {
+    it('Thursday: Team 1 and Team 4 have expected attendings', () => {
       const buf = fs.readFileSync(REAL_FILE);
       result = parseWeeklySchedule(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
       const thursday = result.days.find(d => d.dayOfWeek === 'Thursday')!;
       const { providers } = getProvidersForShift(thursday, 9);
-      expect(providers.filter(p => p.teamId === 1 && p.type === 'attending').map(p => p.name)).toContain('BEHAN');
-      expect(providers.filter(p => p.teamId === 4 && p.type === 'attending').map(p => p.name)).toContain('MARSHALL');
+      expect(providers.filter(p => p.teamId === 1 && p.type === 'attending').map(p => p.name)).toContain('ATTENDING_T1_THURSDAY');
+      expect(providers.filter(p => p.teamId === 4 && p.type === 'attending').map(p => p.name)).toContain('ATTENDING_T4_THURSDAY');
     });
 
-    it('Monday midnight: OVN attendings ALBERT (T1) and BOWEN-SPINELLI (T2) present', () => {
+    it('Monday midnight: OVN attendings on Team 1 and Team 2 present', () => {
       const buf = fs.readFileSync(REAL_FILE);
       result = parseWeeklySchedule(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
       const monday = result.days[0];
       const { providers } = getProvidersForShift(monday, 0); // midnight
       const names = providers.map(p => p.name);
-      expect(names).toContain('ALBERT');
-      expect(names).toContain('BOWEN-SPINELLI');
-      // OVN attending ALBERT should be on Team 1
-      const albert = providers.find(p => p.name === 'ALBERT');
-      expect(albert?.teamId).toBe(1);
-      expect(albert?.type).toBe('attending');
+      expect(names).toContain('OVN_ATT_T1');
+      expect(names).toContain('OVN_ATT_T2');
+      const ovnAttending = providers.find(p => p.name === 'OVN_ATT_T1');
+      expect(ovnAttending?.teamId).toBe(1);
+      expect(ovnAttending?.type).toBe('attending');
     });
 
-    it('Monday midnight: PEDs overnight attending (P 11P-7A LA) is excluded', () => {
+    it('Monday midnight: PEDs overnight attending row is excluded', () => {
       const buf = fs.readFileSync(REAL_FILE);
       result = parseWeeklySchedule(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
       const monday = result.days[0];
       const { providers } = getProvidersForShift(monday, 0);
-      // LA is PEDs overnight — should NOT appear
-      const la = providers.find(p => p.name === 'LA');
-      expect(la).toBeUndefined();
+      const pedsOvernight = providers.find(p => p.name === 'PEDS_OVN_SKIP');
+      expect(pedsOvernight).toBeUndefined();
     });
 
     it('Monday midnight: OVN PAs mapped to correct teams (N-side=T1+T3, B-side=T2+T4, Swing=all)', () => {
@@ -220,23 +212,19 @@ describe('scheduleParser — real xlsx (Feb 23 week)', () => {
       result = parseWeeklySchedule(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
       const monday = result.days[0];
       const { providers } = getProvidersForShift(monday, 0);
-      // B-side 7P-7A Moskowitz → Teams 2 & 4
-      const moskowitz = providers.filter(p => p.name === 'Moskowitz');
-      expect(moskowitz.length).toBe(2);
-      expect(moskowitz.map(p => p.teamId).sort()).toEqual([2, 4]);
-      expect(moskowitz[0]?.type).toBe('pa');
-      // N-side 7P-7A Mohamed → Teams 1 & 3
-      const mohamed = providers.filter(p => p.name === 'Mohamed');
-      expect(mohamed.length).toBe(2);
-      expect(mohamed.map(p => p.teamId).sort()).toEqual([1, 3]);
-      expect(mohamed[0]?.type).toBe('pa');
-      // Swing 7P-7A Thaung → all teams
-      const thaung = providers.filter(p => p.name === 'Thaung');
-      expect(thaung.length).toBe(4);
-      expect(thaung.map(p => p.teamId).sort()).toEqual([1, 2, 3, 4]);
-      // Swing 7P-7A ZURICA → all teams
-      const zurica = providers.filter(p => p.name === 'ZURICA');
-      expect(zurica.length).toBe(4);
+      const bSide = providers.filter(p => p.name === 'OVN_PA_BSIDE');
+      expect(bSide.length).toBe(2);
+      expect(bSide.map(p => p.teamId).sort()).toEqual([2, 4]);
+      expect(bSide[0]?.type).toBe('pa');
+      const nSide = providers.filter(p => p.name === 'OVN_PA_NSIDE');
+      expect(nSide.length).toBe(2);
+      expect(nSide.map(p => p.teamId).sort()).toEqual([1, 3]);
+      expect(nSide[0]?.type).toBe('pa');
+      const swing = providers.filter(p => p.name === 'OVN_PA_SWING');
+      expect(swing.length).toBe(4);
+      expect(swing.map(p => p.teamId).sort()).toEqual([1, 2, 3, 4]);
+      const swing2 = providers.filter(p => p.name === 'OVN_PA_SWING2');
+      expect(swing2.length).toBe(4);
     });
 
     it('Monday 9 AM: OVN providers should NOT appear', () => {
@@ -245,19 +233,19 @@ describe('scheduleParser — real xlsx (Feb 23 week)', () => {
       const monday = result.days[0];
       const { providers } = getProvidersForShift(monday, 9);
       const names = providers.map(p => p.name);
-      expect(names).not.toContain('ALBERT');
-      expect(names).not.toContain('BOWEN-SPINELLI');
-      expect(names).not.toContain('Moskowitz');
+      expect(names).not.toContain('OVN_ATT_T1');
+      expect(names).not.toContain('OVN_ATT_T2');
+      expect(names).not.toContain('OVN_PA_BSIDE');
     });
 
-    it('Thursday midnight: OVN resident FRIEND on B-Side (Teams 2 & 4)', () => {
+    it('Thursday midnight: OVN resident on B-Side (Teams 2 & 4)', () => {
       const buf = fs.readFileSync(REAL_FILE);
       result = parseWeeklySchedule(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
       const thursday = result.days.find(d => d.dayOfWeek === 'Thursday')!;
       const { providers } = getProvidersForShift(thursday, 0);
-      const friend = providers.filter(p => p.name === 'FRIEND' && p.shiftStart === '8P');
-      expect(friend.length).toBe(2);
-      expect(friend.map(p => p.teamId).sort()).toEqual([2, 4]); // B-Side = Teams 2 & 4
+      const resident = providers.filter(p => p.name === 'JR_BSIDE' && p.shiftStart === '8P');
+      expect(resident.length).toBe(2);
+      expect(resident.map(p => p.teamId).sort()).toEqual([2, 4]); // B-Side = Teams 2 & 4
     });
 
     it('each day has at least 4 providers at 9 AM', () => {

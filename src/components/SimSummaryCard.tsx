@@ -48,13 +48,12 @@ function fmt(n: number): string {
 export default function SimSummaryCard({ simulation: sim }: Props) {
   const shadow = sim.shadow;
   const liveShadow = sim.liveShadow;
-  if (!shadow || !liveShadow) return null;
 
   const liveMode = sim.roundRobin ? 'Round Robin' : 'Formula';
-  const shadowMode = shadow.mode === 'round_robin' ? 'Round Robin' : 'Formula';
+  const shadowMode = shadow?.mode === 'round_robin' ? 'Round Robin' : 'Formula';
 
-  const liveStats = useMemo(() => statsFromEntries(liveShadow.entries), [liveShadow]);
-  const shadowStats = useMemo(() => statsFromEntries(shadow.entries), [shadow]);
+  const liveStats = useMemo(() => statsFromEntries(liveShadow?.entries ?? []), [liveShadow?.entries]);
+  const shadowStats = useMemo(() => statsFromEntries(shadow?.entries ?? []), [shadow?.entries]);
 
   const teamCapacities = useMemo(() => {
     const caps: Record<number, number> = {};
@@ -67,6 +66,8 @@ export default function SimSummaryCard({ simulation: sim }: Props) {
 
   const liveFairness = useMemo(() => computeFairness(liveStats, sim.permanentlyClosedTeams, teamCapacities), [liveStats, sim.permanentlyClosedTeams, teamCapacities]);
   const shadowFairness = useMemo(() => computeFairness(shadowStats, sim.permanentlyClosedTeams, teamCapacities), [shadowStats, sim.permanentlyClosedTeams, teamCapacities]);
+
+  if (!shadow || !liveShadow) return null;
 
   const eligible = ([1, 2, 3, 4] as TeamId[]).filter(
     t => t !== 4 && !sim.permanentlyClosedTeams.includes(t)

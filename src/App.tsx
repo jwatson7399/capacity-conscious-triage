@@ -3,6 +3,10 @@ import { ShiftProvider, useShift } from './context/ShiftContext';
 import RoleSelection from './components/RoleSelection';
 import Dashboard from './components/Dashboard';
 
+function urlHasTourParam(): boolean {
+  return new URLSearchParams(window.location.search).has('tour');
+}
+
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
   static getDerivedStateFromError(error: Error) { return { error }; }
@@ -29,7 +33,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 
 function AppInner() {
   const { state, dispatch } = useShift();
-  const [tourActive, setTourActive] = useState(false);
+  const [tourActive, setTourActive] = useState(urlHasTourParam);
   const [darkMode, setDarkMode] = useState(() => {
     return localStorage.getItem('er-triage-dark') === 'true';
   });
@@ -47,10 +51,8 @@ function AppInner() {
 
   // Auto-start tour from ?tour URL param
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.has('tour')) {
+    if (urlHasTourParam()) {
       dispatch({ type: 'LOAD_TOUR_DEMO' });
-      setTourActive(true);
     }
   }, [dispatch]);
 

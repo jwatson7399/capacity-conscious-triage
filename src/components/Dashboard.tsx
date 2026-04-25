@@ -33,7 +33,6 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
     closeHelp: () => setShowHelp(false),
     capacityWeights,
     team1Providers,
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [capacityWeights, team1Providers]);
   const [globalCollapseProviders, setGlobalCollapseProviders] = useState(true);
   const [globalCollapsePatients, setGlobalCollapsePatients] = useState(false);
