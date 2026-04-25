@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useShift } from '../context/ShiftContext';
 import type { TeamId, TeamScore, ProviderType } from '../types';
 import { ACUITY_DECAY, PROVIDER_TYPE_LABELS, PROVIDER_TYPE_SHORT, TRAUMA_TEAM_ID, TEAM_CLOSE_TRANSFER_MS, TEAM_CLOSE_TRANSFER_TARGETS, getCapacityColor } from '../constants';
@@ -35,24 +35,25 @@ export default function TeamCard({ teamId, score, recommendationRank, isClosed, 
   const [swapping, setSwapping] = useState<string | null>(null);
   const [swapName, setSwapName] = useState('');
   const [swapType, setSwapType] = useState<ProviderType>('senior_resident');
-  const [providersOpen, setProvidersOpen] = useState(true);
-  const [patientsOpen, setPatientsOpen] = useState(true);
-  const [hideStabilized, setHideStabilized] = useState(false);
+  const [providersOpen, setProvidersOpen] = useState(!forceCollapseProviders);
+  const [patientsOpen, setPatientsOpen] = useState(!forceCollapsePatients);
+  const [hideStabilized, setHideStabilized] = useState(!!forceHideStabilized);
+  const [prevForceCollapseProviders, setPrevForceCollapseProviders] = useState(forceCollapseProviders);
+  const [prevForceCollapsePatients, setPrevForceCollapsePatients] = useState(forceCollapsePatients);
+  const [prevForceHideStabilized, setPrevForceHideStabilized] = useState(forceHideStabilized);
 
-  useEffect(() => {
-    if (forceCollapseProviders) setProvidersOpen(false);
-    else setProvidersOpen(true);
-  }, [forceCollapseProviders]);
-
-  useEffect(() => {
-    if (forceCollapsePatients) setPatientsOpen(false);
-    else setPatientsOpen(true);
-  }, [forceCollapsePatients]);
-
-  useEffect(() => {
-    if (forceHideStabilized) setHideStabilized(true);
-    else setHideStabilized(false);
-  }, [forceHideStabilized]);
+  if (prevForceCollapseProviders !== forceCollapseProviders) {
+    setProvidersOpen(!forceCollapseProviders);
+    setPrevForceCollapseProviders(forceCollapseProviders);
+  }
+  if (prevForceCollapsePatients !== forceCollapsePatients) {
+    setPatientsOpen(!forceCollapsePatients);
+    setPrevForceCollapsePatients(forceCollapsePatients);
+  }
+  if (prevForceHideStabilized !== forceHideStabilized) {
+    setHideStabilized(!!forceHideStabilized);
+    setPrevForceHideStabilized(forceHideStabilized);
+  }
 
   const isPatientStabilized = (p: typeof teamPatients[0]) => {
     if (p.deceased) return false;

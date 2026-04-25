@@ -1,6 +1,8 @@
 import * as XLSX from 'xlsx';
 import type { ProviderType, TeamId } from '../types';
 
+// Trust boundary: xlsx inputs are local user/bundled files; revisit this before accepting third-party workbooks.
+
 export interface ScheduleProvider {
   name: string;
   type: ProviderType;
@@ -500,7 +502,7 @@ function extractDayProviders(
       // Regular OVN shift rows: time in ovnTimeCol, name in ovnNameCol
       // The name may be in the same cell as a side label (e.g. "B-Side" in nameCol with shift in timeCol)
       // or on a row following the side label
-      let targetName = nameVal;
+      const targetName = nameVal;
       // If name column has a side label, the actual name might be after it
       if (/^(N-side|B-[Ss]ide|Swing)$/i.test(targetName)) {
         // Side label only — no name on this row, skip

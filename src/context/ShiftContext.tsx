@@ -92,7 +92,8 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
               p.assignedTeamId === teamId ? { ...p, assignedTeamId: target } : p
             );
           }
-          const { [teamId]: _, ...rest } = closedTeams;
+          const rest = { ...closedTeams };
+          delete rest[teamId];
           closedTeams = rest;
         }
       }
@@ -101,7 +102,8 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
 
       // Simulation: process pending status changes and arrivals
       if (sim?.active) {
-        let { nextArrivalIndex, nextStatusChangeIndex, snapshots, roundRobinNext } = sim;
+        let { nextArrivalIndex, nextStatusChangeIndex, snapshots } = sim;
+        const { roundRobinNext } = sim;
 
         // Process status changes
         let simProviders = newState.providers;
@@ -360,7 +362,8 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
       const patients = state.patients.map(p =>
         p.assignedTeamId === action.fromTeamId ? { ...p, assignedTeamId: action.toTeamId } : p
       );
-      const { [action.fromTeamId]: _, ...closedTeams } = state.closedTeams;
+      const closedTeams = { ...state.closedTeams };
+      delete closedTeams[action.fromTeamId];
       return { ...state, patients, closedTeams };
     }
 
@@ -556,7 +559,7 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
 
       let cCount = 0;
       let fCount = 0;
-      let simPatients: Patient[] = [];
+      const simPatients: Patient[] = [];
 
       for (const arrivedAt of arrivalTimes) {
         const tier = pick(tiers);

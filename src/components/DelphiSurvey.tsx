@@ -202,7 +202,7 @@ export default function DelphiSurvey({ onCancel, startOnResults }: { onCancel: (
     window.dispatchEvent(new Event('delphi-submitted'));
   };
 
-  const ResultsView = () => (
+  const resultsView = (
     <div className="dashboard-bg flex flex-col items-center justify-center p-6">
       <div className="glass-card rounded-xl p-8 max-w-sm w-full text-center">
         <div className="text-3xl mb-3">✓</div>
@@ -288,7 +288,7 @@ export default function DelphiSurvey({ onCancel, startOnResults }: { onCancel: (
     </div>
   );
 
-  if (submitted) return <ResultsView />;
+  if (submitted) return resultsView;
 
   const headerTitle = activeRound === 2 ? 'Provider Strength Survey, Round 2' : 'Provider Strength Survey';
   const headerSub = activeRound === 2
