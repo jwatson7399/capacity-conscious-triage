@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Patient, TeamId, FloatModifier } from '../types';
+import type { Patient, TeamId, FloatModifier, AcuityTier } from '../types';
 import { ACUITY_LABELS, ACUITY_COLORS, ACUITY_DECAY, QUICK_UNDO_WINDOW_MS, FLOAT_MODIFIER_LABELS } from '../constants';
 import { getDecayedAcuityWeight } from '../engine/recommendation';
 
@@ -18,7 +18,62 @@ function getNextDecayInfo(patient: Patient, now: number, currentWeight: number):
   if (!last || elapsed >= last.afterMs) return { label: '(stabilized)', decaying: false };
   const remainMs = last.afterMs - elapsed;
   const mins = Math.ceil(remainMs / 60000);
-  return { label: `current demand ${currentWeight.toFixed(1)}; stabilizes in [${formatDuration(mins)}]`, decaying: true };
+  return { label: `current load ${currentWeight.toFixed(1)}; stabilizes in [${formatDuration(mins)}]`, decaying: true };
+}
+
+// Progress (0–1) within the patient's current decay window — i.e. elapsed time
+// since entering the current weight tier divided by the interval until the next
+// scheduled decay. Returns null if the patient is fully stabilized.
+function getDecayWindowProgress(patient: Patient, now: number): number | null {
+  const elapsed = now - (patient.upgradedAt ?? patient.assignedAt);
+  const steps = ACUITY_DECAY[patient.acuity];
+  let windowStart = 0;
+  for (const step of steps) {
+    if (elapsed < step.afterMs) {
+      const span = step.afterMs - windowStart;
+      if (span <= 0) return 0;
+      return Math.min(1, Math.max(0, (elapsed - windowStart) / span));
+    }
+    windowStart = step.afterMs;
+  }
+  return null;
+}
+
+const DECAY_PIE_COLORS: Record<AcuityTier, string> = {
+  tier_one: '#dc2626',
+  tier_two: '#ca8a04',
+  tier_three: '#a855f7',
+};
+
+function DecayPie({ progress, tier, size = 16 }: { progress: number | null; tier: AcuityTier; size?: number }) {
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = size / 2 - 1;
+  const color = DECAY_PIE_COLORS[tier];
+  // Stabilized: pie is fully consumed.
+  if (progress === null) {
+    return (
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true" className="flex-shrink-0">
+        <circle cx={cx} cy={cy} r={r} fill={color} opacity="0.25" />
+      </svg>
+    );
+  }
+  const elapsedPath = (() => {
+    if (progress <= 0) return null;
+    if (progress >= 1) return null;
+    const theta = progress * 2 * Math.PI;
+    const endX = cx + r * Math.sin(theta);
+    const endY = cy - r * Math.cos(theta);
+    const largeArc = progress > 0.5 ? 1 : 0;
+    return `M ${cx},${cy} L ${cx},${cy - r} A ${r},${r} 0 ${largeArc},1 ${endX.toFixed(3)},${endY.toFixed(3)} Z`;
+  })();
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true" className="flex-shrink-0">
+      <circle cx={cx} cy={cy} r={r} fill={color} />
+      {elapsedPath && <path d={elapsedPath} fill="rgba(255,255,255,0.82)" />}
+      {progress >= 1 && <circle cx={cx} cy={cy} r={r} fill="rgba(255,255,255,0.82)" />}
+    </svg>
+  );
 }
 
 interface Props {
@@ -49,6 +104,7 @@ export default function PatientBadge({ patient, now, canManage, onUpgrade, onRea
   const decayInfo = getNextDecayInfo(patient, now, currentWeight);
   const isDeceased = patient.deceased === true;
   const isStabilized = !isDeceased && !decayInfo.decaying;
+  const decayProgress = isDeceased ? 0 : getDecayWindowProgress(patient, now);
 
   return (
     <div className="mb-1">
@@ -61,6 +117,9 @@ export default function PatientBadge({ patient, now, canManage, onUpgrade, onRea
           backgroundImage: 'repeating-linear-gradient(135deg, transparent, transparent 4px, rgba(255,255,255,0.7) 4px, rgba(255,255,255,0.7) 11px)',
         } : undefined}
       >
+        {!isDeceased && (
+          <DecayPie progress={decayProgress} tier={patient.acuity} />
+        )}
         <span className={`patient-id font-bold ${isStabilized ? 'text-xs' : ''} ${isDeceased ? 'text-gray-500' : colors.text}`}>{patient.id}</span>
         <span className={`text-xs ${isDeceased ? 'text-gray-500' : colors.text}`}>
           {isDeceased ? 'Deceased' : ACUITY_LABELS[patient.acuity]}
@@ -74,12 +133,11 @@ export default function PatientBadge({ patient, now, canManage, onUpgrade, onRea
           </span>
         )}
         {!isDeceased && !isStabilized && (
-          <span className="text-xs text-gray-500 dark:text-gray-500 font-medium">(demand: {currentWeight.toFixed(2)})</span>
+          <span className="text-xs text-gray-500 dark:text-gray-500 font-medium">(load: {currentWeight.toFixed(2)})</span>
         )}
         {!isDeceased && !isStabilized && (
           <span className="ml-auto text-right text-xs text-gray-500 dark:text-gray-500 leading-tight">
-            <span className="block">assigned {formatDuration(Math.floor((now - patient.assignedAt) / 60000))} ago</span>
-            <span className={`block text-[10px] ${decayInfo.decaying ? '' : 'italic'}`}>{decayInfo.label}</span>
+            assigned {formatDuration(Math.floor((now - patient.assignedAt) / 60000))} ago
           </span>
         )}
         {isStabilized && (
@@ -89,6 +147,12 @@ export default function PatientBadge({ patient, now, canManage, onUpgrade, onRea
           <span className="text-gray-400 text-xs ml-1 flex-shrink-0">›</span>
         )}
       </button>
+
+      {expanded && !isDeceased && !isStabilized && (
+        <div className="mt-1 px-3 py-1.5 bg-gray-50 dark:bg-slate-700/60 rounded-lg text-xs text-gray-600 dark:text-gray-300 italic">
+          {decayInfo.label}
+        </div>
+      )}
 
       {expanded && canManage && !isDeceased && (
         <div className="mt-1 p-2 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-600 space-y-2">

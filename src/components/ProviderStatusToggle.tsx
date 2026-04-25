@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useShift } from '../context/ShiftContext';
 import type { Provider, ProviderStatus } from '../types';
-import { STATUS_LABELS, STATUS_COLORS, PROVIDER_TYPE_LABELS, STATUS_MULTIPLIERS } from '../constants';
+import { STATUS_LABELS, STATUS_COLORS, PROVIDER_TYPE_SHORT, STATUS_MULTIPLIERS } from '../constants';
 
 const STATUSES: ProviderStatus[] = ['active', 'in_procedure', 'taking_signout', 'off_floor'];
 
@@ -21,66 +21,66 @@ interface Props {
 
 export default function ProviderStatusToggle({ provider, canManage, now, onSwap }: Props) {
   const { dispatch, capacityWeights } = useShift();
-  const [showStatuses, setShowStatuses] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const effective = capacityWeights[provider.type] * STATUS_MULTIPLIERS[provider.status];
 
   return (
-    <div className="py-2 border-b border-gray-50 dark:border-slate-700 last:border-0">
-      <div className="flex items-center gap-2">
-        <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${STATUS_COLORS[provider.status]}`} />
-        <div className="flex-1 min-w-0">
-          <div className="font-medium text-gray-900 dark:text-gray-100 truncate">{provider.name}</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">
-            {PROVIDER_TYPE_LABELS[provider.type]}
-            {effective > 0 && <span className="ml-1">(strength: {effective.toFixed(1)})</span>}
-          </div>
-        </div>
-        {provider.status !== 'active' && (
-          <span className="text-xs text-gray-500 dark:text-gray-400">{STATUS_LABELS[provider.status]}</span>
-        )}
+    <>
+      <button
+        onClick={() => canManage && setExpanded(!expanded)}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-700 text-gray-900 dark:text-gray-100 transition-colors ${canManage ? 'hover:bg-slate-200 dark:hover:bg-slate-600 cursor-pointer' : 'cursor-default'}`}
+      >
+        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_COLORS[provider.status]}`} />
+        <span>{provider.name}</span>
+        <span className="text-gray-500 dark:text-gray-400 font-medium">{PROVIDER_TYPE_SHORT[provider.type]}</span>
         {provider.statusExpiresAt && (
-          <span className="text-sm font-mono font-bold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
+          <span className="font-mono text-[10px] bg-orange-200 dark:bg-orange-900/60 text-orange-800 dark:text-orange-200 px-1.5 py-0.5 rounded-full">
             {formatCountdown(provider.statusExpiresAt, now)}
           </span>
         )}
-        {canManage && (
-          <button
-            onClick={() => setShowStatuses(!showStatuses)}
-            className="text-xs text-blue-600 font-medium min-h-[44px] px-2"
-          >
-            {showStatuses ? 'Done' : 'Status'}
-          </button>
-        )}
-        {canManage && onSwap && (
-          <button
-            onClick={onSwap}
-            className="text-xs text-gray-500 min-h-[44px] px-2"
-          >
-            Swap
-          </button>
-        )}
-      </div>
+      </button>
 
-      {showStatuses && canManage && (
-        <div className="grid grid-cols-2 gap-2 mt-2">
-          {STATUSES.map(s => (
+      {expanded && canManage && (
+        <div className="basis-full w-full mt-1 p-2 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-600 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              {provider.name} · strength {effective.toFixed(1)}
+              {provider.status !== 'active' && ` · ${STATUS_LABELS[provider.status]}`}
+            </div>
             <button
-              key={s}
-              onClick={() => {
-                dispatch({ type: 'SET_PROVIDER_STATUS', providerId: provider.id, status: s });
-                setShowStatuses(false);
-              }}
-              className={`py-2 px-3 rounded-lg text-sm font-medium min-h-[44px] transition-colors ${
-                s === provider.status
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 active:bg-gray-200'
-              }`}
+              onClick={() => setExpanded(false)}
+              className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 px-2"
             >
-              {STATUS_LABELS[s]} <span className="text-xs opacity-70">({Math.round(STATUS_MULTIPLIERS[s] * 100)}% strength)</span>
+              Close
             </button>
-          ))}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {STATUSES.map(s => (
+              <button
+                key={s}
+                onClick={() => {
+                  dispatch({ type: 'SET_PROVIDER_STATUS', providerId: provider.id, status: s });
+                }}
+                className={`py-2 px-3 rounded-lg text-sm font-medium min-h-[44px] transition-colors ${
+                  s === provider.status
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-200 active:bg-gray-200'
+                }`}
+              >
+                {STATUS_LABELS[s]} <span className="text-xs opacity-70">({Math.round(STATUS_MULTIPLIERS[s] * 100)}%)</span>
+              </button>
+            ))}
+          </div>
+          {onSwap && (
+            <button
+              onClick={() => { onSwap(); setExpanded(false); }}
+              className="w-full py-2 rounded-lg bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-200 text-sm font-medium min-h-[44px]"
+            >
+              Swap Provider
+            </button>
+          )}
         </div>
       )}
-    </div>
+    </>
   );
 }

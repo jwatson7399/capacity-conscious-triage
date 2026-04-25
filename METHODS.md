@@ -245,6 +245,80 @@ Grid template: `180px 28px 120px 28px 100px`. The operator symbols (÷, =) are c
 
 ---
 
+## 4. V3 Decay Schedule Benchmark — Log Back-Loaded Family, Ratio-Cap Fix, and Clean-Provenance Rerun
+
+**Objective.** Address five latent defects in the V2 decay benchmark that surfaced during cross-check against Section 4 of the paper, and produce an authoritative V3 results file with a clean, reproducible provenance trail that Section 4 can cite as the version of record.
+
+**Methodology / data.**
+- **Concerns intake.** Starting from a cross-check of the paper's Section 4 table against `docs/results/DECAY_SCHEDULE_BENCHMARK_RESULTS_V2.md`, five concerns were documented in `SHAPE_COMPARISON_CONCERNS.md`:
+  1. Paper's per-condition values for Direct Drop didn't match the V2 markdown.
+  2. V2 Direct and Linear were statistically indistinguishable in every metric.
+  3. V2's shape table omitted Min Ratio and LM SD — the two metrics with the largest shape effects.
+  4. "4.8% variation" claim didn't specify which ratio (Avg vs. Min).
+  5. The Linear-over-Direct rationale (continuous recency → buffer replacement) lived in Section 5, not where readers would look for it in Section 4.
+- **Root cause of (1) and (2).** Inspection of `src/engine/recommendation.ts` `getDecayedAcuityWeight` (lines 30–52) confirmed the engine does piecewise-linear interpolation between decaySteps entries starting from `(t=0, w=base)`. A single-endpoint schedule `[{afterMs: T, weight: 0}]` therefore interpolates to the same curve as an explicit linear ramp. V2's "Direct Drop" was never a distinct condition in engine behavior — D2/D3, D5/D6, D8/D9, D11/D12 were byte-identical by construction. The paper's Section 4 numbers showing Direct worse than Linear on Slams/Acuity Spread were not reproducible from the engine.
+- **V3 scope decision (April 22, 2026 Roundtable).** Rather than patch V2 incrementally, replace Direct Drop with a clinically grounded log back-loaded family swept across `k ∈ {1, 3, 9}`, fix the ratio-cap numerical artifact, surface the strongest shape-effect metrics, switch to non-parametric pairwise tests with FDR correction, and attach a reproducibility footer. Handoff specified in `CLAUDE_CODE_HANDOFF_decay_v3.md`; Claude Code owned the implementation.
+- **Condition matrix (21 total).** Factorial of 4 durations (0.5x, 0.75x, 1.0x, 1.5x) × 5 shape families (Stepped, Linear, LogBack-k1, LogBack-k3, LogBack-k9) = 20 formula conditions + 1 Actual baseline. IDs D1–D20 + A1, iterating duration-outer, family-inner.
+- **Log back-loaded formula.**
+  ```
+  w(t) = W0 · ln(1 + k(1 − t/T)) / ln(1 + k),   0 ≤ t ≤ T
+  w(t) = 0,                                     t > T
+  ```
+  Larger k = more back-loaded (weight sustained longer before collapse). Sampled at 15-minute granularity into decaySteps with the final sample pinned exactly to `(T, 0)`, so the engine's piecewise-linear interpolation faithfully tracks the continuous curve. k=1 is mathematically distinct from Linear (finite-k limit, not the linear limit) — at t=T/2, k=1 gives `4·ln(1.5)/ln(2) ≈ 2.34` vs. Linear's 2.00. This is verified as an anti-regression test to guard against the Direct-collapse pathology re-emerging.
+- **Ratio-cap fix.** New constants `RATIO_CAP = 1000` and `MIN_LOAD_EPSILON = 1e-6` defined at the benchmark layer. Replaces V2's `Infinity → 100` guard in `replayDay` with:
+  ```typescript
+  const rawRatio = score.capacity / Math.max(score.load, MIN_LOAD_EPSILON);
+  const ratio = Math.min(rawRatio, RATIO_CAP);
+  ```
+  Applied on both the condition-matched and reference-normalized paths. Per-day `ratioClipCount` / `ratioSampleCount` tracked and rolled up as a per-condition diagnostic. **Engine code stays untouched** — all ratio-cap logic is benchmark-local.
+- **New columns.** `Norm Min Ratio` promoted alongside `Norm Avg Ratio` (both use the same 1.0x Stepped / V2 D7 reference schedule). `Clip Rate (%)` added as a diagnostic column — not in `METRICS` because it's not a routing-quality measure.
+- **Pairwise tests (V3).** Switched from paired t-test to Wilcoxon signed-rank (two-sided, normal approximation with tie-averaged ranks). Justification: day-level ratio distributions are skewed, and with hundreds of paired days the CLT regime of the normal approximation holds comfortably. Benjamini-Hochberg correction (FDR = 0.05) applied separately within each `metric × comparison-family` bucket, where families are `shape` (40 pairs/metric: C(5,2) × 4 durations), `duration` (30 pairs/metric: C(4,2) × 5 families), and `vs-actual` (20 pairs/metric). Rationale for BH over Bonferroni: modern default, less conservative, and the families are exploratory-hypothesis sets where controlling FDR is the right target rather than family-wise error.
+- **Reproducibility footer.** `captureGitProvenance()` uses `execSync('git rev-parse --short HEAD')` and `execSync('git status --porcelain')` — no new dependency. Reports SHA, dirty/clean, modified files (collapsed into a `<details>` block), run timestamp, RNG seed (`N/A (deterministic replay)`), sample size, and output JSON path.
+- **Output paths.** Markdown writes to `docs/results/DECAY_SCHEDULE_BENCHMARK_RESULTS_V3.md`; JSON to `data/decay-benchmark-runs/decay-benchmark-results-v3-<YYYYMMDD-HHMMSS>.json` with `mkdirSync(..., { recursive: true })` on first run. JSON always emitted (V2 gated it behind `--json`); V3 commits the JSON so tables are regenerable without rerunning the ~2-minute replay. V2 markdown preserved untouched as audit baseline.
+- **Verification.** Standalone `scripts/test-log-back-loaded.ts` runs 52 assertions before the benchmark is allowed: formula endpoints at t=0, t=T, t>T for each k; Python-verified reference values at t ∈ {0, 1, 3, 15, 45, 75, 89, 90} for k ∈ {1, 3, 9} within tolerance 0.001; engine round-trip at grid and off-grid points; endpoint-pinning of decaySteps; the curvature-preserved anti-regression check (logBack-k=1 at t=T/2 ≠ Linear); `buildDecaySchedule` dispatch including the required-argument throw when `logBackK` is undefined.
+
+**Results.**
+- V3 benchmark produced 21 conditions × 14 metrics + clip-rate diagnostic across 121 three-team days / 1,541 A-side encounters.
+- **Shape effect (headline):** Stepped still wins most metrics within each duration, but log back-loaded families are competitive on Norm Avg Ratio (LogBack k=9 wins at 1.0x, k=1 at 1.5x) and on `LM SD (D6 meas.)` at 0.5x/0.75x (LogBack k=3) and 1.5x (LogBack k=9). Cohen's d on shape comparisons typically ≤ 0.15.
+- **Norm Avg Ratio range across all 20 formula conditions: 588.7 (D9, 0.75x LogBack k=3) to 600.7 (D15, 1.0x LogBack k=9), 2.0% variation.** This is the tightened, transcription-robust version of V2's "4.8% variation" claim. Paper Section 4 now cites this.
+- **Clip rate is higher than anticipated:** 32% (1.5x) to 81% (0.5x) of ratio samples hit `rawRatio > 1000`. This reflects real near-empty-team arrivals under short-decay schedules, not a bug — decayed loads fall below `1e-6 × (typical capacity / RATIO_CAP)` when a team has no active patients. `Min Ratio`, `Slams`, `Gini`, and `LM SD` metrics are unaffected by clipping; `Avg Ratio` should be read with clip-rate context.
+- **Clean-SHA rerun.** The first V3 run landed at SHA `a623a22` with 42 modified files in the working tree → provenance footer read `dirty`. Since the paper cites V3 as version of record, a clean rerun was executed from SHA `89ab82f` (the commit that introduced the V3 code) with `git stash push -u` isolating the dirty work, `.git/info/exclude` scoped to the untracked input-data directory, and the old dirty-tree JSON replaced via `git rm` + `git add` (recorded as a rename in git). Footer now reads `Git status: clean`. Committed as `84d9852 Rerun V3 decay benchmark from clean tree for paper provenance`.
+- **Spot-check reproducibility (rerun vs. first-run):** D7 Norm Avg Ratio 588.8 ≡, D11 Norm Min Ratio 112.7 ≡, D7 Clip Rate 63.21% ≡, Norm Avg Ratio range 588.7–600.7 (2.0%) ≡ — byte-identical, confirming deterministic replay.
+
+**Design rationale.**
+- **Why drop Direct Drop rather than fix it.** Making Direct Drop a genuine step function would require engine changes to support a non-interpolating step evaluator — a change with blast radius far beyond the benchmark. The handoff instead excludes Direct from V3's comparison set (retaining the `direct` branch in `buildDecaySchedule` as dead-but-audit-safe code) and documents the collapse explicitly. This keeps the engine's production semantics intact and still resolves the paper's data-integrity concern.
+- **Why log back-loaded rather than another curve family.** Clinical motivation: high-acuity patients carry near-full attention burden until disposition, then collapse. Linear decay (V2's winner) doesn't capture the "sustained plateau, steep tail" shape that mirrors active workup → disposition dynamics. The log family is the simplest one-parameter extension that interpolates smoothly between near-linear (small k) and near-step (large k); the k∈{1,3,9} sweep deliberately brackets the interesting region without over-fitting.
+- **Why BH over Bonferroni for V3.** With 40 shape-effect comparisons per metric and 10 metrics = 400 tests per family, Bonferroni at α=0.05 gives per-test α=0.000125, which is almost impossible to clear for shape effects of d≈0.15. BH controls the false discovery rate across the exploratory comparison set — the appropriate target for this stage of analysis.
+- **Why Wilcoxon over a permutation test.** Sample size (~121 paired days) is large enough for the Wilcoxon normal approximation to be accurate; permutation would add runtime without improving the inference. Ties in integer-valued metrics (B2B HA/day, Slams/day, Count Spread) introduce slight anti-conservatism in the normal-approximation p-values — noted in the markdown preamble as a caveat, since Cohen's d is reported alongside for effect-size context.
+- **Why the RATIO_CAP = 1000 constant.** The V2 `Infinity → 100` guard caught only exact-zero-load cases. Near-zero loads (e.g., 0.001 from a mostly-decayed tier-three patient) produced ratios in the tens of thousands, uncapped, which contaminated Avg Ratio means. RATIO_CAP = 1000 with MIN_LOAD_EPSILON = 1e-6 gives a uniform ceiling where raw ratios of ~3 × 10⁷ (capacity 30 / epsilon 10⁻⁶) are clipped to a known sentinel, and `condClipRate` exposes the frequency honestly rather than hiding it in the mean.
+- **Why the ratio-cap lives at the benchmark layer, not the engine.** Production code (`scoreTeam`, `getRecommendation`) needs the raw ratio for UI display and routing; capping inside the engine would alter that behavior. The benchmark re-derives the ratio from `score.capacity` and `score.load` after the routing decision, so the cap is a measurement choice, not a routing change.
+- **Why a standalone test script instead of a vitest test.** The project has `vitest` in devDependencies but no `test` script wired in `package.json` and no existing `*.test.ts` files. Adding a test runner for a single sanity-check script was over-engineering against established convention — the repo's pattern is `scripts/*-benchmark*.ts` with inline stats, and a sibling `scripts/test-log-back-loaded.ts` follows that pattern and runs identically via `npx tsx`.
+- **Why single-file monolithic instead of factoring into `scripts/lib/`.** No `scripts/lib/` exists in the repo; `comprehensive-benchmark.ts`, `buffer-duration-benchmark.ts`, and `historical-replay.ts` all duplicate stats helpers inline. V3 adds ~200 lines to a 1,369-line file → ~1,570 lines readable. Factoring now creates import-graph churn when no other consumer exists. Revisit when a second benchmark needs Wilcoxon + BH.
+
+**Implementation / congruency notes.**
+- **Handoff reference-table transcription error caught during verification.** The handoff's `CLAUDE_CODE_HANDOFF_decay_v3.md` specified D6-window (W0=4, T=90) reference values for the three k values as sanity-check targets. The V3 implementation of the stated formula produced values that disagreed — e.g., at t=45, k=1 the formula gives `4·ln(1.5)/ln(2) ≈ 2.340`, but the handoff claimed `2.000`. Python cross-check confirmed the implementation matched the stated formula; the handoff table values were internally inconsistent (k=1 midpoint = 2.000 implied linear, but k=1 at t=15 = 3.522 was above linear). User confirmed "trust the formula, reference table had transcription errors" — `test-log-back-loaded.ts` REF table uses Python-verified values and the handoff file was updated post-hoc.
+- **`.trim()` bug in git-status parsing.** First provenance run truncated the first modified filename ("METHODS.md" → "ETHODS.md") because `execSync('git status --porcelain').toString().trim()` stripped the leading space that `git status --porcelain` uses for unstaged-modified files (` M file`). Fixed by using `.replace(/\n+$/, '')` instead of `.trim()` to strip only trailing newlines.
+- **D6 label continuity.** `LM SD (D6 meas.)` column label stays as V2-era proper noun. In V3, `MEASUREMENT_OV` is constructed from `buildDecaySchedule(ROUTING_WEIGHTS, 0.75, 'linear')` — schedule-pinned, not ID-pinned — so there is no V3 condition literally named D6. A comment at the `MEASUREMENT_OV` construction site clarifies this: "D6 here refers to the V2 D6 schedule, not a V3 condition ID."
+- **`capacity === 0` edge case.** When no providers are scheduled for a team at `now`, `capacity / max(load, epsilon) = 0 / 1e-6 = 0` — same value V2 returned via its explicit `capacity === 0 ? 0` branch. Not counted as a clip (0 is not > RATIO_CAP). Behavior preserved.
+- **Clean-SHA rerun ran into a stale `.git/index.lock`.** The lock file was 0 bytes, created >2 hours earlier, and `lsof` showed only a Spotlight indexer read handle on it — no active git process. After user-authorized `rm`, stash + rerun + commit + pop completed without further incident. Documented for future operators encountering the same symptom.
+- **Stash strategy during rerun.** `git stash push -u` captured both modified-tracked (8 files) and untracked (49 files) content, including the `data/provider-schedules/` input directory the benchmark needs. Restored just that directory via `git checkout stash@{0}^3 -- data/provider-schedules/` (the `^3` parent is the untracked-files tree in a `-u` stash), unstaged it with `git reset HEAD -- data/provider-schedules/`, and added the directory to `.git/info/exclude` for the duration of the run so it wouldn't show in `git status --porcelain` (the provenance-footer source). Exclude entry reverted after the commit landed.
+- **Condition ID semantics inverted between V2 and V3.** V2's D6 was "0.75x Linear"; V3's D6 is "0.75x Stepped" (due to duration-outer/family-inner iteration with family order `[Stepped, Linear, logBack-k1, logBack-k3, logBack-k9]`). Paper prose citing specific D-IDs from V2 needs to either re-map or cite by `(duration, family)` tuple — the advisor-thread edits to Section 4 should verify every D-ID reference against the V3 condition matrix.
+- **JSON commit footprint.** V3 JSON is ~2 MB. Committed alongside the markdown so downstream consumers (paper build scripts, future reruns, independent audits) can regenerate the tables without the ~2-minute replay. The dirty-tree JSON was replaced via `git rm` + `git add` in a single commit (recorded as a rename in git log), keeping the directory to exactly one authoritative file.
+- **Out-of-scope items explicitly flagged.** Did not touch `buffer-duration-benchmark.ts`, `comprehensive-benchmark.ts`, or any engine code. Did not re-draft paper Section 4 prose — that belongs to the advisor thread per the handoff's division of labor. Did not expand the k-sweep beyond {1, 3, 9}. Did not remove the `direct` branch from `buildDecaySchedule` (dead-but-audit-safe).
+- **Commits.** `89ab82f` introduced the V3 implementation (script + test + V3 markdown + V2 audit baseline + first JSON). `84d9852` replaced the V3 markdown and JSON with clean-provenance versions from the post-89ab82f clean-tree rerun.
+
+**Artifacts.**
+- `scripts/decay-schedule-benchmark.ts` — extended in place from the V2 version
+- `scripts/test-log-back-loaded.ts` — 52-assertion verification script (new)
+- `docs/results/DECAY_SCHEDULE_BENCHMARK_RESULTS_V3.md` — authoritative V3 results (clean provenance)
+- `docs/results/DECAY_SCHEDULE_BENCHMARK_RESULTS_V2.md` — audit baseline (preserved)
+- `data/decay-benchmark-runs/decay-benchmark-results-v3-20260423-192901.json` — raw results for regeneration
+- `SHAPE_COMPARISON_CONCERNS.md` — concerns document that triggered the V3 scope
+- `CLAUDE_CODE_HANDOFF_decay_v3.md` — V3 implementation spec (closed: work landed in 89ab82f)
+- `CLAUDE_CODE_HANDOFF_decay_v3_rerun.md` — clean-provenance rerun spec (closed: work landed in 84d9852)
+
+---
+
 # Historical Methodology Record
 
 _The sections below document earlier methodology work preserved from a prior version of this document._
@@ -1426,6 +1500,233 @@ Three options were evaluated:
 
 - `src/components/EvidenceWalkthrough.tsx` — all visual and editorial changes
 - `src/index.css` — added `fadeScaleIn`, `fadeSlideUp` keyframes and `prefers-reduced-motion` override
+
+---
+
+## 16. Team-Card Redesign — Battery Gauge, Empirically-Calibrated Fill Scale, and Pill Relocation
+
+### 16.1 Objective
+
+Replace the arc-gauge capacity widget, tighten vertical card height, and re-anchor the visual scale so that the red→green spectrum maps to capacity values that actually occur in real operations (not to simulation-extreme tails). A secondary goal was to fold the provider row into the tinted header so the card is scannable at a glance without reading multiple section labels. All tier vocabulary (Busy / Overwhelmed / etc.) was removed from the live UI; only the number, battery, and the word **Capacity** remain on the widget.
+
+### 16.2 Battery Gauge Selection (G4f)
+
+The arc gauge had a fixed 110×60 SVG footprint and broke down when the number-width exceeded its bounding arc (tested with 100.2, 1234.5, etc.). We prototyped six alternative widget concepts in `team-card-colors.html` (G1–G5 plus an iterated G4 family), each rendered across all six capacity tiers for comparison:
+
+- **G1** horizontal bar with number above
+- **G2** full donut ring
+- **G3** pill badge (no gauge, just number + tier chip)
+- **G4** segmented stepper with sub-variants:
+  - G4a thin battery bars
+  - G4b ascending signal bars
+  - G4c dot indicators
+  - G4d chunky pills
+  - G4e ruler ticks
+  - **G4f literal battery icon** (outlined shell + terminal cap + continuous fill)
+- **G5** number + colored underline
+
+**G4f was selected** because the battery metaphor is instantly parseable, the fill is continuous (no discrete steps that jump), the number lives cleanly above the shape, and the terminal cap gives the icon strong recognition at small sizes. The shell and cap take the tier color; the interior uses a `rgba(255,255,255,0.6)` track so the fill reads clearly against the tile-head tint.
+
+Fill percentage is intentionally steep at the low end so an overwhelmed team (ratio 3.2) renders as a thin ~4-pixel sliver — visually alarming — rather than the chunky half-pill that an earlier even-scale prototype produced. This was refined iteratively by showing ratios 100.2, 28.5, 15.2, 8.7, 6.1, 4.3, 2.8, 0.8 side-by-side and tuning the stops until each tier looked distinct.
+
+### 16.3 Empirical Fill-Scale Calibration
+
+**The problem.** The initial simulation-derived thresholds (Comfortable ≥50, Manageable ≥23, Busy ≥16, Very Busy ≥11.5, High Demand ≥8.5, Red Zone <8.5) were calibrated against 23,193 simulated observations under the old 5:3:1 acuity weights. Applied to 1,958 **actual** per-arrival capacity ratios from the 4:2:1 historical replay (121 three-team days + 120 two-team days, Dec 2025 – Apr 2026), this scale produced a degenerate fill distribution: **86% of observations rendered in the top 20% of fill**, with 79.2% pinned above 90% fill. The battery barely moved during normal operations — the visual signal was effectively binary (full vs. "something is wrong"), which contradicted the goal of using the widget to show relative team state at a glance.
+
+**Data pipeline.** `scripts/historical-replay.ts` already computed `ratioAtAssignment` per arrival but discarded the per-entry ratios during JSON serialization. A supplementary dump was added: `historical-replay-ratios-4-2-1.json`, which writes every arrival's assigned-team ratio across both cohorts. Running the replay with `--weights 4:2:1 --json` now produces both the daily-summary file and the per-arrival ratio file.
+
+**Empirical distribution (actual per-arrival, n=1,958):**
+
+| p1 | p5 | p15 | p25 | p50 | p75+ |
+|---|---|---|---|---|---|
+| 12.0 | 19.2 | 31.1 | 47.3 | 100 (clipped) | 100 (clipped) |
+
+~50% of arrivals go to teams with effectively infinite ratio (zero load), which is why p50 pins at the 100 cap. The interesting range — where the battery should do visual work — is ratio 10–60.
+
+**Options considered (all applied to the same 1,958 observations):**
+
+| Option | Strategy | % in 0–90% fill |
+|---|---|---|
+| **A** — Percentile-anchored | stops at p1/p5/p15/p25 (12/19/31/47), 60 = full | **27.5%** |
+| B — Log-perceptual | `log(ratio)/log(50)` | 17.7% |
+| C — Simple linear | `ratio × 2`, clamp at 50 | 23.8% |
+| D — Danger-forward | full at ≥30, compressed below | 12.8% |
+| E — Stress-floor | full at ≥20, battery only signals danger | 4.4% |
+
+**Option A was selected** because the product goal is granularity — the app allocates optimally on its own, so the visual scale's job is to surface relative team state across the shift, not just to alarm. Stops are anchored to real-world percentiles, so a visual difference on screen maps to a real-world operational difference: a battery below 40% means the team is in the bottom 5% of historical observations, not in the bottom 5% of an arbitrary model run.
+
+**Final `capacityFillPercent` stops (in `src/constants.ts`):**
+
+```
+ratio 0 → 0%     (hard floor)
+ratio 8.5 → 7%   (overwhelm threshold, preserved from fairness engine)
+ratio 12 → 20%   (p1 of per-arrival)
+ratio 19 → 40%   (p5)
+ratio 31 → 60%   (p15)
+ratio 47 → 80%   (p25)
+ratio 60 → 100%  (anything above reads full; matches color stop)
+```
+
+### 16.4 COLOR_STOPS & Header-Tint Re-Alignment
+
+`COLOR_STOPS` (the continuous color-interpolation table used for the capacity number and battery border) was updated to match the new fill stops:
+
+```
+0      → red-800   (#991b1b)
+8.5    → red-600   (#dc2626)  [overwhelm threshold]
+12     → red-500   (#ef4444)
+19     → orange-500 (#f97316)
+31     → yellow-500 (#eab308)
+47     → green-500  (#22c55e)
+60     → emerald-500 (#10b981)
+```
+
+**Tint-transition placement.** Initially the header Tailwind classes used stepped thresholds (`≥60 emerald`, `≥47 green`, `≥31 yellow`, …) identical to the color stops. This produced a visible mismatch: at ratio 42.5, the interpolated number color is already dominantly green (midway between yellow-500 at 31 and green-500 at 47), but the stepped rule still returned a yellow tint. The card showed a green number over a cream-yellow background — dissonant.
+
+Fix: the tint transitions now fire at the **midpoints between COLOR_STOPS**, so the tint's hue tracks the interpolated number color:
+
+```
+emerald tint:  ≥ 54   (midpoint 47–60)
+green tint:    ≥ 39   (midpoint 31–47)
+yellow tint:   ≥ 25   (midpoint 19–31)
+orange tint:   ≥ 15   (midpoint 12–19)
+red tint:      ≥ 10   (midpoint 8.5–12)
+red-dark tint: else
+```
+
+Applied in both `getCapacityHeaderGradient` (inline style) and the TeamCard `headerBg` Tailwind-class switch (for dark-mode support).
+
+### 16.5 Infinity Cap & "Next Up" Tiebreaker Indicator
+
+Any `ratio ≥ 100` now displays as `∞` (previously only `ratio === Infinity` did; a team with 0.01 load could otherwise produce `5477.5`, which overflowed the widget). Above 60 the battery is already full, so numeric precision in that range carries no information.
+
+**Tiebreaker signal.** When multiple teams are all at effectively infinite capacity, the recommendation engine picks one by the least-recent-patient tiebreaker. The "Recommended" pill already shows which team was picked, but doesn't convey *why* — the pill could be there because of strict capacity dominance or because of a tiebreaker among tied teams. To surface this specifically in the ambiguous case, a small `· next up ·` annotation renders directly under the `CAPACITY` caption when *both*:
+
+1. the team's display is capped at ∞, and
+2. the team is `recommendationRank === 'first'`.
+
+The annotation uses the same tier color as the rest of the widget with reduced opacity (0.8) and italic styling, so it reads as a footnote, not as a separate tier.
+
+### 16.6 Inactive-Trauma Visual Treatment
+
+Team 4 (Trauma) is excluded from auto-recommendations and often sits with zero patients. Displaying it with its live capacity color (usually comfortable/green, since it has providers but no load) misleadingly implied it was a viable target. Fix: when `isTrauma && teamPatients.length === 0`, the card switches to neutral-inactive styling:
+
+- Header tint: flat slate-50 (same as no-providers state)
+- Capacity number, battery border, caption: slate-400 grey
+- **Battery interior: diagonal stripes** via `repeating-linear-gradient(-45deg, rgba(148,163,184,0.35) 0 2px, rgba(255,255,255,0.6) 2px 5px)` — a disabled-pattern cue borrowed from the stabilized-patient row
+
+The moment a patient is assigned to Team 4, all of this flips back to the normal capacity-colored styling.
+
+### 16.7 Provider-Pill Relocation Into the Tinted Header (Layout Option 2)
+
+Five layout options were prototyped in `team-card-provider-layouts.html`:
+
+1. Full pills below team info (full width)
+2. **Strength/Load moves inline with team name; pills take the Strength/Load slot**
+3. Pills right-aligned, two-column
+4. Dots only (names on click)
+5. Role-count chips (names on click)
+
+**Option 2 was selected** because it's the densest layout that preserves full name-at-a-glance. The right column of the header now stacks as:
+
+```
+Line 1: Team N  ·  Strength 44.8  ·  Load 5.8
+Line 2: Dr. Attending
+Line 3: [provider pills]
+Line 4: Buffered / Add Providers / Trauma notice (conditional)
+```
+
+The standalone `Providers (N)` collapsible section is deleted entirely. The `forceCollapseProviders` prop and `globalCollapseProviders` state were removed; the Dashboard's Compact Mode menu dropped the "Collapse all providers" toggle and Compact Mode now groups only the two remaining options (collapse patients + hide stabilized). The swap-provider form, previously nested inside the collapsed section, now renders as a full-width panel immediately below the tinted header when triggered.
+
+**Provider pill details:**
+- Attending is filtered out of the pill row (always shown separately as "Dr. [Name]" under the team number)
+- `PROVIDER_TYPE_SHORT` was updated so residents display as `PGY-3/4` / `PGY-2` / `PGY-1` (was SR / JR / INT) — matches clinical vocabulary
+- Pills are clickable and expand into the full status-management grid (active / in-procedure / taking-signout / off-floor) in a `basis-full` panel below the pill row
+- Status is conveyed by a small dot at the left of the pill (matching `STATUS_COLORS`); non-active status adds a countdown chip to the pill
+
+### 16.8 Patient-Decay Pie (D1e) on Patient Rows
+
+Six decay-visualization options were prototyped in `patient-decay-designs.html` (ring, hourglass, stopwatch, shrinking bar, tier-step waypoints, pulse/fade). The ring was picked, then iterated into six fill treatments (D1a–D1f: stroke, solid pie, outlined pie, thick donut, **inverse pie**, donut pie).
+
+**D1e (inverse pie) was selected.** The SVG renders a full tier-colored disc with a `rgba(255,255,255,0.82)` wedge that sweeps clockwise as time elapses within the patient's current decay window. Fresh patients show as a fully-colored disc; patients approaching the next decay tier show as nearly-consumed discs; stabilized patients show as a faded disc at 25% opacity. Deceased patients show no pie.
+
+Progress calculation (`getDecayWindowProgress` in `PatientBadge.tsx`): for each patient, walks the ACUITY_DECAY step list, finds the current window `[windowStart, nextStepAfterMs]`, and returns elapsed-within-window ÷ window-span, clamped to `[0, 1]`. Returns `null` for stabilized patients.
+
+The "stabilizes in [Xmins]" text was simultaneously removed from the visible patient row (previously cluttered the right side under "assigned X ago") and folded into a small italic italic dropdown panel that appears when the row is clicked.
+
+### 16.9 Patient Count Pills & Stabilized Pill
+
+The patient section now shows a narrow row of count tiles (`1 RED`, `2 YELLOW`, `0 PURPLE`) styled as inline-flex pills with big number + tiny uppercase tier label. Zero-count tiles dim to 40% opacity so they remain visible without drawing attention. The stabilized-toggle pill was moved into this same row as a grey tile (`{N} STABILIZED`), matching the visual grammar. Clicking toggles hide/show of stabilized rows; no ring outline (kept consistent with the other tiles).
+
+### 16.10 Recommendation Border Color
+
+The `.recommendation-first` glow animation border was changed from `#eab308` (yellow-500) to `#2563eb` (blue-600) so the outlined border matches the "Recommended" pill's background color. The pulse-glow keyframe's box-shadow halo was updated to matching rgba. The legend swatch in Dashboard.tsx was also updated to blue-600. The dashed `recommendation-second` outline was removed entirely; the "2nd Choice" pill alone conveys the ranking.
+
+### 16.11 Files Modified
+
+- `src/constants.ts` — `COLOR_STOPS` recalibration, new `capacityFillPercent` and `getCapacityHeaderGradient` stops, `PROVIDER_TYPE_SHORT` PGY labels
+- `src/components/TeamCard.tsx` — full header rewrite (battery widget, inline Strength/Load, provider pill row, filter out attending), inactive-trauma styling, ∞ cap, Next Up annotation, absolute-positioned Recommended/2nd Choice/Closed pills in the top-right corner
+- `src/components/ProviderStatusToggle.tsx` — pill-style compact rendering with basis-full expanded status panel
+- `src/components/PatientBadge.tsx` — inline `DecayPie` SVG component, `getDecayWindowProgress` helper, renamed demand → load throughout, moved decay-info text to click-to-expand
+- `src/components/Dashboard.tsx` — removed `globalCollapseProviders` state + "Collapse all providers" menu item + `forceCollapseProviders` prop wiring, recommendation legend swatch color update
+- `src/index.css` — `.glass-card.recommendation-first` border + pulse-glow keyframe color change (yellow → blue-600); removed `.recommendation-second` dashed-border rule
+- `scripts/historical-replay.ts` — side-output of per-arrival `ratioAtAssignment` dump (`historical-replay-ratios-{weights}.json`) for fill-scale recalibration
+- `team-card-colors.html`, `team-card-provider-layouts.html`, `patient-decay-designs.html` — prototype files used to prototype and select widget / layout / decay-viz designs; retained as a living record of alternatives considered
+
+---
+
+## 17. Evidence Walkthrough — Mobile Rendering Repair (Walkthrough & Comparison Sections)
+
+### Objective
+Restore correct mobile rendering for the in-app Evidence Walkthrough (`public/walkthrough-v4.html`, the iframe loaded by `EvidenceWalkthrough.tsx`). The deck has three section chips — **Intro · Walkthrough · Comparison** — totaling 32 slides. The Intro section (slides 1–8) rendered correctly on iPhone; the Walkthrough (slides 9–27) and Comparison (slides 28–32) sections did not. Both showed horizontal overflow with body text and chart panels clipped on the left and right edges of the viewport.
+
+### Diagnosis
+Working from two iPhone screenshots (slide 5 — correct; slide 9 — broken), the failure modes were narrowed to three distinct CSS causes, all sharing the same root: layout primitives sized for desktop (fixed `width`, multi-column `grid` / `flex` containers) had no overrides inside the existing `@media (max-width: 600px)` block, even though the Intro section's mobile rules were already comprehensive (lines 914–1043).
+
+| Slide(s) | Root cause | Symptom |
+|----------|-----------|---------|
+| 9 (`stepNYUBK`) | Inline `style="width: 640px"` on the `.lede` paragraph | Text block forced wider than viewport, overflowing both edges |
+| 10–27 (`stepStart955`) | `.s955-grid` declared as `grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr)` with no mobile override | Team rows + chart squeezed side-by-side into ~190 px columns |
+| 28–32 (`stepFormulaCompare`) | Inline `<div style="display:flex; gap:20px">` flex wrapper around two 560-px charts, no mobile override | Two `chart-wrap` panels jammed shoulder-to-shoulder, both clipped |
+
+The default `.lede` rule already used `max-width: 640px`, which is mobile-safe — only the inline `width` override broke it. The other two sections lacked any mobile-specific rules at all because their wrapping classes (`.s955-grid`, the unnamed comparison flex div) post-dated the original mobile pass.
+
+### Methodology / Implementation
+Three changes, all confined to `public/walkthrough-v4.html`:
+
+1. **Removed the fixed-width inline style on slide 9's lede** — changed `style="width: 640px; margin: 18px 0"` to `style="margin: 18px 0"`. The class default (`max-width: 640px`) already constrains the upper bound while permitting the paragraph to shrink below 640 px on narrow viewports.
+
+2. **Tagged the comparison flex wrapper with a stable class** — added `class="compare-charts"` to the previously-anonymous `<div style="display:flex; gap:20px; align-items:flex-start">` in `stepFormulaCompare`, giving the mobile media query a clean selector hook without relying on positional or attribute selectors.
+
+3. **Extended the mobile media query** with overrides for the two newly-failing sections:
+   - `.s955-grid` collapses from two columns to `1fr` (team rows stack above the chart) with tightened gap.
+   - `.s955-row` shrinks its grid template (`36px minmax(0, 1fr) auto auto`) and downscales typography for `.dv-team`, `.dv-num`, `.dv-den`, `.dv-eq`, `.dv-cap`, `.dv-cap-lbl`, and `.dv-mini-card`.
+   - `.s955-right .chart-wrap`, `.chart-title`, and `.chart-legend` get reduced padding and font sizes so the chart fits cleanly below the team rows.
+   - `.compare-charts` switches to `flex-direction: column`; both `.chart-wrap` panels get `width: 100%` and the comparison chart titles/legends shrink for the narrow viewport.
+
+### Verification
+Used Playwright at a 390 × 844 viewport (iPhone 12/13/14 baseline) against the locally-served walkthrough. For each section, the script invoked the deck's internal renderer (`current = N; phase = M; render()`) to jump directly to representative slides, then measured `document.body.scrollWidth` against `window.innerWidth`:
+
+| Slide | Section | Result | scrollWidth × innerWidth |
+|-------|---------|--------|--------------------------|
+| 9     | Walkthrough (NYUBK intro) | Pass | 390 × 390 |
+| 10    | Walkthrough (T+0 zero-state) | Pass | 390 × 390 |
+| 22    | Walkthrough (mid-window, three patients chip-loaded) | Pass | 390 × 390 |
+| 28    | Comparison (historical vs formula) | Pass | 390 × 390 |
+
+Full-page screenshots confirmed: text wraps within the viewport, team rows stack vertically with patient chips remaining inline, the chart panel sits below the rows at full mobile width, and the two comparison charts stack one above the other rather than side-by-side. No content is clipped at either edge.
+
+### Design Rationale
+- **Surgical, layout-only changes.** No JS, no engine, no scoring, no data — strictly CSS plus one class-name addition. The desktop rendering is unchanged because every fix lives inside `@media (max-width: 600px)`.
+- **Class-name over attribute-selector for the comparison wrapper.** Targeting `[style*="display:flex"]` would have been brittle and would have applied to any future inline-flex wrapper. A semantic class (`compare-charts`) keeps the mobile rule colocated with the slide it targets.
+- **Stack rather than scale for the Walkthrough section.** The team rows + chart in `stepStart955` carry meaningful spatial relationships (load chips proportional to weight, chart x-axis time markers). Aggressive horizontal scaling would have shrunk these below legibility; vertical stacking preserves the visual grammar at full mobile width.
+- **Why the Intro section already worked.** It was built with a mobile-first review pass in mind (see lines 914–1043, ~130 lines of mobile rules covering `.rr-diagram`, `.teams-grid`, `.weights-table`, `.formula`, etc.). The two later sections were added without an equivalent pass — this work closes that gap.
+
+### Files Touched
+- `public/walkthrough-v4.html` — three changes: inline-style removal at the NYUBK lede, `compare-charts` class on the comparison flex wrapper, and a ~24-line addition to the mobile media query covering `.lede`, `.s955-grid`, `.s955-card`, `.s955-row` (and its descendants), `.s955-right` chart components, and `.compare-charts` / `.compare-slide` chart components.
+
+### Outcome
+Committed as `e0abeb4` on `main` and pushed to `origin/main` (which serves as the source for the deployed prototype). All three walkthrough sections now render without horizontal overflow at iPhone-class viewport widths.
 
 ---
 
