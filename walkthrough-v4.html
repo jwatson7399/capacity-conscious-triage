@@ -1040,6 +1040,34 @@
     .dv-mini-card { min-width: 62px; font-size: 8px; padding: 3px 4px; }
     .dv-mp { height: 14px; font-size: 8px; }
     .dyn-caption { font-size: 11px; margin-bottom: 4px; }
+
+    /* NYUBK intro (slide 9) — let lede wrap naturally */
+    .lede { max-width: 100%; width: auto; }
+
+    /* Walkthrough slides 10-27 — stack team rows and chart vertically */
+    .s955-grid { grid-template-columns: 1fr; gap: 8px; }
+    .s955-card { padding: 6px 8px !important; }
+    .s955-row {
+      grid-template-columns: 36px minmax(0, 1fr) auto auto;
+      gap: 6px !important;
+    }
+    .s955-row .dv-team { font-size: 11px; }
+    .s955-row .dv-num, .s955-row .dv-den { font-size: 16px; }
+    .s955-row .dv-eq { font-size: 18px; }
+    .s955-row .dv-cap { font-size: 24px; }
+    .s955-row .dv-cap-lbl { font-size: 9px; }
+    .s955-row .dv-mini-card { font-size: 8px; padding: 2px 4px; }
+    .s955-row .dv-mini-card ul li { gap: 4px; }
+    .s955-row .dv-mini-card ul li .w { min-width: 18px; }
+    .s955-right .chart-wrap { padding: 6px 8px 4px !important; }
+    .s955-right .chart-title { font-size: 11px !important; margin-bottom: 4px !important; }
+    .s955-right .chart-legend { font-size: 9px !important; gap: 6px !important; }
+
+    /* Comparison slides 28-32 — stack the two charts vertically */
+    .compare-charts { flex-direction: column; gap: 10px !important; }
+    .compare-charts .chart-wrap { padding: 6px 8px 4px !important; width: 100%; }
+    .compare-slide .chart-title { font-size: 11px !important; margin-bottom: 4px !important; }
+    .compare-slide .chart-legend { font-size: 9px !important; gap: 6px !important; }
   }
 
 </style>
@@ -1314,7 +1342,7 @@ function stepNYUBK() {
   return `
     <div class="slide">
       <h1 class="hero-title serif" style="text-wrap:balance">Let’s use a real-life example.</h1>
-      <p class="lede" style="width: 640px; margin: 18px 0">One morning, 146 minutes, eight critical patients arrived to NYU BK.<br>
+      <p class="lede" style="margin: 18px 0">One morning, 146 minutes, eight critical patients arrived to NYU BK.<br>
 Here’s how capacity-conscious routing would have compared to what actually occurred. These were the teams that day:</p>
       <div class="group-card strength-teams" style="padding:16px 24px; margin-top:12px"><div class="teams-row" style="gap:14px">
         ${tsCard('Team 1', [['Attending',20],['Senior Resident',15.2],['Intern',6.6]], 't1')}
@@ -2883,7 +2911,7 @@ function stepFormulaCompare(phase = 0) {
       <div class="problem-eyebrow" style="color:#1a3a7b;margin-bottom:6px">COMPARISON</div>
       <h1 class="slide-title serif compare-heading" style="margin:0 0 6px; font-size:30px; color:#000">${FORMULA_COMPARE_HEADINGS[phase] || FORMULA_COMPARE_HEADINGS[0]}</h1>
       <p class="slide-sub compare-sub" style="margin:0 0 18px; font-size:15px; max-width:820px; min-height:68px">${FORMULA_COMPARE_SUBS[phase] || FORMULA_COMPARE_SUBS[0]}</p>
-      <div style="display:flex; gap:20px; align-items:flex-start">
+      <div class="compare-charts" style="display:flex; gap:20px; align-items:flex-start">
         <div class="chart-wrap" style="flex:1 1 0; padding:10px 14px 6px">
           ${chartTitle('var(--muted)', 'Historical routing')}
           ${renderChart({
