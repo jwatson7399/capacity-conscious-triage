@@ -35,12 +35,11 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
     team1Providers,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [capacityWeights, team1Providers]);
-  const [globalCollapseProviders, setGlobalCollapseProviders] = useState(true);
   const [globalCollapsePatients, setGlobalCollapsePatients] = useState(false);
   const [globalHideStabilized, setGlobalHideStabilized] = useState(true);
   const [compactMenuOpen, setCompactMenuOpen] = useState(false);
   const [scheduleHour, setScheduleHour] = useState(() => state.scheduleData?.currentHour ?? new Date().getHours());
-  const compactMode = globalCollapseProviders && globalCollapsePatients && globalHideStabilized;
+  const compactMode = globalCollapsePatients && globalHideStabilized;
   const isSandbox = state.demoMode === 'sandbox';
   const inDemo = state.demoMode != null;
   const [sandboxTipDismissed, setSandboxTipDismissed] = useState(() => {
@@ -115,7 +114,6 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
                   <button
                     onClick={() => {
                       const next = !compactMode;
-                      setGlobalCollapseProviders(next);
                       setGlobalCollapsePatients(next);
                       setGlobalHideStabilized(next);
                     }}
@@ -127,15 +125,6 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
                     </span>
                   </button>
                   <div className="border-t border-gray-200 dark:border-slate-700 my-1" />
-                  <button
-                    onClick={() => setGlobalCollapseProviders(!globalCollapseProviders)}
-                    className="w-full px-4 py-2 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300"
-                  >
-                    Collapse all providers
-                    <span className={`w-4 h-4 rounded border ${globalCollapseProviders ? 'bg-blue-500 border-blue-500 text-white' : 'border-gray-400'} flex items-center justify-center text-xs`}>
-                      {globalCollapseProviders && '✓'}
-                    </span>
-                  </button>
                   <button
                     onClick={() => setGlobalCollapsePatients(!globalCollapsePatients)}
                     className="w-full px-4 py-2 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300"
@@ -255,10 +244,7 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
             <div className="font-semibold text-gray-700 dark:text-gray-200 mb-1">Recommendation</div>
             <div className="flex flex-wrap gap-3">
               <span className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300">
-                <span className="w-4 h-3 border-2 border-yellow-500 rounded-sm inline-block" /> 1st Choice
-              </span>
-              <span className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300">
-                <span className="w-4 h-3 border-2 border-dashed border-blue-400 rounded-sm inline-block" /> 2nd Choice
+                <span className="w-4 h-3 border-2 border-blue-600 rounded-sm inline-block" /> 1st Choice
               </span>
             </div>
           </div>
@@ -333,7 +319,7 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
               : null;
             const isClosed = id in state.closedTeams;
             const closedAt = state.closedTeams[id];
-            return <TeamCard key={id} teamId={id} score={score} recommendationRank={rank} isClosed={isClosed} closedAt={closedAt} allCandidatesBuffered={allCandidatesBuffered} forceCollapseProviders={globalCollapseProviders} forceCollapsePatients={globalCollapsePatients} forceHideStabilized={globalHideStabilized} />;
+            return <TeamCard key={id} teamId={id} score={score} recommendationRank={rank} isClosed={isClosed} closedAt={closedAt} allCandidatesBuffered={allCandidatesBuffered} forceCollapsePatients={globalCollapsePatients} forceHideStabilized={globalHideStabilized} />;
           });
         })()}
       </div>

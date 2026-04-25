@@ -97,9 +97,9 @@ export const PROVIDER_TYPE_LABELS: Record<ProviderType, string> = {
 
 export const PROVIDER_TYPE_SHORT: Record<ProviderType, string> = {
   attending: 'ATT',
-  senior_resident: 'SR',
-  junior_resident: 'JR',
-  intern: 'INT',
+  senior_resident: 'PGY-3/4',
+  junior_resident: 'PGY-2',
+  intern: 'PGY-1',
   pa: 'PA',
   rotator: 'ROT',
 };
@@ -139,17 +139,20 @@ export const CAPACITY_TERMS: Array<{ minRatio: number; label: string; color: str
   { minRatio: OVERWHELM_THRESHOLD, label: 'High Demand', color: 'text-red-500' },  // p5–p15
 ];
 
+// Color stops anchored to per-arrival percentiles of real 4:2:1 historical replay data
+// (1,958 arrivals, 121 shift-days). p1=12 · p5=19 · p15=31 · p25=47.
 const COLOR_STOPS: Array<{ ratio: number; r: number; g: number; b: number }> = [
   { ratio: 0, r: 153, g: 27, b: 27 },        // red-800
-  { ratio: 8.5, r: 239, g: 68, b: 68 },      // red-500
-  { ratio: 11.5, r: 249, g: 115, b: 22 },    // orange-500
-  { ratio: 16, r: 250, g: 204, b: 21 },      // yellow-400
-  { ratio: 23, r: 34, g: 197, b: 94 },       // green-500
-  { ratio: 50, r: 16, g: 185, b: 129 },      // emerald-500
+  { ratio: 8.5, r: 220, g: 38, b: 38 },      // red-600 (overwhelm threshold)
+  { ratio: 12, r: 239, g: 68, b: 68 },       // red-500
+  { ratio: 19, r: 249, g: 115, b: 22 },      // orange-500
+  { ratio: 31, r: 234, g: 179, b: 8 },       // yellow-500
+  { ratio: 47, r: 34, g: 197, b: 94 },       // green-500
+  { ratio: 60, r: 16, g: 185, b: 129 },      // emerald-500
 ];
 
 export function getCapacityColor(ratio: number): string {
-  if (!isFinite(ratio) || ratio >= 50) return 'rgb(16, 185, 129)';
+  if (!isFinite(ratio) || ratio >= 60) return 'rgb(16, 185, 129)';
   if (ratio <= 0) return 'rgb(153, 27, 27)';
   for (let i = 0; i < COLOR_STOPS.length - 1; i++) {
     const a = COLOR_STOPS[i], b = COLOR_STOPS[i + 1];
@@ -162,6 +165,44 @@ export function getCapacityColor(ratio: number): string {
 }
 
 export const CAPACITY_GRADIENT_CSS = `linear-gradient(to right, ${COLOR_STOPS.map((s, i) => `rgb(${s.r},${s.g},${s.b}) ${(i / (COLOR_STOPS.length - 1) * 100).toFixed(1)}%`).join(', ')})`;
+
+// Battery fill percentage (0–100) for the capacity widget.
+// Anchored to per-arrival percentiles of 4:2:1 historical replay (1,958 arrivals across 121 shift-days):
+// ratio 8.5 (overwhelm) → 7% · 12 (p1) → 20% · 19 (p5) → 40% · 31 (p15) → 60% · 47 (p25) → 80% · 60+ → 100%
+export function capacityFillPercent(ratio: number): number {
+  if (!isFinite(ratio) || ratio >= 60) return 100;
+  if (ratio <= 0) return 0;
+  const stops: Array<{ r: number; pct: number }> = [
+    { r: 0, pct: 0 },
+    { r: OVERWHELM_THRESHOLD, pct: 7 },
+    { r: 12, pct: 20 },
+    { r: 19, pct: 40 },
+    { r: 31, pct: 60 },
+    { r: 47, pct: 80 },
+    { r: 60, pct: 100 },
+  ];
+  for (let i = 0; i < stops.length - 1; i++) {
+    const a = stops[i], b = stops[i + 1];
+    if (ratio <= b.r) {
+      const t = (ratio - a.r) / (b.r - a.r);
+      return a.pct + t * (b.pct - a.pct);
+    }
+  }
+  return 100;
+}
+
+// Tinted card-header gradient per capacity tier.
+// Transitions sit at the MIDPOINT between COLOR_STOPS so the tint hue tracks
+// the interpolated number color (e.g., ratio 42.5 already reads visually green
+// even though it's below the green stop at 47, so green tint starts at 39).
+export function getCapacityHeaderGradient(ratio: number): string {
+  if (!isFinite(ratio) || ratio >= 54) return 'linear-gradient(180deg, #ecfdf5 0%, #f6fdfa 100%)';
+  if (ratio >= 39) return 'linear-gradient(180deg, #dcfce7 0%, #f2fdf4 100%)';
+  if (ratio >= 25) return 'linear-gradient(180deg, #fef9c3 0%, #fffceb 100%)';
+  if (ratio >= 15) return 'linear-gradient(180deg, #ffedd5 0%, #fff5eb 100%)';
+  if (ratio >= 10) return 'linear-gradient(180deg, #fee2e2 0%, #fef4f4 100%)';
+  return 'linear-gradient(180deg, #fecaca 0%, #fdebeb 100%)';
+}
 
 export function getCapacityTerm(capacityRatio: number): CapacityTerm {
   if (capacityRatio === Infinity) return { label: 'Comfortable', color: 'text-emerald-500' };

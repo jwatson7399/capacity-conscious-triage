@@ -1408,6 +1408,22 @@ if (FLAG_JSON) {
   const jsonPath = join(PROJECT_ROOT, 'data', 'historical-replay-runs', `historical-replay-results${jsonSuffix}.json`);
   writeFileSync(jsonPath, JSON.stringify(jsonOutput, null, 2));
   console.log(`\n  JSON results written to: ${jsonPath}`);
+
+  // Per-arrival ratio dump for visual-scale calibration.
+  const ratiosOutput = {
+    meta: {
+      weightLabel: WEIGHT_LABEL,
+      threeTeamDays: threeTeamDays.length,
+      twoTeamDays: twoTeamDays.length,
+    },
+    threeTeamFormulaRatios: threeTeamDays.flatMap(d => d.formula.entries.map(e => e.ratioAtAssignment)),
+    threeTeamActualRatios: threeTeamDays.flatMap(d => d.actual.entries.map(e => e.ratioAtAssignment)),
+    twoTeamFormulaRatios: twoTeamDays.flatMap(d => d.formula.entries.map(e => e.ratioAtAssignment)),
+    twoTeamActualRatios: twoTeamDays.flatMap(d => d.actual.entries.map(e => e.ratioAtAssignment)),
+  };
+  const ratiosPath = join(PROJECT_ROOT, 'data', 'historical-replay-runs', `historical-replay-ratios${jsonSuffix}.json`);
+  writeFileSync(ratiosPath, JSON.stringify(ratiosOutput));
+  console.log(`  Per-arrival ratio dump written to: ${ratiosPath}`);
 }
 
 // ── Interpretation ──
