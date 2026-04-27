@@ -162,6 +162,10 @@ Overwhelm threshold (`OVERWHELM_THRESHOLD` in `constants.ts`) = 3.75 (exact p5 o
 - **Buffer bar width** is computed directly from `remainingMs / (elapsed + remaining)` each render (not CSS animation) so it stays in sync with the app clock.
 - **Patient nomenclature**: `C-###` = critical/new arrival, `F-###` = floor upgrade, time display = minutes until next decay, `w:N` = current decayed weight.
 
+## Agent rounds
+
+Cross-agent deliberation log: `.rounds/CCTrounds.md`. Run `/rounds` to read recent entries and append your own. **When creating a non-trivial plan or facing a substantive design decision, read rounds first and consider posting if peer input from a parallel agent would help.** Don't post for trivial work or pure execution tasks.
+
 ## Next Step: Real-Time Backend
 
 The app needs a backend so multiple phones/tablets can share the same shift state. Requirements:
