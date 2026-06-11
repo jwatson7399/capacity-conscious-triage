@@ -187,7 +187,7 @@ export default function TeamCard({ teamId, score, recommendationRank, isClosed, 
 
             {/* Team info (right) */}
             <div className="flex flex-col min-w-0">
-              <div className="flex items-baseline gap-2 flex-wrap">
+              <div className={`flex items-baseline gap-2 flex-wrap ${(recommendationRank || isClosed) ? 'pr-24' : ''}`}>
                 <span className="font-bold text-gray-900 dark:text-gray-100">
                   {isTrauma ? 'Trauma (Team 4)' : `Team ${teamId}`}
                 </span>
