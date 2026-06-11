@@ -1,14 +1,16 @@
 # er-triage-app
 
-A mobile-first React + TypeScript app for ER patient triage assignment. Replaces round-robin team rotation with formula-driven scoring that considers provider capacity, patient acuity/load, decay over time, and cooldown buffers. Built with Vite, Tailwind CSS v4, React 19.
+A mobile-first React + TypeScript app for ER patient triage assignment. Replaces round-robin team rotation with formula-driven scoring that considers provider capacity, patient acuity/load, and decay over time. Built with Vite, Tailwind CSS v4, React 19. The app lives at the **repo root** (no subdirectory).
+
+Parameter choices (weights, decay, buffers, thresholds) were validated against 1,541 real A-side encounters across 121 days — see `METHODS.md` for the full derivation. Keep this file, `METHODS.md`, and `src/constants.ts` in sync when parameters change.
 
 ## Setup
 
 ```bash
-cd er-triage-app
 npm install
 npm run dev              # dev server (Vite)
 npm run build            # type-check + production build → dist/
+npx vitest run           # unit tests (schedule parser)
 ```
 
 ## Deploy = GitHub Pages (gh-pages branch)
@@ -16,7 +18,6 @@ npm run build            # type-check + production build → dist/
 When the user says "deploy", build and push to the `gh-pages` branch. There is no GitHub Actions workflow — deployment is manual.
 
 ```bash
-cd er-triage-app
 npm run build
 npx gh-pages -d dist
 ```
@@ -76,21 +77,26 @@ If the env var is unset, the survey falls back to localStorage-only mode.
 
 ## Architecture
 
-- `src/types.ts` — all TypeScript types: `Provider`, `Patient`, `Buffer`, `TeamScore`, `Recommendation`, `ShiftState`, `ShiftAction`
+- `src/types.ts` — all TypeScript types: `Provider`, `Patient`, `Buffer`, `TeamScore`, `Recommendation`, `ShiftState`, `ShiftAction`, simulation types
 - `src/constants.ts` — tuning parameters (see below)
 - `src/engine/recommendation.ts` — pure-function scoring engine
+- `src/engine/simulation.ts` — seeded arrival/status timelines, shadow sims (formula vs round-robin), replay
+- `src/engine/fairness.ts` — per-mode stats + individual comparison metrics (B2B high-acuity, slams, red-zone events, spreads). No composite in the UI — the sim panels compare metrics one by one; the legacy composite (`computeFairness`) is retained only for the benchmark scripts
 - `src/context/ShiftContext.tsx` — `useReducer`-based state management
-- `src/App.tsx` — root: role selection → shift setup (charge nurse) → dashboard; 1s TICK interval
+- `src/hooks/useSurveyWeights.ts` — polls the Delphi sheet every 5 min; falls back to `CAPACITY_WEIGHTS`
+- `src/utils/scheduleParser.ts` — parses real weekly `.xlsx` provider schedules (unit-tested)
+- `src/App.tsx` — root: role selection → dashboard; 1s TICK interval
 - `src/components/`
-  - `Dashboard.tsx` — main view: sticky header, help toggle (?), color legend, team cards grid, FAB
-  - `TeamCard.tsx` — capacity ratio, buffer bars, collapsible providers (default collapsed), patient badges
+  - `Dashboard.tsx` — main view: sticky header, help toggle (?), team cards grid, FAB
+  - `TeamCard.tsx` — battery capacity widget, strength/load, collapsible patients, patient badges
   - `AssignPatient.tsx` — modal: tier selection with clinical examples, team selection, override flow
-  - `HelpSection.tsx` — collapsible guide (intro, formula, example, capacity, decay, buffers, recommendations, overrides, nomenclature)
-  - `ShiftSetup.tsx` — charge nurse team builder
-  - `RoleSelection.tsx` — role picker + LOAD_DEMO button
-  - `ProviderStatusToggle.tsx` — provider status cycling
-  - `PatientBadge.tsx` — acuity color, decay timer, weight indicator
-  - `OverrideModal.tsx` — override reason selection
+  - `HelpSection.tsx` — collapsible guide (formula, capacity scale, decay, overrides, nomenclature)
+  - `EvidenceWalkthrough.tsx` / `MethodologyDeepDive.tsx` / `BenchmarkReport.tsx` / `RealScheduleBenchmarkReport.tsx` — evidence & methods views
+  - `ShiftSetup.tsx`, `RoleSelection.tsx`, `ScheduleImport.tsx` — setup flows
+  - `SimulationSetup.tsx`, `SimulationControls.tsx`, `SimulationParams.tsx`, `SimSummaryCard.tsx`, `TimelineSlider.tsx` — simulation mode
+  - `DelphiSurvey.tsx` / `DelphiAdminPanel.tsx` — provider-weight survey
+  - `PatientBadge.tsx`, `ProviderStatusToggle.tsx`, `OverrideModal.tsx`, `GuidedTour.tsx`, `Toast.tsx`
+- `scripts/` — benchmark CLIs (historical replay, decay/buffer/weight sensitivity, real-schedule)
 
 ## Scoring Formula
 
@@ -98,22 +104,22 @@ If the env var is unset, the survey falls back to localStorage-only mode.
 Capacity Ratio = Team Capacity / Patient Load
 ```
 
-Highest ratio (among non-buffered teams) = recommended. Team 4 (Trauma) excluded from auto-recommendations.
+Highest ratio = recommended. Team 4 (Trauma) excluded from auto-recommendations.
 
 **Tiebreakers:** not-buffered first → highest ratio → least recent assignment → lowest team ID.
 
 ### Capacity Weights (provider type × status multiplier)
 
-Weights are fetched live from the Delphi survey sheet (polled every 5 min via `useSurveyWeights` hook). Fallback defaults in `constants.ts` are used when the sheet is unavailable.
+Weights are fetched live from the Delphi survey sheet (polled every 5 min via `useSurveyWeights`). The fallback defaults in `constants.ts` are the Delphi round-one means (n=19, attending fixed at 20 as reference).
 
-| Provider             | Fallback | Survey Avg (6 responses) |
-|----------------------|----------|--------------------------|
-| Attending            | 20       | 20 (fixed reference)     |
-| Senior Resident      | 15.0     | 15.2                     |
-| PA                   | 10.0     | 10.8                     |
-| Junior Resident (PGY-2) | 7.5  | 10.8                     |
-| Intern (PGY-1)       | 5.0      | 5.7                      |
-| Rotator              | 1.0      | 1.0                      |
+| Provider                | Fallback (= Delphi R1 mean) |
+|-------------------------|-----------------------------|
+| Attending               | 20 (fixed reference)        |
+| Senior Resident         | 15.2                        |
+| PA                      | 11.4                        |
+| Junior Resident (PGY-2) | 10.8                        |
+| Intern (PGY-1)          | 6.6                         |
+| Rotator                 | 2.4                         |
 
 | Status          | Multiplier |
 |-----------------|------------|
@@ -122,50 +128,57 @@ Weights are fetched live from the Delphi survey sheet (polled every 5 min via `u
 | In Procedure    | 0.25       |
 | Off Floor       | 0.0        |
 
-### Acuity Weights & Decay
+### Acuity Weights & Decay (4:2:1, D6 linear)
 
-| Tier      | Initial | Decay                          |
-|-----------|---------|--------------------------------|
-| Tier One  | 5       | → 3 at 60m → 1 at 120m → 0 at 240m |
-| Tier Two  | 3       | → 1 at 90m → 0 at 240m              |
-| Tier Three| 1       | → 0 at 120m                          |
+Recommended config per `METHODS.md`: weights 4:2:1 with linear decay to zero (no steps).
 
-### Buffer Durations
+| Tier                | Initial | Decay                        |
+|---------------------|---------|------------------------------|
+| Tier One (Red)      | 4       | linear → 0 over 180 min      |
+| Tier Two (Yellow)   | 2       | linear → 0 over 180 min      |
+| Tier Three (Purple) | 1       | linear → 0 over 90 min       |
 
-| Spawning Tier | Duration |
-|---------------|----------|
-| Tier One      | 35 min   |
-| Tier Two      | 25 min   |
-| Tier Three    | 15 min   |
+`getDecayedAcuityWeight` interpolates piecewise-linearly across the points in `ACUITY_DECAY`; the production config uses a single endpoint per tier (pure linear). Benchmark scripts may pass multi-step schedules via `ScoringOverrides`.
 
-Buffer stacking is **additive** — 3 rapid assignments = ~3× duration, not max(). Merged buffers show combined count.
+Float coverage modifiers scale a patient's load contribution: `float_supervising` ×0.65, `float_primary` ×0.0.
+
+### Buffers: removed from the live config
+
+`BUFFER_DURATIONS_MS` is all zeros — buffer-duration sensitivity testing showed the decaying load model already provides the cooling-off effect, so assignment buffers are inert by design. The buffer machinery remains in the engine for two reasons:
+
+- **Deceased-patient cooldown** (`DECEASED_BUFFER_MS` = 30 min): marking a patient deceased buffers the team for 30 minutes (deceased patients are excluded from load).
+- **Simulation overrides**: the sim panel can re-enable buffer durations for what-if runs.
 
 ### Capacity Terms (displayed on cards)
 
-| Ratio    | Label        | Color    | Percentile |
-|----------|--------------|----------|------------|
-| ≥ 21.25  | Comfortable  | emerald  | top 25%    |
-| ≥ 10     | Manageable   | green    | p50–p75    |
-| ≥ 7.5    | Busy         | yellow   | p33–p50    |
-| ≥ 5      | Very Busy    | orange   | p15–p33    |
-| ≥ 3.75   | High Demand  | red      | p5–p15     |
-| < 3.75   | Overwhelmed  | dark red | bottom 5%  |
+Recalibrated under the recommended config (4:2:1 + linear decay + no buffers) from 1,000 simulated shifts on real schedules (23,193 team-level observations); boundaries at empirical percentiles.
 
-Overwhelm threshold (`OVERWHELM_THRESHOLD` in `constants.ts`) = 3.75 (exact p5 of 23,193 empirical observations). Used by fairness engine, simulation, and benchmark script. See `METHODS.md` for full derivation.
+| Ratio   | Label        | Percentile |
+|---------|--------------|------------|
+| ≥ 50    | Comfortable  | top 25%    |
+| ≥ 23    | Manageable   | p50–p75    |
+| ≥ 16    | Busy         | p33–p50    |
+| ≥ 11.5  | Very Busy    | p15–p33    |
+| ≥ 8.5   | High Demand  | p5–p15     |
+| < 8.5   | Red Zone     | bottom 5%  |
+
+`RED_ZONE_THRESHOLD` in `constants.ts` = 8.5 (empirical p5 — a descriptive rarity boundary, not a claim about subjective overwhelm). Used by the fairness engine, simulation, and benchmark scripts. See `METHODS.md` for full derivation.
 
 ## Key Design Decisions
 
 - **All state is client-side** (`useReducer` + React context). No backend yet.
 - **Provider status auto-expires** — off_floor at 15min, in_procedure/taking_signout at 30min.
-- **Team 4 (Trauma)** is visible but excluded from auto-recommendations; assignment only via manual override.
-- **Demo mode** randomizes provider names, team compositions, statuses, and simulates patient arrivals chronologically through the recommendation engine for balanced distribution.
-- **Buffer bar width** is computed directly from `remainingMs / (elapsed + remaining)` each render (not CSS animation) so it stays in sync with the app clock.
-- **Patient nomenclature**: `C-###` = critical/new arrival, `F-###` = floor upgrade, time display = minutes until next decay, `w:N` = current decayed weight.
+- **Team 4 (Trauma)** is visible but excluded from auto-recommendations; assigning to it bypasses the override modal (manual-only by design).
+- **Teams 3 & 4 can be closed**; their patients auto-transfer (3→1, 4→2) after 60 min, or immediately via "Sign Out".
+- **Deceased patients** drop out of team load and counts; the team gets a 30-min cooldown buffer.
+- **Demo mode** randomizes provider names, team compositions, statuses, and simulates patient arrivals chronologically through the recommendation engine.
+- **Simulation mode** runs seeded arrival/status timelines at adjustable speed, with a shadow sim of the opposite assignment mode (formula vs round-robin) for live comparison.
+- **Patient nomenclature**: `C-###` = critical/new arrival, `F-###` = floor upgrade; badges show live decayed load and a decay pie that fills as the patient stabilizes.
 
 ## Next Step: Real-Time Backend
 
 The app needs a backend so multiple phones/tablets can share the same shift state. Requirements:
-- Real-time sync: all connected clients see updates instantly (provider status changes, new patient assignments, buffer countdowns)
+- Real-time sync: all connected clients see updates instantly (provider status changes, new patient assignments)
 - Conflict resolution: two users assigning a patient simultaneously must not corrupt state
 - Minimal infrastructure: ideally a single service (e.g. WebSocket server, or Firebase/Supabase real-time)
 - The recommendation engine (`recommendation.ts`) is pure functions and can run on either client or server

@@ -142,7 +142,7 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
             teamId = eligible[rrIdx];
             rrNext++;
           } else {
-            const rec = getRecommendation(providers, simPatients, simBuffers, tickNow, closedTeams, scoringOverrides);
+            const rec = getRecommendation(simProviders, simPatients, simBuffers, tickNow, closedTeams, scoringOverrides);
             teamId = rec.first ?? (1 as TeamId);
           }
 
@@ -436,14 +436,13 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
 
     case 'LOAD_TOUR_DEMO': {
       // Curated demo state for the guided tour.
-      // Only Team 1 has an active buffer. Teams 2 & 3 are buffer-free.
       // Good mix of acuity tiers, provider types, and statuses.
       const now = Date.now();
       const m = 60_000; // 1 minute in ms
 
       const tourProviders: Provider[] = [
         // Team 1: Attending + 2 Juniors (one in procedure) + PA + Rotator
-        // Capacity: 17.5 + (7.5×0.25) + 7.5 + 10 + 1 = 37.875 ≈ 37.9
+        // Capacity (fallback weights): 20 + (10.8×0.25) + 10.8 + 11.4 + 2.4 = 47.3
         { id: 'tp1', name: 'King', type: 'attending', status: 'active', statusExpiresAt: null, teamId: 1 },
         { id: 'tp2', name: 'Chen', type: 'junior_resident', status: 'in_procedure', statusExpiresAt: now + 12 * m, teamId: 1 },
         { id: 'tp3', name: 'Reeves', type: 'junior_resident', status: 'active', statusExpiresAt: null, teamId: 1 },
@@ -475,13 +474,10 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
         { id: 'F-002', acuity: 'tier_three', assignedTeamId: 4, assignedAt: now - 30 * m },
       ];
 
-      // Team 1: Yellow buffer from C-003 (assigned 3m ago, 25m duration → 22m left)
-      // Team 2: no buffer (Red buffer from C-002 expired: 40m ago, 35m duration)
-      // Team 3: no buffer (Yellow buffer from F-001 expired: 30m ago, 25m duration)
-      // Only Team 1 has an active buffer so users can see buffered vs non-buffered.
-      const tourBuffers: Buffer[] = [
-        { id: 'tb1', teamId: 1, tier: 'tier_two', createdAt: now - 3 * m, expiresAt: now + 22 * m },
-      ];
+      // No buffers: assignment buffers were removed from the recommended config
+      // (the decaying load model provides the cooling-off effect); buffers now only
+      // arise from deceased-patient cooldowns, which the tour doesn't cover.
+      const tourBuffers: Buffer[] = [];
 
       return {
         ...state,
@@ -744,8 +740,20 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
       // Jump time to the next arrival, then let the TICK-like logic process it
       const skipNow = nextEntry.arrivalTime;
 
+      // Drain pending status changes up to the new time (mirrors TICK / shadow sim)
+      let providers = state.providers;
+      let nextStatusChangeIndex = sim.nextStatusChangeIndex;
+      while (nextStatusChangeIndex < sim.statusChanges.length && sim.statusChanges[nextStatusChangeIndex].time <= skipNow) {
+        const change = sim.statusChanges[nextStatusChangeIndex];
+        nextStatusChangeIndex++;
+        providers = providers.map(p => {
+          if (p.id !== change.providerId) return p;
+          if (p.status !== 'active') return p;
+          return { ...p, status: change.status, statusExpiresAt: change.time + change.durationMs };
+        });
+      }
       // Auto-expire providers at the new time
-      const providers = state.providers.map(p => {
+      providers = providers.map(p => {
         if (p.statusExpiresAt !== null && p.statusExpiresAt <= skipNow) {
           return { ...p, status: 'active' as const, statusExpiresAt: null };
         }
@@ -810,7 +818,7 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
         patients: simPatients,
         buffers: simBuffers,
         patientCounter,
-        simulation: { ...sim, nextArrivalIndex: nextIdx, snapshots, paused: sim.paused },
+        simulation: { ...sim, nextArrivalIndex: nextIdx, nextStatusChangeIndex, snapshots, paused: sim.paused },
       };
     }
 

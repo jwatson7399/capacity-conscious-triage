@@ -53,7 +53,7 @@ export function getDecayedAcuityWeight(patient: Patient, now: number, overrides?
 
 export function getCurrentLoad(patients: Patient[], teamId: TeamId, now: number, overrides?: ScoringOverrides): number {
   return patients
-    .filter(p => p.assignedTeamId === teamId)
+    .filter(p => p.assignedTeamId === teamId && !p.deceased)
     .reduce((sum, p) => {
       const decayed = getDecayedAcuityWeight(p, now, overrides);
       const floatMult = FLOAT_MODIFIER_MULTIPLIERS[p.floatModifier ?? 'none'];

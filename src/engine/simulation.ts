@@ -6,7 +6,7 @@ import {
   BUFFER_DURATIONS_MS,
   ACUITY_DECAY,
   TRAUMA_TEAM_ID,
-  OVERWHELM_THRESHOLD,
+  RED_ZONE_THRESHOLD,
 } from '../constants';
 import { getRecommendation, scoreTeam, createBuffer, type ScoringOverrides } from './recommendation';
 
@@ -413,7 +413,7 @@ export function runShadowSim(
   const ratioSums: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
   const ratioCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
   const minRatioPerTeam: Record<number, number> = { 1: Infinity, 2: Infinity, 3: Infinity, 4: Infinity };
-  const overwhelmEvents: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
+  const redZoneEvents: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
 
   for (let i = 0; i < timeline.length; i++) {
     const entry = timeline[i];
@@ -498,7 +498,7 @@ export function runShadowSim(
     ratioSums[teamId] += ratio;
     ratioCounts[teamId]++;
     if (ratio < minRatioPerTeam[teamId]) minRatioPerTeam[teamId] = ratio;
-    if (ratio < OVERWHELM_THRESHOLD) overwhelmEvents[teamId]++;
+    if (ratio < RED_ZONE_THRESHOLD) redZoneEvents[teamId]++;
   }
 
   const avgRatioPerTeam: Record<number, number> = {};
@@ -514,6 +514,6 @@ export function runShadowSim(
     teamAcuityLoad,
     avgRatioPerTeam,
     minRatioPerTeam,
-    overwhelmEvents,
+    redZoneEvents,
   };
 }

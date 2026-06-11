@@ -66,7 +66,7 @@ export default function BenchmarkReport({ onBack }: Props) {
             <div className="text-sm text-blue-500 dark:text-blue-200 mt-1">of simulated shifts won by formula</div>
             <div className="mt-3 space-y-1 text-xs text-slate-500 dark:text-slate-400 text-center">
               <div>3 out of every 4 shifts, your team gets a fairer, safer workload.</div>
-              <div>That means less chaos, less burnout, fewer overwhelmed teams</div>
+              <div>That means less chaos, less burnout, fewer teams pushed into the red zone</div>
               <div>— safer patient care.</div>
             </div>
           </div>
@@ -84,7 +84,7 @@ export default function BenchmarkReport({ onBack }: Props) {
           </div>
           <div className="space-y-2">
             <StatRow label="Fairness Score" formula="82.0" roundRobin="79.3" winner="formula" />
-            <StatRow label="Overwhelm Events" subtitle="fewer = safer patients & staff" formula="2.8" roundRobin="3.4" winner="formula" />
+            <StatRow label="Red-Zone Events" subtitle="fewer = safer patients & staff" formula="2.8" roundRobin="3.4" winner="formula" />
             <StatRow label="Min Safety Margin" subtitle="higher = more cushion above 'red zone'" formula="42%" roundRobin="28%" winner="formula" />
             <StatRow label="Demand Spread" subtitle="higher = closer to even across teams" formula="91%" roundRobin="88%" winner="formula" />
           </div>
@@ -127,11 +127,11 @@ export default function BenchmarkReport({ onBack }: Props) {
           </div>
           <ul className="space-y-4 text-sm text-slate-600 dark:text-slate-300">
             <li>
-              <strong>Overwhelm Events</strong> — Count of assignments where the receiving team's capacity ratio fell below 8.5 (p5 of empirical distribution). Fewer = safer.
+              <strong>Red-Zone Events</strong> — Count of assignments where the receiving team's capacity ratio fell below 8.5 (p5 of empirical distribution). Fewer = safer.
               <br /><span className="text-xs text-slate-400 dark:text-slate-500">p &lt; 0.001</span>
             </li>
             <li>
-              <strong>Min Safety Margin</strong> — Lowest capacity ratio observed across all assignments, as % of the 8.5 overwhelm boundary. Higher = more cushion above crisis.
+              <strong>Min Safety Margin</strong> — Lowest capacity ratio observed across all assignments, as % of the 8.5 red-zone boundary. Higher = more cushion above crisis.
               <br /><span className="text-xs text-slate-400 dark:text-slate-500">p &lt; 0.001</span>
             </li>
             <li>
@@ -202,13 +202,13 @@ export default function BenchmarkReport({ onBack }: Props) {
             <PresetSection
               title="Typical Day"
               description="Your standard Tuesday — full teams, normal flow, no surprises."
-              finding="Formula dominates — better demand balancing when teams are unequally staffed. Overwhelm events cut nearly in half."
+              finding="Formula dominates — better demand balancing when teams are unequally staffed. Red-zone events cut nearly in half."
               winRate="88% formula wins"
             />
             <PresetSection
               title="High Acuity Day"
               description="Sick patients keep rolling in — lots of reds and yellows, no letup."
-              finding="Formula shines brightest under pressure — it routes patients away from teams approaching overwhelm rather than blindly rotating."
+              finding="Formula shines brightest under pressure — it routes patients away from teams approaching the red zone rather than blindly rotating."
               winRate="84% formula wins"
             />
             <PresetSection

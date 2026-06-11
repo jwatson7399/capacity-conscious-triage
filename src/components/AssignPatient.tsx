@@ -29,7 +29,9 @@ export default function AssignPatient({ onClose, initialSource, onAssigned }: Pr
 
   const handleTeamSelect = (teamId: TeamId) => {
     setSelectedTeam(teamId);
-    if (teamId === recommendation.first || teamId === TRAUMA_TEAM_ID) {
+    // No override flow when assigning to the recommended team, to Trauma (manual-only
+    // by design), or when there is no recommendation to override (all teams closed/unstaffed).
+    if (teamId === recommendation.first || teamId === TRAUMA_TEAM_ID || recommendation.first === null) {
       if (!tier) return;
       dispatch({
         type: 'ASSIGN_PATIENT',

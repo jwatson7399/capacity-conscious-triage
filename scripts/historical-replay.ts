@@ -31,7 +31,7 @@ import {
   getDecayedAcuityWeight,
 } from '../src/engine/recommendation';
 import type { ScoringOverrides } from '../src/engine/recommendation';
-import { TRAUMA_TEAM_ID, OVERWHELM_THRESHOLD, ACUITY_WEIGHTS } from '../src/constants';
+import { TRAUMA_TEAM_ID, RED_ZONE_THRESHOLD, ACUITY_WEIGHTS } from '../src/constants';
 import { uid } from '../src/uid';
 
 // ── CLI flags ──────────────────────────────────────────────────────
@@ -751,7 +751,7 @@ function replayCohort(
       teamCounts: counts,
       avgRatio: stats.avgRatio,
       minRatio: stats.minRatio === Infinity ? 0 : stats.minRatio,
-      overwhelms: stats.overwhelms,
+      overwhelms: stats.redZoneEvents,
       backToBackHA: countBackToBackHA(entries),
       slams: countSlams(entries),
       teamSpread: teamSpread(counts, eligibleTeams),

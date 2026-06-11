@@ -42,9 +42,12 @@ async function fetchSurveyAverages(activeRound: 1 | 2): Promise<Record<ProviderT
 
     const weights: Record<string, number> = { attending: 20 };
     for (const { sheet, type } of ROLE_KEYS) {
-      let sum = 0;
-      for (const row of rows) sum += Number(row[sheet] ?? 0);
-      weights[type] = Math.round((sum / rows.length) * 10) / 10;
+      // Average only over rows that answered for this role — a blank cell is a
+      // non-response, not a zero rating, and must not drag the mean down.
+      const values = rows.map(row => Number(row[sheet])).filter(v => Number.isFinite(v) && v > 0);
+      weights[type] = values.length > 0
+        ? Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10
+        : CAPACITY_WEIGHTS[type];
     }
     return weights as Record<ProviderType, number>;
   } catch {
