@@ -2,8 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { useShift } from '../context/ShiftContext';
 import SimulationParams from './SimulationParams';
 import type { TeamId } from '../types';
-import { statsFromEntries, computeFairness } from '../engine/fairness';
-import { getEffectiveCapacity } from '../engine/recommendation';
+import { statsFromEntries, countSpread } from '../engine/fairness';
 
 const SPEEDS = [1, 5, 10, 15, 20, 30, 40, 50, 100, 200, 400];
 
@@ -30,21 +29,12 @@ function ComparisonPanel({ sim, arrivedCount }: { sim: NonNullable<ReturnType<ty
   const liveStats = useMemo(() => statsFromEntries(liveEntries), [liveEntries]);
   const shadowStats = useMemo(() => statsFromEntries(shadowEntries), [shadowEntries]);
 
-  const teamCapacities = useMemo(() => {
-    const caps: Record<number, number> = {};
-    const providers = sim.initialProviders ?? [];
-    for (const t of [1, 2, 3, 4] as (1|2|3|4)[]) {
-      caps[t] = getEffectiveCapacity(providers.filter(p => p.teamId === t), sim.baseTime);
-    }
-    return caps;
-  }, [sim.initialProviders, sim.baseTime]);
-
-  const liveFairness = useMemo(() => computeFairness(liveStats, sim.permanentlyClosedTeams, teamCapacities), [liveStats, sim.permanentlyClosedTeams, teamCapacities]);
-  const shadowFairness = useMemo(() => computeFairness(shadowStats, sim.permanentlyClosedTeams, teamCapacities), [shadowStats, sim.permanentlyClosedTeams, teamCapacities]);
-
   const eligible = ([1, 2, 3, 4] as TeamId[]).filter(
     t => t !== 4 && !sim.permanentlyClosedTeams.includes(t)
   );
+
+  const liveSpread = countSpread(liveStats, eligible);
+  const shadowSpread = countSpread(shadowStats, eligible);
 
   const f = (n: number) => !isFinite(n) ? '-' : n.toFixed(1);
   const hi = (a: number, b: number, higher: boolean) => {
@@ -85,18 +75,18 @@ function ComparisonPanel({ sim, arrivedCount }: { sim: NonNullable<ReturnType<ty
         <span className={`text-left font-mono text-slate-300 ${hi(shadowStats.minRatio, liveStats.minRatio, true)}`}>{f(shadowStats.minRatio)}</span>
       </div>
 
-      {/* Overwhelms */}
+      {/* Red-zone arrivals (receiving team below p5 of historical capacity distribution) */}
       <div className="grid grid-cols-[1fr_auto_1fr] gap-1 items-center py-0.5">
-        <span className={`text-right font-mono text-slate-300 ${hi(liveStats.overwhelms, shadowStats.overwhelms, false)}`}>{liveStats.overwhelms}</span>
-        <span className="w-20 text-center text-slate-500">Overwhelms</span>
-        <span className={`text-left font-mono text-slate-300 ${hi(shadowStats.overwhelms, liveStats.overwhelms, false)}`}>{shadowStats.overwhelms}</span>
+        <span className={`text-right font-mono text-slate-300 ${hi(liveStats.redZoneEvents, shadowStats.redZoneEvents, false)}`}>{liveStats.redZoneEvents}</span>
+        <span className="w-20 text-center text-slate-500">Red Zone</span>
+        <span className={`text-left font-mono text-slate-300 ${hi(shadowStats.redZoneEvents, liveStats.redZoneEvents, false)}`}>{shadowStats.redZoneEvents}</span>
       </div>
 
-      {/* Fairness */}
+      {/* Count spread (max − min patients across teams) */}
       <div className="grid grid-cols-[1fr_auto_1fr] gap-1 items-center py-0.5">
-        <span className={`text-right font-mono text-slate-300 ${hi(liveFairness, shadowFairness, true)}`}>{liveFairness.toFixed(0)}</span>
-        <span className="w-20 text-center text-slate-500">Fairness</span>
-        <span className={`text-left font-mono text-slate-300 ${hi(shadowFairness, liveFairness, true)}`}>{shadowFairness.toFixed(0)}</span>
+        <span className={`text-right font-mono text-slate-300 ${hi(liveSpread, shadowSpread, false)}`}>{liveSpread}</span>
+        <span className="w-20 text-center text-slate-500">Spread</span>
+        <span className={`text-left font-mono text-slate-300 ${hi(shadowSpread, liveSpread, false)}`}>{shadowSpread}</span>
       </div>
     </div>
   );

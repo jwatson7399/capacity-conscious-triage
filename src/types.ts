@@ -101,7 +101,7 @@ export interface ShadowResult {
   teamAcuityLoad: Record<number, { tier_one: number; tier_two: number; tier_three: number }>;
   avgRatioPerTeam: Record<number, number>;
   minRatioPerTeam: Record<number, number>;
-  overwhelmEvents: Record<number, number>;
+  redZoneEvents: Record<number, number>;
 }
 
 export interface SimulationState {

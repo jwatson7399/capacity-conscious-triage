@@ -327,7 +327,7 @@ function runPreset(preset: PresetDef): {
         fairness,
         avgRatio: stats.avgRatio,
         minRatio: stats.minRatio === Infinity ? 0 : stats.minRatio,
-        overwhelms: stats.overwhelms,
+        overwhelms: stats.redZoneEvents,
       };
       if (mode === 'formula') formula.push(metrics);
       else roundRobin.push(metrics);

@@ -129,14 +129,17 @@ export interface CapacityTerm {
   color: string;
 }
 
-export const OVERWHELM_THRESHOLD = 8.5;  // p5 of empirical distribution (23,193 obs) under recommended config
+// Red-zone boundary: p5 of the empirical capacity-ratio distribution (23,193 obs)
+// under the recommended config. Purely descriptive — "this team-state is in the
+// historically rarest, busiest 5%" — it makes no claim about subjective overwhelm.
+export const RED_ZONE_THRESHOLD = 8.5;
 
 export const CAPACITY_TERMS: Array<{ minRatio: number; label: string; color: string }> = [
   { minRatio: 50, label: 'Comfortable', color: 'text-emerald-500' },     // top 25% (≥ p75)
   { minRatio: 23, label: 'Manageable', color: 'text-green-500' },        // p50–p75 (above median)
   { minRatio: 16, label: 'Busy', color: 'text-yellow-600' },             // p33–p50
   { minRatio: 11.5, label: 'Very Busy', color: 'text-orange-500' },      // p15–p33 (modal plateau)
-  { minRatio: OVERWHELM_THRESHOLD, label: 'High Demand', color: 'text-red-500' },  // p5–p15
+  { minRatio: RED_ZONE_THRESHOLD, label: 'High Demand', color: 'text-red-500' },  // p5–p15
 ];
 
 // Color stops anchored to per-arrival percentiles of real 4:2:1 historical replay data
@@ -174,7 +177,7 @@ export function capacityFillPercent(ratio: number): number {
   if (ratio <= 0) return 0;
   const stops: Array<{ r: number; pct: number }> = [
     { r: 0, pct: 0 },
-    { r: OVERWHELM_THRESHOLD, pct: 7 },
+    { r: RED_ZONE_THRESHOLD, pct: 7 },
     { r: 12, pct: 20 },
     { r: 19, pct: 40 },
     { r: 31, pct: 60 },

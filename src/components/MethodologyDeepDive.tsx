@@ -81,21 +81,21 @@ export default function MethodologyDeepDive({ onBack }: Props) {
         {/* 2. Provider Capacity Weights */}
         <Section title="2. Provider Capacity Weights">
           <p className="text-base text-slate-600 dark:text-slate-300 leading-relaxed mb-3">
-            Six ER providers (attendings, residents, and PAs) independently rated each provider type's patient-handling capacity relative to an attending, fixed at 20. Responses were collected via a Google Sheet polled every 5 minutes by the app's <code className="text-xs bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded">useSurveyWeights</code> hook. When the sheet is unavailable, fallback defaults are used.
+            Nineteen ER clinicians (attendings, residents, and PAs) independently rated each provider type's patient-handling capacity relative to an attending, fixed at 20, via a Delphi survey. Responses are collected in a Google Sheet polled every 5 minutes by the app's <code className="text-xs bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded">useSurveyWeights</code> hook; the round-one means below are baked in as fallback defaults when the sheet is unavailable.
           </p>
           <DataTable
-            headers={['Provider Type', 'Fallback', 'Survey Avg']}
+            headers={['Provider Type', 'Original Default', 'Delphi R1 Mean (n=19, adopted)']}
             rows={[
-              ['Attending', '20', '20 (fixed)'],
+              ['Attending', '20', '20 (fixed reference)'],
               ['Senior Resident (PGY 3\u20134)', '15.0', '15.2'],
-              ['PA', '10.0', '10.8'],
+              ['PA', '10.0', '11.4'],
               ['Junior Resident (PGY-2)', '7.5', '10.8'],
-              ['Intern (PGY-1)', '5.0', '5.7'],
-              ['Rotator', '1.0', '1.0'],
+              ['Intern (PGY-1)', '5.0', '6.6'],
+              ['Rotator', '1.0', '2.4'],
             ]}
           />
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-3">
-            Survey averages closely match the fallback defaults, confirming clinical consensus on relative capacity.
+            Round-one means broadly confirmed the original defaults for seniors and PAs, and rated junior residents and interns meaningfully higher. Live values update automatically as later survey rounds complete.
           </p>
         </Section>
 
