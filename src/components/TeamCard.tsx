@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useShift } from '../context/ShiftContext';
 import type { TeamId, TeamScore, ProviderType } from '../types';
-import { ACUITY_DECAY, PROVIDER_TYPE_LABELS, TRAUMA_TEAM_ID, TEAM_CLOSE_TRANSFER_MS, TEAM_CLOSE_TRANSFER_TARGETS, getCapacityColor, capacityFillPercent } from '../constants';
+import { ACUITY_DECAY, PROVIDER_TYPE_LABELS, TRAUMA_TEAM_ID, TEAM_CLOSE_TRANSFER_MS, TEAM_CLOSE_TRANSFER_TARGETS, getCapacityColor, capacityFillPercent, getCapacityTerm } from '../constants';
 import { getActiveBuffers } from '../engine/recommendation';
 import ProviderStatusToggle from './ProviderStatusToggle';
 import PatientBadge from './PatientBadge';
@@ -175,6 +175,14 @@ export default function TeamCard({ teamId, score, recommendationRank, isClosed, 
               >
                 Capacity
               </div>
+              {useCapacityStyling && (
+                <div
+                  className="mt-0.5 font-semibold uppercase"
+                  style={{ color: capColor, fontSize: 9, letterSpacing: '0.05em', opacity: 0.85 }}
+                >
+                  {getCapacityTerm(ratio).label}
+                </div>
+              )}
               {showNextUp && (
                 <div
                   className="mt-1 font-semibold uppercase italic"
