@@ -138,9 +138,9 @@ export default function SimSummaryCard({ simulation: sim }: Props) {
 
         {/* Patients per team (context, not a scored metric) */}
         <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center py-1.5 border-b border-white/5">
-          <span className="text-right font-mono text-sm text-slate-300">{liveCountStr}</span>
+          <span className="text-right font-mono text-xs whitespace-nowrap text-slate-300">{liveCountStr}</span>
           <span className="text-[10px] text-slate-500 font-medium w-28 text-center">Patients</span>
-          <span className="text-left font-mono text-sm text-slate-300">{shadowCountStr}</span>
+          <span className="text-left font-mono text-xs whitespace-nowrap text-slate-300">{shadowCountStr}</span>
         </div>
 
         {/* Individual metrics — each compared on its own; no composite */}
