@@ -55,7 +55,7 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
     : 'Attending';
 
   return (
-    <div className="dashboard-bg pb-24 overflow-x-clip">
+    <div className="dashboard-bg pb-36 overflow-x-clip">
       {/* Header */}
       {state.simulation?.active && (
         <div className="sticky top-0 z-11 h-1 bg-gradient-to-r from-cyan-500 via-blue-500 to-violet-500" />
