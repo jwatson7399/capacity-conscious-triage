@@ -12,6 +12,7 @@ body {
 .patient-id {
   font-family: 'JetBrains Mono', monospace;
   letter-spacing: 0.05em;
+  white-space: nowrap;
 }
 
 .dashboard-bg {
