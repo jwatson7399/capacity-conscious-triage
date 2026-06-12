@@ -139,7 +139,7 @@ export default function BenchmarkReport({ onBack }: Props) {
             Round-robin "wins" exactly one thing: dealing out equal <em>numbers</em> of patients. That is its entire algorithm — and it's the problem this app exists to fix. The formula deliberately gives a stronger team more patients, so raw counts spread apart while actual burden evens out. Equal bodies is not fairness; equal burden is.
           </p>
           <p className="text-sm text-slate-600 dark:text-slate-300 text-left">
-            Back-to-back high-acuity arrivals and 1-hour clusters ("slams") were effectively tied in these synthetic shifts — the difference was under a third of one event per 8-hour shift, and under the high-acuity preset slams actually favored the formula. When the formula does send consecutive patients to the same team, it's because that team has the most headroom to absorb them — round-robin spaces arrivals evenly regardless of who can actually take them.
+            Back-to-back high-acuity arrivals and 1-hour clusters ("slams") were effectively tied in these synthetic shifts: round-robin's edge amounted to about one extra back-to-back event every 7 shifts and one extra slam every 4 shifts — and on the high-acuity preset, slams actually favored the formula. When the formula does send consecutive patients to the same team, it's because that team has the most headroom to absorb them — round-robin spaces arrivals evenly regardless of who can actually take them.
           </p>
         </Section>
 
