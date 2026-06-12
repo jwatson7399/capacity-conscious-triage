@@ -81,7 +81,7 @@ If the env var is unset, the survey falls back to localStorage-only mode.
 - `src/constants.ts` — tuning parameters (see below)
 - `src/engine/recommendation.ts` — pure-function scoring engine
 - `src/engine/simulation.ts` — seeded arrival/status timelines, shadow sims (formula vs round-robin), replay
-- `src/engine/fairness.ts` — per-mode stats + individual comparison metrics (B2B high-acuity, slams, red-zone events, spreads). No composite in the UI — the sim panels compare metrics one by one; the legacy composite (`computeFairness`) is retained only for the benchmark scripts
+- `src/engine/fairness.ts` — per-mode stats + individual comparison metrics (B2B high-acuity, slams, red-zone events, spreads). No composite anywhere in the UI — the sim panels and `BenchmarkReport` compare metrics one by one; the legacy composite (`computeFairness`) is retained only for `scripts/historical-replay.ts` and related CLIs
 - `src/context/ShiftContext.tsx` — `useReducer`-based state management
 - `src/hooks/useSurveyWeights.ts` — polls the Delphi sheet every 5 min; falls back to `CAPACITY_WEIGHTS`
 - `src/utils/scheduleParser.ts` — parses real weekly `.xlsx` provider schedules (unit-tested)
@@ -91,7 +91,8 @@ If the env var is unset, the survey falls back to localStorage-only mode.
   - `TeamCard.tsx` — battery capacity widget, strength/load, collapsible patients, patient badges
   - `AssignPatient.tsx` — modal: tier selection with clinical examples, team selection, override flow
   - `HelpSection.tsx` — collapsible guide (formula, capacity scale, decay, overrides, nomenclature)
-  - `EvidenceWalkthrough.tsx` / `MethodologyDeepDive.tsx` / `BenchmarkReport.tsx` / `RealScheduleBenchmarkReport.tsx` — evidence & methods views
+  - `EvidenceWalkthrough.tsx` / `BenchmarkReport.tsx` — evidence views. `BenchmarkReport` ("Formula vs Round-Robin") presents the synthetic 1,000-run benchmark per metric (safety + capacity-conscious workload equity; no composite score), framed as the pre-NYU-data simulation proof; numbers regenerate via `npx tsx scripts/benchmark.ts`
+  - `MethodologyDeepDive.tsx` / `RealScheduleBenchmarkReport.tsx` — retained but not linked from the UI (the Real Week Backtest entry points were removed)
   - `ShiftSetup.tsx`, `RoleSelection.tsx`, `ScheduleImport.tsx` — setup flows
   - `SimulationSetup.tsx`, `SimulationControls.tsx`, `SimulationParams.tsx`, `SimSummaryCard.tsx`, `TimelineSlider.tsx` — simulation mode
   - `DelphiSurvey.tsx` / `DelphiAdminPanel.tsx` — provider-weight survey
