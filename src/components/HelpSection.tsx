@@ -47,7 +47,7 @@ export default function HelpSection({ onClose, onShowBenchmark }: Props) {
         {onShowBenchmark && (
           <div className="p-3 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-lg space-y-2">
             <p className="text-gray-800 dark:text-gray-200">
-              Proven in 1,000 paired simulated shifts before any real data existed: red-zone arrivals &minus;51%, worst-moment capacity +35%, acuity burden gap between teams &minus;50% (all p &lt; 0.001).{' '}
+              Across 1,000 paired simulated shifts vs round-robin: red-zone arrivals &minus;51%, worst-moment capacity +35%, acuity burden gap between teams &minus;50% (all p &lt; 0.001).{' '}
               <button onClick={onShowBenchmark} className="text-blue-600 dark:text-blue-400 font-medium">
                 Benchmark →
               </button>
