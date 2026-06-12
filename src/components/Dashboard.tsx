@@ -55,28 +55,28 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
     : 'Attending';
 
   return (
-    <div className="dashboard-bg pb-24">
+    <div className="dashboard-bg pb-36 overflow-x-clip">
       {/* Header */}
       {state.simulation?.active && (
         <div className="sticky top-0 z-11 h-1 bg-gradient-to-r from-cyan-500 via-blue-500 to-violet-500" />
       )}
       <div data-tour="header" className={`sticky ${state.simulation?.active ? 'top-1' : 'top-0'} header-bar px-4 py-3 z-10 flex items-center justify-between`}>
-        <div>
+        <div className="min-w-0">
           <h1 className="text-xl font-bold text-white">
             {isSandbox ? 'Sandbox' : state.scheduleData ? 'Real Schedule Demo' : state.simulation?.active ? 'ER Triage Simulator' : 'ER Triage'}
           </h1>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {isSandbox && (
               <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-medium">DEMO</span>
             )}
             {state.simulation?.active && (
               <span className="text-xs bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full font-medium">SIM</span>
             )}
-            <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full font-medium">{roleLabel}</span>
+            <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full font-medium whitespace-nowrap">{roleLabel}</span>
             {isSandbox && (
               <button
                 onClick={() => dispatch({ type: 'LOAD_DEMO' })}
-                className="text-xs text-amber-300 hover:text-amber-200 font-medium"
+                className="text-xs text-amber-300 hover:text-amber-200 font-medium whitespace-nowrap"
                 title="Reshuffle sandbox"
               >
                 ↻ Reshuffle
@@ -89,17 +89,17 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
                 }
                 dispatch({ type: 'RESET' });
               }}
-              className="text-xs text-blue-400 hover:text-blue-300 font-medium"
+              className="text-xs text-blue-400 hover:text-blue-300 font-medium whitespace-nowrap"
             >
               Main Menu
             </button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <div className="relative">
             <button
               onClick={() => setCompactMenuOpen(!compactMenuOpen)}
-              className={`w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white/70 text-lg ${compactMode ? 'ring-2 ring-blue-400' : ''}`}
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/10 flex items-center justify-center text-white/70 text-lg ${compactMode ? 'ring-2 ring-blue-400' : ''}`}
               aria-label="Compact mode"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -148,26 +148,26 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
           </div>
           <button
             onClick={onToggleDarkMode}
-            className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white/70 text-lg"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/10 flex items-center justify-center text-white/70 text-lg"
             aria-label="Toggle dark mode"
           >
             {darkMode ? '☀️' : '🌙'}
           </button>
           <button
             onClick={() => setLegendOpen(!legendOpen)}
-            className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white/70 text-sm font-medium"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/10 flex items-center justify-center text-white/70 text-sm font-medium"
             aria-label="Color legend"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" /></svg>
           </button>
           <button
             onClick={() => setShowHelp(v => !v)}
-            className="h-10 px-3 rounded-full bg-white/20 border border-white/30 flex items-center justify-center gap-1.5 text-white/90 font-medium text-sm"
+            className="h-9 sm:h-10 px-2.5 sm:px-3 rounded-full bg-white/20 border border-white/30 flex items-center justify-center gap-1.5 text-white/90 font-medium text-sm"
             aria-label="Help"
             data-tour="help-button"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" /></svg>
-            Help
+            <span className="hidden sm:inline">Help</span>
           </button>
         </div>
       </div>

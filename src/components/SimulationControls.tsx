@@ -100,6 +100,14 @@ export default function SimulationControls() {
   const [showCompare, setShowCompare] = useState(false);
   const speedBtnRef = useRef<HTMLButtonElement>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const [scrolledPastBar, setScrolledPastBar] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolledPastBar(window.scrollY > 160);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   useEffect(() => {
     if (showSpeedMenu && speedBtnRef.current) {
@@ -231,7 +239,8 @@ export default function SimulationControls() {
         )}
       </div>
 
-      {/* Floating mini controls */}
+      {/* Floating mini controls — only once the top control bar has scrolled away */}
+      {scrolledPastBar && (
       <div className="fixed bottom-6 left-6 z-20 flex items-center gap-1.5 bg-slate-800/90 backdrop-blur rounded-2xl px-3 py-2 shadow-lg border border-white/10">
         <button
           onClick={() => {
@@ -261,6 +270,7 @@ export default function SimulationControls() {
         </button>
         <span className="text-[10px] text-slate-400 font-mono ml-1">{formatTime(elapsed)}</span>
       </div>
+      )}
 
       {showSpeedMenu && menuPos && (
         <>

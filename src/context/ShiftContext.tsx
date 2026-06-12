@@ -548,9 +548,10 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
 
       // Build patients by simulating assignments through the recommendation engine
       const tiers: Patient['acuity'][] = ['tier_one', 'tier_two', 'tier_three'];
-      const patientCount = randInt(4, 8);
-      // Generate arrival times spread over the last 90 minutes, sorted oldest first
-      const arrivalTimes = Array.from({ length: patientCount }, () => demoNow - randInt(3, 90) * min)
+      const patientCount = randInt(3, 6);
+      // Spread arrivals over the last 150 minutes (decay runs 180) so reshuffles
+      // show a range of capacity colors instead of uniformly red cards.
+      const arrivalTimes = Array.from({ length: patientCount }, () => demoNow - randInt(3, 150) * min)
         .sort((a, b) => a - b);
 
       let cCount = 0;

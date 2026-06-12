@@ -290,7 +290,7 @@ export default function SimulationSetup({ onCancel }: { onCancel: () => void }) 
               }`}
             >
               <div className="font-semibold">Formula-Driven</div>
-              <div className="text-xs opacity-70 mt-0.5">Capacity ratio + buffers</div>
+              <div className="text-xs opacity-70 mt-0.5">Capacity-ratio scoring</div>
             </button>
             <button
               onClick={() => setRoundRobin(true)}
