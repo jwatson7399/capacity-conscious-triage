@@ -319,6 +319,33 @@ Grid template: `180px 28px 120px 28px 100px`. The operator symbols (÷, =) are c
 
 ---
 
+## 5. Per-Metric Synthetic Benchmark — "Formula vs Round-Robin" Page Redesign
+
+**Objective.** Remove the composite fairness score from the last place it surfaced in the app (the "Formula vs Round-Robin" page) and rebuild that page as a per-metric delineation of the evidence that capacity-aware routing beats round-robin on the outcomes the project actually optimizes: safety and capacity-conscious workload equity. Frame the page around its true provenance — the head-to-head was settled by pure synthetic simulation before any NYU data (schedules or encounters) existed in the project; real data later calibrated parameters and confirmed the result.
+
+**Methodology.**
+- `scripts/benchmark.ts` was rewritten to drop `computeFairness` and report ten individual metrics per run: red-zone arrivals, min capacity, avg capacity, B2B high-acuity, slams, raw count spread, raw acuity spread, stress spread, acuity-stress spread, and per-team avg-ratio spread. Design unchanged: 200 seeded runs × 5 staffing presets × 2 modes, 8-hour shifts, identical patient timelines per seed, paired t-tests + Cohen's d, now with per-metric win/tie/loss tallies.
+- **Capacity-conscious spreads** are new: stress = workload ÷ steady-state team strength (Delphi-weighted provider sum, evaluated with temporary statuses expired); the spread is max − min across eligible teams. These encode the design thesis directly — round-robin equalizes *counts*, the formula equalizes *burden relative to strength* — and replace raw spreads as the equity metrics on the page (raw spreads remain in the script output for honesty).
+- Headline tally: per seed, which mode leads on more of the four primary metrics (red-zone arrivals, min capacity, stress spread, acuity-stress spread). Unweighted count, mirroring the in-app sim summary card — not a composite.
+
+**Results (1,000 pooled runs).** Formula led the primary metrics in **809/1,000 shifts (81%)** vs round-robin's 72 (7%); 119 even. Per metric: red-zone arrivals 0.7 vs 1.3 per shift (−51%, p < 0.001, d = 0.56); min capacity 17.6 vs 13.0 (+35%, p < 0.001, d = 0.77, better in 87% of shifts); acuity-stress spread 0.099 vs 0.200 (−50%, p < 0.001, d = 0.81, better in 74%); stress spread 0.053 vs 0.075 (−29%, p < 0.001, d = 0.53). Round-robin wins raw count spread (0.7 vs 2.6) by construction; B2B high-acuity and slams are near-ties in synthetic presets (Δ ≤ 0.3 events per 8-h shift; slams favor the formula under the high-acuity preset). Per-preset primary-metric lead rates: High Acuity 98%, Sporadic Staffing 91%, Mid-Shift Chaos 89%, Typical Day 83%, Night Shift 45% (44% even — two near-identical teams and trickle arrivals leave nothing for capacity-aware routing to exploit).
+
+**Design rationale.**
+- **No composite, anywhere.** The old page's 0–100 fairness score (and its 75% win-rate headline) let round-robin's trivial count-equality partially offset the formula's safety gains — the exact category error the app corrects. Each metric now stands alone with its own p-value and win rate, consistent with the sim summary card and `fairness.ts` doc comments.
+- **Honesty as persuasion.** The page includes a "Where Round-Robin Looks Better — By Design" section showing the count-spread loss and the B2B/slam near-ties, with the explanation (the formula deliberately gives stronger teams more patients; consecutive sends go to the team with the most headroom). Showing the tradeoff makes the safety/equity wins credible rather than curated.
+- **Provenance framing.** Hero, copy, and methodology emphasize zero real patient data: the simulation proof predates the NYU schedule/encounter data, which is fleshed out in the methods and rationale paper. The Help-section blurb that previously quoted historical-replay (real-data) numbers next to the benchmark link now quotes the synthetic per-metric results, so the link copy matches the page it opens.
+
+**UI changes.**
+- "Real Week Backtest" delinked from the app: removed from the role-selection footer, the Dashboard, and both Help-section link slots. `RealScheduleBenchmarkReport.tsx` is retained in the repo but unreachable from the UI (same status as `MethodologyDeepDive.tsx`).
+- The role-selection footer now carries a single "Formula vs Round-Robin" link.
+
+**Artifacts.**
+- `scripts/benchmark.ts` — per-metric rewrite; `npx tsx scripts/benchmark.ts` regenerates every number on the page
+- `src/components/BenchmarkReport.tsx` — redesigned page (Safety / Capacity-Conscious Workload Equity / By-Design tradeoffs / Preset Breakdown / Methodology)
+- `benchmark-redesign.png`, `benchmark-redesign-expanded.png` — UI verification screenshots
+
+---
+
 # Historical Methodology Record
 
 _The sections below document earlier methodology work preserved from a prior version of this document._

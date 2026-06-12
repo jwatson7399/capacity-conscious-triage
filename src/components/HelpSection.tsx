@@ -4,7 +4,6 @@ import { CAPACITY_GRADIENT_CSS } from '../constants';
 interface Props {
   onClose: () => void;
   onShowBenchmark?: () => void;
-  onShowBacktest?: () => void;
 }
 
 function Section({ title, children, dataTour }: { title: string; children: React.ReactNode; dataTour?: string }) {
@@ -21,7 +20,7 @@ function Section({ title, children, dataTour }: { title: string; children: React
   );
 }
 
-export default function HelpSection({ onClose, onShowBenchmark, onShowBacktest }: Props) {
+export default function HelpSection({ onClose, onShowBenchmark }: Props) {
   const { capacityWeights } = useShift();
   return (
     <div className="glass-card rounded-xl overflow-hidden">
@@ -48,19 +47,11 @@ export default function HelpSection({ onClose, onShowBenchmark, onShowBacktest }
         {onShowBenchmark && (
           <div className="p-3 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-lg space-y-2">
             <p className="text-gray-800 dark:text-gray-200">
-              Tested against 1,541 patient arrivals over 121 days of real NYU BK shifts: average capacity ratio +55%, minimum ratio +249%, back-to-back high-acuity events &minus;83% (all p &lt; 0.001).{' '}
+              Across 1,000 paired simulated shifts vs round-robin: red-zone arrivals &minus;51%, worst-moment capacity +35%, acuity burden gap between teams &minus;50% (all p &lt; 0.001).{' '}
               <button onClick={onShowBenchmark} className="text-blue-600 dark:text-blue-400 font-medium">
                 Benchmark →
               </button>
             </p>
-            {onShowBacktest && (
-              <p className="text-gray-800 dark:text-gray-200">
-                Replay a real week of NYU BK schedules.{' '}
-                <button onClick={onShowBacktest} className="text-blue-600 dark:text-blue-400 font-medium">
-                  Backtest →
-                </button>
-              </p>
-            )}
           </div>
         )}
       </div>
@@ -256,18 +247,11 @@ export default function HelpSection({ onClose, onShowBenchmark, onShowBacktest }
         </div>
       </Section>
 
-      {(onShowBenchmark || onShowBacktest) && (
-        <div className="px-4 py-3 border-t border-gray-200 dark:border-slate-700 flex flex-wrap gap-x-4 gap-y-1">
-          {onShowBenchmark && (
-            <button onClick={onShowBenchmark} className="text-sm text-blue-600 dark:text-blue-400 font-medium">
-              See how formula compares to round-robin →
-            </button>
-          )}
-          {onShowBacktest && (
-            <button onClick={onShowBacktest} className="text-sm text-blue-600 dark:text-blue-400 font-medium">
-              See real-week backtest →
-            </button>
-          )}
+      {onShowBenchmark && (
+        <div className="px-4 py-3 border-t border-gray-200 dark:border-slate-700">
+          <button onClick={onShowBenchmark} className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+            See how formula compares to round-robin →
+          </button>
         </div>
       )}
     </div>

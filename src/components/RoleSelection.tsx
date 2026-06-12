@@ -6,7 +6,6 @@ import { randomSeed, getDefaultOverrides } from '../engine/simulation';
 import { uid } from '../uid';
 import SimulationSetup from './SimulationSetup';
 import BenchmarkReport from './BenchmarkReport';
-import RealScheduleBenchmarkReport from './RealScheduleBenchmarkReport';
 import DelphiSurvey from './DelphiSurvey';
 import DelphiAdminPanel from './DelphiAdminPanel';
 import { CURRENT_ROUND } from '../constants';
@@ -41,7 +40,6 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
   }, []);
   const [showSimSetup, setShowSimSetup] = useState(false);
   const [showBenchmark, setShowBenchmark] = useState(false);
-  const [showRealBenchmark, setShowRealBenchmark] = useState(false);
   const [showDelphi, setShowDelphi] = useState<false | 'survey' | 'results'>(false);
   const [showAttestation, setShowAttestation] = useState(false);
   const [attestationCounts, setAttestationCounts] = useState<{ yes: number; no: number } | null>(null);
@@ -54,7 +52,6 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
 
   if (showSimSetup) return <SimulationSetup onCancel={() => setShowSimSetup(false)} />;
   if (showBenchmark) return <BenchmarkReport onBack={() => setShowBenchmark(false)} />;
-  if (showRealBenchmark) return <RealScheduleBenchmarkReport onBack={() => setShowRealBenchmark(false)} />;
   if (showDelphi) return <DelphiSurvey onCancel={() => setShowDelphi(false)} startOnResults={showDelphi === 'results'} />;
   if (showEvidence) return <EvidenceWalkthrough onBack={() => setShowEvidence(false)} darkMode={darkMode} />;
 
@@ -302,16 +299,9 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
         <div className="flex items-center justify-center pt-2 text-xs text-slate-500">
           <button
             onClick={() => setShowBenchmark(true)}
-            className="flex-1 text-right hover:text-slate-600 dark:hover:text-slate-400"
+            className="hover:text-slate-600 dark:hover:text-slate-400"
           >
             Formula vs Round-Robin
-          </button>
-          <span className="mx-1.5">|</span>
-          <button
-            onClick={() => setShowRealBenchmark(true)}
-            className="flex-1 text-left hover:text-slate-600 dark:hover:text-slate-400"
-          >
-            Real Week Backtest
           </button>
         </div>
         <div className="flex items-center justify-center gap-3 pt-4">

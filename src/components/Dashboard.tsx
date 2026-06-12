@@ -11,7 +11,6 @@ import SimulationControls from './SimulationControls';
 import SimSummaryCard from './SimSummaryCard';
 import TimelineSlider, { TimelineBar } from './TimelineSlider';
 import BenchmarkReport from './BenchmarkReport';
-import RealScheduleBenchmarkReport from './RealScheduleBenchmarkReport';
 import ShiftSetup from './ShiftSetup';
 import Toast from './Toast';
 import { buildTourSteps } from '../tourSteps';
@@ -23,7 +22,6 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
   const [showAssign, setShowAssign] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showBenchmark, setShowBenchmark] = useState(false);
-  const [showBacktest, setShowBacktest] = useState(false);
   const [showShiftSetup, setShowShiftSetup] = useState(false);
   const [toastTeam, setToastTeam] = useState<TeamId | null>(null);
   const [legendOpen, setLegendOpen] = useState(!!tourActive);
@@ -211,7 +209,7 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
       {/* Help Section (inline) */}
       {showHelp && (
         <div className="mx-4 mt-3">
-          <HelpSection onClose={() => setShowHelp(false)} onShowBenchmark={() => { setShowHelp(false); setShowBenchmark(true); }} onShowBacktest={() => { setShowHelp(false); setShowBacktest(true); }} />
+          <HelpSection onClose={() => setShowHelp(false)} onShowBenchmark={() => { setShowHelp(false); setShowBenchmark(true); }} />
         </div>
       )}
 
@@ -399,11 +397,6 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
         </div>
       )}
 
-      {showBacktest && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <RealScheduleBenchmarkReport onBack={() => setShowBacktest(false)} />
-        </div>
-      )}
     </div>
   );
 }
