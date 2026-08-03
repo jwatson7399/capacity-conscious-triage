@@ -259,7 +259,6 @@
     border-radius: 8px;
     border: 1px solid var(--border);
     background: var(--surface);
-    color: var(--ink);
     cursor: pointer;
     transition: all 0.15s;
   }
@@ -507,10 +506,6 @@
     box-shadow: 0 10px 30px rgba(26, 58, 123, 0.08), 0 2px 6px rgba(0,0,0,0.04);
   }
   .formula-card { padding: 56px 80px; }
-  body.dark .formula-card, body.dark .group-card {
-    background: linear-gradient(180deg, #1e293b 0%, #16202f 100%);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.25);
-  }
   .formula {
     font-family: 'EB Garamond', serif;
     font-size: 72px;
@@ -3190,14 +3185,6 @@ modeToggle.addEventListener('click', () => {
   localStorage.setItem('walkthrough-dark', on ? '1' : '0');
   syncToggleIcon();
 });
-
-// Embedded inside the app: theme comes from the parent (?dark=), so hide the
-// duplicate toggle, and pad the header so the app's floating "← Back" chip
-// doesn't cover the title.
-if (urlParams.get('embedded') === '1') {
-  modeToggle.style.display = 'none';
-  document.querySelector('header').style.paddingLeft = '96px';
-}
 
 // restore state
 const hashMatch = window.location.hash.match(/step-(\d+)/);
