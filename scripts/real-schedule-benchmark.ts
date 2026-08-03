@@ -73,17 +73,24 @@ function loadScheduleFile(filePath: string): ScheduleFile {
 
 const scheduleFiles: ScheduleFile[] = [];
 
-// Always include demo-schedule.xlsx
-const demoPath = join(__dirname, '..', 'public', 'demo-schedule.xlsx');
+// Always include demo-schedule.xlsx. It carries real provider names despite the
+// "demo" name, so it lives under data/, not public/.
+const demoPath = join(__dirname, '..', 'data', 'provider-schedules', 'schedules', 'demo-schedule.xlsx');
 if (existsSync(demoPath)) {
   scheduleFiles.push(loadScheduleFile(demoPath));
 }
 
-// Read additional schedules from public/schedules/
-const schedulesDir = join(__dirname, '..', 'public', 'schedules');
-if (existsSync(schedulesDir)) {
+// Read the real schedules from data/provider-schedules/. These are deliberately NOT
+// under public/ — Vite copies public/ verbatim into dist/, which is what published them
+// to GitHub Pages. Keep real provider data out of public/.
+const scheduleDirs = [
+  join(__dirname, '..', 'data', 'provider-schedules', 'schedules'),
+  join(__dirname, '..', 'data', 'provider-schedules', 'initially missing schedules'),
+];
+for (const schedulesDir of scheduleDirs) {
+  if (!existsSync(schedulesDir)) continue;
   for (const file of readdirSync(schedulesDir).sort()) {
-    if (file.endsWith('.xlsx') && !file.startsWith('~$')) {
+    if (file.endsWith('.xlsx') && !file.startsWith('~$') && !file.includes('demo-schedule')) {
       scheduleFiles.push(loadScheduleFile(join(schedulesDir, file)));
     }
   }

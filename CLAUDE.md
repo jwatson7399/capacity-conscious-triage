@@ -13,15 +13,47 @@ npm run build            # type-check + production build → dist/
 
 ## Deploy = GitHub Pages (gh-pages branch)
 
-When the user says "deploy", build and push to the `gh-pages` branch. There is no GitHub Actions workflow — deployment is manual.
+**GitHub Pages for this repo was unpublished on 2026-08-03 and should stay that way
+until Julian says otherwise.** This repo is private, but a Pages site serves publicly
+regardless of repo visibility — that is how 11 real departmental schedules and the
+Delphi weights were publicly downloadable from 2026-03-11 to 2026-08-03. Deploying
+republishes the site. Confirm with Julian before running a deploy.
+
+Note the Pages *config record* still exists (`gh api /repos/.../pages` returns
+`"status":"built"`), so `npx gh-pages -d dist` would resurrect the site without any
+settings change. Do not test whether the site is live via that API — curl the URL.
+
+Deployment is manual; there is no GitHub Actions workflow.
 
 ```bash
-cd er-triage-app
-npm run build
-npx gh-pages -d dist
+npm run deploy   # runs predeploy: build + check:schedules, then pushes dist/
 ```
 
-This publishes to: https://jwatson7399.github.io/er-triage-app/
+`predeploy` runs `scripts/check-no-real-schedules.ts`, which fails the deploy if any
+real provider data is about to be published. Never bypass it by calling
+`npx gh-pages -d dist` directly.
+
+This publishes to: https://jwatson7399.github.io/capacity-conscious-triage/
+
+### Schedule data policy
+
+Vite copies `public/` verbatim into `dist/`, and `dist/` is what gets published. So:
+
+- **Real schedules live in `data/provider-schedules/`, never under `public/`.** This
+  includes `demo-schedule.xlsx`, which despite its name contains 120 real provider
+  names.
+- The only workbook allowed under `public/` is `public/schedules/demo-week-schedule.xlsx`,
+  a synthetic file with real layout and shift structure but pseudonymous names. It is
+  what the "Real Schedule" demo button in `RoleSelection.tsx` fetches.
+- To regenerate it from a real schedule:
+
+```bash
+npx tsx scripts/deidentify-schedule.ts "data/provider-schedules/schedules/<file>.xlsx" public/schedules/demo-week-schedule.xlsx
+npx tsx scripts/verify-deidentified-schedule.ts "data/provider-schedules/schedules/<file>.xlsx" public/schedules/demo-week-schedule.xlsx
+```
+
+The verifier asserts the synthetic file is parse-equivalent to the real one (same days,
+provider counts, types, teams and shift windows) and that no real name survives.
 
 ## Delphi Survey — Google Sheets Backend
 

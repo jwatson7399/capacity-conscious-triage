@@ -114,7 +114,10 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
                 setScheduleError(null);
                 setScheduleLoading(true);
                 try {
-                  const resp = await fetch(`${import.meta.env.BASE_URL}schedules/January 26_Weekly Schedule (1).xlsx`);
+                  // Synthetic schedule: real layout and shift structure, pseudonymous
+                  // provider names. Real schedules live in data/provider-schedules/ and
+                  // must never be placed under public/ — see scripts/check-no-real-schedules.ts.
+                  const resp = await fetch(`${import.meta.env.BASE_URL}schedules/demo-week-schedule.xlsx`);
                   if (!resp.ok) throw new Error('Failed to fetch schedule');
                   const buf = await resp.arrayBuffer();
                   const parsed = parseWeeklySchedule(buf);
