@@ -319,6 +319,70 @@ Grid template: `180px 28px 120px 28px 100px`. The operator symbols (÷, =) are c
 
 ---
 
+## 5. Public Exposure Remediation — GitHub Pages, Schedule De-Identification, and a Content-Based Deploy Guard
+
+**Objective.** Close a live disclosure of protected material and make its recurrence structurally impossible. Two classes of content were publicly downloadable from `https://jwatson7399.github.io/capacity-conscious-triage/`: real NYU Langone Brooklyn weekly departmental schedules naming attendings, PAs and residents against shift times; and the Delphi-derived provider capacity weights, in the clear inside the JS bundle. A secondary objective was to establish the exposure window for a separate patent grace-period question.
+
+**The exposure mechanism.** The repository is private, but GitHub Pages serves its publishing branch publicly *regardless of repository visibility*. The chain is: real schedules live in `public/schedules/` → Vite copies `public/` verbatim into `dist/` on every build (no `publicDir` override in `vite.config.ts`) → `npx gh-pages -d dist` pushes `dist/` to the `gh-pages` branch → Pages serves it to the world. Any build-and-deploy therefore republished the schedules. This is a configuration hazard rather than a code defect, which is why it survived ordinary code review.
+
+**Verification method — measure, don't infer.** Every claim below was established against the live site rather than from the source tree, because the deployed artifact and the working tree had diverged. Both `/` and `/schedules/Department Schedule Week December 29.xlsx` returned HTTP 200 with a spreadsheet `content-type` at session start. Three assumptions carried in from the handoff brief proved wrong when measured, each in the direction of understating the exposure:
+
+| Assumption | Measured reality |
+|---|---|
+| Last deploy `bb82588`, 2026-04-25 | `b0628cf`, **2026-06-12** — seven weeks more recent |
+| Bundle `index-BKlD-X9g.js` | `index-DmcoEIPj.js` |
+| 18 schedules exposed | **11** deployed (18 exist in `public/`; the June build predates seven) |
+
+All six weights were confirmed present in the live bundle (`attending:20`, `senior_resident:15.2`, `pa:11.4`, `junior_resident:10.8`, `intern:6.6`, `rotator:2.4`).
+
+**Unpublishing — the documented route does not exist.** `DELETE /repos/:owner/:repo/pages` returns `422 "Deactivating GitHub pages for this repository is not allowed"` (reproduced twice, not transient). `PUT .../pages` with `public=false` returns `422 "Current plan does not support private GitHub Pages"`; the account has no paid plan (`.plan` is `null`). **There is no API path to unpublish this site.** The Settings → Pages "Unpublish site" button in the web UI succeeds where the API refuses, and was used.
+
+A durable trap follows from this: after unpublishing, `gh api /repos/.../pages` still returns `"status":"built"` with the stale build. The *configuration record* survives unpublishing even though no content is served. Two consequences, both since confirmed empirically: the API must never be used as the test for whether the site is exposed (curl the URL instead), and a subsequent `npx gh-pages -d dist` resurrects the site with no settings change — which is exactly what happened when the remediated build was later deployed, triggering an automatic Pages rebuild.
+
+**De-identification method.** The demo feature at `RoleSelection.tsx` fetches a real schedule, parses it, and renders real provider surnames into the UI. The schedule parser (`src/utils/scheduleParser.ts`) is highly layout-sensitive — it locates day blocks by scanning for `Team 1` headers, infers team column pairs by offset, detects role sections by label, and cross-references a PGY key table to type each resident. Authoring a synthetic workbook from scratch would risk silently different parse behaviour, so a **transform-in-place** approach was chosen instead: rewrite only the leading person-name token of each cell, preserving layout, shift times, parenthetical annotations (`(Swing T1/T3)`), and the PGY table verbatim.
+
+Token classification is deliberately asymmetric. A shared vocabulary (`scripts/schedule-name-tokens.ts`) whitelists structural tokens — team labels, role labels, weekday and month names, side markers, service abbreviations (`PEDs`, `NP`, `FHC`, `IM`, `PEM`) and clock-time patterns — and treats *everything else* as a name. Unknown tokens are therefore replaced rather than preserved, erring toward over-redaction. Pseudonyms are drawn from a pool of single-token botanical surnames; single-token matters because `cleanProviderName()` truncates to the first word, so multi-word pseudonyms like "Provider A" would collapse every provider to a single deduplication key and destroy the roster.
+
+**Verification — two independent layers.** Parse-level equivalence (`scripts/verify-deidentified-schedule.ts`) asserts the real and synthetic files yield identical structure: 7 days, 211 providers, 20 PGY entries, and matching per-day signatures of `teamId | type | shiftStart | shiftEnd`. It separately asserts that no name from the real corpus survives anywhere in the synthetic parse. Because the parser deliberately *skips* A-Side sections, a parse-level check alone could miss names in cells the parser never reads, so a byte-level check was run over the unzipped OOXML: of 190 distinct strings in the original, the 63 appearing in both files are all structural (shift times, `Team 1`, weekday names); **127 name strings were dropped and zero real names survived**. Finally, the demo path was simulated directly — all 7 days yield providers at hour 7, so the button cannot throw `No providers active at current hour`.
+
+**Two findings surfaced by tooling rather than by reading code.** Both were invisible to filename inspection and to the original remediation plan:
+
+1. **`public/demo-schedule.xlsx` contains 120 real provider names**, including the project owner's. Despite its name it is not a demo artifact, and it had been published at `/demo-schedule.xlsx` throughout. The brief's proposed alternative — "ship the demo with `demo-schedule.xlsx` only" — would have left the exposure fully intact. Nothing under `src/` ever loaded it; only a benchmark script did, so it was removed from `public/` entirely rather than de-identified.
+2. **A stale `dist/` on disk still contained all 18 real schedules.** `dist/` is gitignored so it was never committed, but it is precisely the directory `npx gh-pages -d dist` publishes; a deploy without an intervening rebuild would have re-exposed everything.
+
+The generalisable lesson drove the guard's design: a filename-pattern check would have passed both cases. `scripts/check-no-real-schedules.ts` therefore opens every shipped `.xlsx` and compares leading name tokens against the corpus in `data/provider-schedules/`, blocking on content rather than naming. It is negative-tested — a real schedule copied into `public/` as `harmless-sample.xlsx` is still blocked, exit code 1 — and is wired to `predeploy`, so `npm run deploy` cannot bypass it.
+
+**Design rationale for the chosen scope.** Only one runtime reference to a real schedule existed; everything else under `scripts/` is Node-only tooling reading from `data/`. That asymmetry made a narrow fix correct: de-identify the single file the browser fetches, and relocate the rest out of the publishable tree rather than sanitising all 18. All 18 files in `public/schedules/` were confirmed byte-identical (SHA-256) to copies already in `data/provider-schedules/` before deletion, so removal destroyed no data. Benchmark coverage was verified unchanged after repointing: 19 files, 133 days, identical to before.
+
+**Results.** Live verification after redeployment: site 200; `schedules/demo-week-schedule.xlsx` 200 and re-verified parse-equivalent with zero real names when fetched *from the live URL*; all real schedule paths, `demo-schedule.xlsx`, and the old June bundle all 404; the live bundle greps clean for `WATSON`, `SINDKAR`, `FOGAM`, `DRAPER`, `GOLDENBERG`. The `gh-pages` tree now contains exactly one workbook.
+
+**Exposure window.** No account audit log exists (`/user/audit-log` → 404; unavailable for personal accounts) and the Internet Archive holds **zero captures** of either the repository or the Pages site, so no third-party evidence of the public window exists. Build history is the stronger record: the schedules were present in the very first `gh-pages` commit (`c6a1708`, 2026-03-11) and the site served continuously across 34 builds until 2026-08-03 — a window of **~145 days**.
+
+**Deliberate non-remediations, recorded so they are not silently "fixed" later.** Two exposures were assessed and left in place by explicit decision:
+
+- **The Delphi Apps Script endpoint** (`VITE_DELPHI_SHEETS_URL`) is deployed "Anyone with the link" and unauthenticated. A plain GET returns all 35 raw survey rows, whose means (15.15, 10.85, 6.65, 2.30) reproduce the shipped weights — disclosing the *derivation*, not merely the values. Disabling Pages does not affect it.
+- **`src/constants.ts:4` hardcodes the Delphi averages** as fallbacks, so they ship in any build. The rationale accepted for both: the weights are NYU-specific and not portable outside that institution. Note the structural limit — in a client-side app the engine computes in the browser, so any weight it uses must reach the client; bundle obfuscation would be theatre, and the only real protection is server-side scoring, already listed as the project's next step.
+
+A related build-time behaviour was surfaced and consciously accepted: Vite inlines `VITE_*` variables at build time, so building with `.env` present publishes the endpoint URL in the bundle. The June build did not contain it; the 2026-08-03 build does. This was flagged before deploying and accepted.
+
+**Residual condition.** Per the standing instruction against rebasing, squashing, amending or force-pushing, git history was not rewritten. The real schedules remain in history on both `main` and `gh-pages`. This is acceptable while the repository is private, but they are recoverable if it is ever made public — as are the weights.
+
+**Artifacts.**
+- `scripts/deidentify-schedule.ts` — token-preserving de-identifier (new)
+- `scripts/verify-deidentified-schedule.ts` — parse-equivalence and name-leak assertions (new)
+- `scripts/check-no-real-schedules.ts` — content-based predeploy guard (new)
+- `scripts/schedule-name-tokens.ts` — shared structural vocabulary, so guard and de-identifier cannot disagree (new)
+- `public/schedules/demo-week-schedule.xlsx` — synthetic demo schedule (new)
+- `scripts/real-schedule-benchmark.ts` — repointed from `public/` to `data/provider-schedules/`
+- `src/components/RoleSelection.tsx` — demo fetch retargeted to the synthetic file
+- `package.json` — `predeploy` guard wired ahead of `deploy`
+- `CLAUDE.md` — deploy procedure and schedule-data policy documented
+- `.rounds/CCTrounds.md` — cross-agent deliberation entry
+
+**Commit.** `be1b893` — "Remove real provider schedules from the published bundle", merged to `main` by fast-forward.
+
+---
+
 # Historical Methodology Record
 
 _The sections below document earlier methodology work preserved from a prior version of this document._

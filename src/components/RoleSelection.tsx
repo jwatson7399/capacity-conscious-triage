@@ -329,6 +329,9 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
             </span>
           </button>
         </div>
+        <p className="pt-4 text-center text-xs text-slate-400 dark:text-slate-500">
+          © 2026 New York University
+        </p>
       </div>
     </div>
   );

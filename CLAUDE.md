@@ -1,27 +1,50 @@
-# er-triage-app
+# Capacity Conscious Triage (er-triage-app)
 
-A mobile-first React + TypeScript app for ER patient triage assignment. Replaces round-robin team rotation with formula-driven scoring that considers provider capacity, patient acuity/load, decay over time, and cooldown buffers. Built with Vite, Tailwind CSS v4, React 19.
+A mobile-first React + TypeScript app that recommends which ED team should take the next patient. It
+replaces round-robin assignment with a capacity ratio: team provider strength divided by acuity-weighted,
+time-decaying patient load. Advisory only (never auto-assigns), no PHI, no EMR integration. Built with
+Vite, Tailwind CSS v4, React 19.
+
+Copyright holder is **New York University** (NYU TOV ref WAT01-01). Notice lives in `LICENSE`,
+`src/main.tsx`, and the footer of `RoleSelection.tsx`. Keep it on anything new that users see or print.
+
+**Source of truth for formula values is the code** (`src/constants.ts`, `src/engine/recommendation.ts`).
+If this file and the code disagree, the code wins and this file should be fixed.
+
+## Related project documents
+
+- `METHODS.md` (this repo): numbered methodology log. New sections go above the
+  "# Historical Methodology Record" divider. `/methods` skill appends one.
+- `CCT Legal Dossier.md` (this repo, untracked on purpose): IP, TOV and counsel record.
+- `Cowork Roundtable.md` lives in `/Users/julian/Claude CoWork/ER Triage App`, not here. It is the
+  decision log for product and strategy decisions.
+- `.rounds/CCTrounds.md`: cross-agent deliberation log, see "Agent rounds" below.
 
 ## Setup
 
 ```bash
-cd er-triage-app
 npm install
 npm run dev              # dev server (Vite)
-npm run build            # type-check + production build → dist/
+npm run build            # type-check + production build -> dist/
 ```
 
 ## Deploy = GitHub Pages (gh-pages branch)
 
-**GitHub Pages for this repo was unpublished on 2026-08-03 and should stay that way
-until Julian says otherwise.** This repo is private, but a Pages site serves publicly
-regardless of repo visibility — that is how 11 real departmental schedules and the
-Delphi weights were publicly downloadable from 2026-03-11 to 2026-08-03. Deploying
-republishes the site. Confirm with Julian before running a deploy.
+**Status as of 2026-09-27: the Pages site is LIVE**, serving the 2026-08-03 build (commit `610b6f5`
+on `gh-pages`). Real schedules are no longer served (404). The live bundle still contains the Delphi
+fallback weights and the Delphi Apps Script URL. Whether it stays up is Julian's decision. **Never
+deploy without explicit confirmation from Julian.**
 
-Note the Pages *config record* still exists (`gh api /repos/.../pages` returns
-`"status":"built"`), so `npx gh-pages -d dist` would resurrect the site without any
-settings change. Do not test whether the site is live via that API — curl the URL.
+Facts learned the hard way (see METHODS.md section 5):
+
+- The repo is private, but a Pages site serves publicly regardless of repo visibility.
+- The API cannot unpublish this site (`DELETE /pages` returns 422). Only the Settings > Pages
+  "Unpublish site" button works.
+- `gh api /repos/.../pages` reports `"status":"built"` even when unpublished. Never use it to check
+  exposure. Load the URL instead.
+- Any `gh-pages` push republishes the site with no settings change.
+- Vite inlines `VITE_*` variables at build time, so a build made with `.env` present ships the Delphi
+  endpoint URL.
 
 Deployment is manual; there is no GitHub Actions workflow.
 
@@ -29,22 +52,20 @@ Deployment is manual; there is no GitHub Actions workflow.
 npm run deploy   # runs predeploy: build + check:schedules, then pushes dist/
 ```
 
-`predeploy` runs `scripts/check-no-real-schedules.ts`, which fails the deploy if any
-real provider data is about to be published. Never bypass it by calling
-`npx gh-pages -d dist` directly.
+`predeploy` runs `scripts/check-no-real-schedules.ts`, which opens every shipped `.xlsx` and fails if
+any real provider name is present. Never bypass it by calling `npx gh-pages -d dist` directly.
 
-This publishes to: https://jwatson7399.github.io/capacity-conscious-triage/
+Publishes to: https://jwatson7399.github.io/capacity-conscious-triage/
 
 ### Schedule data policy
 
 Vite copies `public/` verbatim into `dist/`, and `dist/` is what gets published. So:
 
-- **Real schedules live in `data/provider-schedules/`, never under `public/`.** This
-  includes `demo-schedule.xlsx`, which despite its name contains 120 real provider
-  names.
-- The only workbook allowed under `public/` is `public/schedules/demo-week-schedule.xlsx`,
-  a synthetic file with real layout and shift structure but pseudonymous names. It is
-  what the "Real Schedule" demo button in `RoleSelection.tsx` fetches.
+- **Real schedules live in `data/provider-schedules/`, never under `public/`.** This includes
+  `demo-schedule.xlsx`, which despite its name contains 120 real provider names.
+- The only workbook allowed under `public/` is `public/schedules/demo-week-schedule.xlsx`, a synthetic
+  file with real layout and shift structure but pseudonymous names. The "Real Schedule" demo button in
+  `RoleSelection.tsx` fetches it.
 - To regenerate it from a real schedule:
 
 ```bash
@@ -52,10 +73,23 @@ npx tsx scripts/deidentify-schedule.ts "data/provider-schedules/schedules/<file>
 npx tsx scripts/verify-deidentified-schedule.ts "data/provider-schedules/schedules/<file>.xlsx" public/schedules/demo-week-schedule.xlsx
 ```
 
-The verifier asserts the synthetic file is parse-equivalent to the real one (same days,
-provider counts, types, teams and shift windows) and that no real name survives.
+The verifier asserts the synthetic file is parse-equivalent to the real one (same days, provider counts,
+types, teams and shift windows) and that no real name survives.
 
-## Delphi Survey — Google Sheets Backend
+## Repo hygiene rules
+
+- **Never rebase, squash, amend, force-push, or delete branches.** Project history is part of the
+  legal record. Real schedules remain in history on `main` and `gh-pages`; acceptable only while the
+  repo is private.
+- **Never `git add .` or `git add -A`.** Legal and counsel files sit untracked in the repo root
+  (`CCT Legal Dossier.md`, `Counsel Memo - CCT*`, `IP Policy Excerpts*`, `Outside Counsel Briefing
+  Packet*`, the Informatics thread PDFs) and must not be committed. Stage files by name.
+- The unauthenticated Delphi Apps Script endpoint and the hardcoded fallback weights in
+  `constants.ts` were left in place by Julian's explicit decision (weights are NYU-specific). Do not
+  "fix" them without asking.
+- No em dashes in any document or user-facing text.
+
+## Delphi Survey: Google Sheets Backend
 
 The Delphi provider-strength survey can optionally store responses in a shared Google Sheet so all users see the same totals.
 
@@ -108,102 +142,116 @@ If the env var is unset, the survey falls back to localStorage-only mode.
 
 ## Architecture
 
-- `src/types.ts` — all TypeScript types: `Provider`, `Patient`, `Buffer`, `TeamScore`, `Recommendation`, `ShiftState`, `ShiftAction`
-- `src/constants.ts` — tuning parameters (see below)
-- `src/engine/recommendation.ts` — pure-function scoring engine
-- `src/context/ShiftContext.tsx` — `useReducer`-based state management
-- `src/App.tsx` — root: role selection → shift setup (charge nurse) → dashboard; 1s TICK interval
-- `src/components/`
-  - `Dashboard.tsx` — main view: sticky header, help toggle (?), color legend, team cards grid, FAB
-  - `TeamCard.tsx` — capacity ratio, buffer bars, collapsible providers (default collapsed), patient badges
-  - `AssignPatient.tsx` — modal: tier selection with clinical examples, team selection, override flow
-  - `HelpSection.tsx` — collapsible guide (intro, formula, example, capacity, decay, buffers, recommendations, overrides, nomenclature)
-  - `ShiftSetup.tsx` — charge nurse team builder
-  - `RoleSelection.tsx` — role picker + LOAD_DEMO button
-  - `ProviderStatusToggle.tsx` — provider status cycling
-  - `PatientBadge.tsx` — acuity color, decay timer, weight indicator
-  - `OverrideModal.tsx` — override reason selection
+- `src/types.ts`: all TypeScript types (`Provider`, `Patient`, `Buffer`, `TeamScore`, `Recommendation`, `ShiftState`, `ShiftAction`)
+- `src/constants.ts`: tuning parameters (see below)
+- `src/engine/recommendation.ts`: pure-function scoring engine
+- `src/engine/simulation.ts`, `src/engine/fairness.ts`: simulator and fairness metrics used by benchmarks
+- `src/context/ShiftContext.tsx`: `useReducer`-based state management
+- `src/hooks/useSurveyWeights.ts`: polls the Delphi sheet for live provider weights
+- `src/utils/scheduleParser.ts`: layout-sensitive parser for departmental schedule workbooks
+- `src/App.tsx`: root: role selection -> shift setup (charge nurse) -> dashboard; 1s TICK interval
+- `src/components/`: `Dashboard`, `TeamCard` (battery capacity gauge), `AssignPatient`, `OverrideModal`,
+  `HelpSection`, `ShiftSetup`, `RoleSelection` (splash, demos, survey entry, copyright footer),
+  `GuidedTour`, `EvidenceWalkthrough` (iframes `public/walkthrough-v4.html`), `MethodologyDeepDive`,
+  `BenchmarkReport`, `RealScheduleBenchmarkReport`, `DelphiSurvey`, `DelphiAdminPanel`,
+  `ScheduleImport`, simulation components, `PatientBadge`, `ProviderStatusToggle`, `Toast`
+- `scripts/`: Node-only benchmark, replay, de-identification and guard scripts (read from `data/`)
 
 ## Scoring Formula
 
 ```
 Capacity Ratio = Team Capacity / Patient Load
+Team Capacity  = sum(provider weight x status multiplier x float modifier)
+Patient Load   = sum(decayed acuity weight)
 ```
 
-Highest ratio (among non-buffered teams) = recommended. Team 4 (Trauma) excluded from auto-recommendations.
+When recommending for an incoming patient, each team's ratio is computed as if that patient's acuity
+weight were already added to its load. Highest ratio among eligible teams is recommended. Team 4 (Trauma) and closed teams are excluded from
+auto-recommendations. Tiebreakers: highest ratio, then least recent assignment, then lowest team ID.
+(The not-buffered-first tiebreaker still exists in code but is inert because buffers are zero.)
 
-**Tiebreakers:** not-buffered first → highest ratio → least recent assignment → lowest team ID.
+### Provider weights
 
-### Capacity Weights (provider type × status multiplier)
+Fetched live from the Delphi sheet (`useSurveyWeights`, polled every 5 min). Fallbacks in
+`constants.ts` are the Delphi Round 1 means (n=19). Round 2 collection is in progress
+(`CURRENT_ROUND = 2`; the admin panel sets the active round).
 
-Weights are fetched live from the Delphi survey sheet (polled every 5 min via `useSurveyWeights` hook). Fallback defaults in `constants.ts` are used when the sheet is unavailable.
+| Provider                     | Fallback weight |
+|------------------------------|-----------------|
+| Attending                    | 20 (fixed reference) |
+| Senior Resident (PGY 3-4)    | 15.2 |
+| PA                           | 11.4 |
+| Junior Resident (PGY-2)      | 10.8 |
+| Intern (PGY-1)               | 6.6 |
+| Rotator                      | 2.4 |
 
-| Provider             | Fallback | Survey Avg (6 responses) |
-|----------------------|----------|--------------------------|
-| Attending            | 20       | 20 (fixed reference)     |
-| Senior Resident      | 15.0     | 15.2                     |
-| PA                   | 10.0     | 10.8                     |
-| Junior Resident (PGY-2) | 7.5  | 10.8                     |
-| Intern (PGY-1)       | 5.0      | 5.7                      |
-| Rotator              | 1.0      | 1.0                      |
+| Status          | Multiplier | Auto-expires |
+|-----------------|------------|--------------|
+| Active          | 1.0        | no |
+| Taking Signout  | 0.5        | 30 min |
+| In Procedure    | 0.25       | 30 min |
+| Off Floor       | 0.0        | 15 min |
 
-| Status          | Multiplier |
-|-----------------|------------|
-| Active          | 1.0        |
-| Taking Signout  | 0.5        |
-| In Procedure    | 0.25       |
-| Off Floor       | 0.0        |
+Float modifiers: none 1.0, float supervising 0.65, float primary 0.0.
 
-### Acuity Weights & Decay
+### Acuity weights and decay (4:2:1, D6 linear)
 
-| Tier      | Initial | Decay                          |
-|-----------|---------|--------------------------------|
-| Tier One  | 5       | → 3 at 60m → 1 at 120m → 0 at 240m |
-| Tier Two  | 3       | → 1 at 90m → 0 at 240m              |
-| Tier Three| 1       | → 0 at 120m                          |
+| Tier               | Label  | Initial weight | Decay |
+|--------------------|--------|----------------|-------|
+| Tier One           | Red    | 4 | linear to 0 at 180 min |
+| Tier Two           | Yellow | 2 | linear to 0 at 180 min |
+| Tier Three         | Purple | 1 | linear to 0 at 90 min |
 
-### Buffer Durations
+### Buffers
 
-| Spawning Tier | Duration |
-|---------------|----------|
-| Tier One      | 35 min   |
-| Tier Two      | 25 min   |
-| Tier Three    | 15 min   |
+Removed. `BUFFER_DURATIONS_MS` is all zeros per the Methods paper: a new assignment raises the team's
+load and lowers its ratio, which provides the protection buffers used to add.
 
-Buffer stacking is **additive** — 3 rapid assignments = ~3× duration, not max(). Merged buffers show combined count.
+### Capacity terms (displayed on cards)
 
-### Capacity Terms (displayed on cards)
+| Ratio   | Label       |
+|---------|-------------|
+| >= 50   | Comfortable |
+| >= 23   | Manageable  |
+| >= 16   | Busy        |
+| >= 11.5 | Very Busy   |
+| >= 8.5  | High Demand |
+| < 8.5   | Red Zone    |
 
-| Ratio    | Label        | Color    | Percentile |
-|----------|--------------|----------|------------|
-| ≥ 21.25  | Comfortable  | emerald  | top 25%    |
-| ≥ 10     | Manageable   | green    | p50–p75    |
-| ≥ 7.5    | Busy         | yellow   | p33–p50    |
-| ≥ 5      | Very Busy    | orange   | p15–p33    |
-| ≥ 3.75   | High Demand  | red      | p5–p15     |
-| < 3.75   | Overwhelmed  | dark red | bottom 5%  |
+`OVERWHELM_THRESHOLD` = 8.5 (p5 of the empirical distribution under the recommended config). Card
+color and battery fill are anchored to per-arrival percentiles of the 4:2:1 historical replay
+(1,958 arrivals, 121 shift-days). See `METHODS.md` for derivations.
 
-Overwhelm threshold (`OVERWHELM_THRESHOLD` in `constants.ts`) = 3.75 (exact p5 of 23,193 empirical observations). Used by fairness engine, simulation, and benchmark script. See `METHODS.md` for full derivation.
+## Known inaccuracies still in the app
+
+- `src/components/HelpSection.tsx` (around line 51) quotes "+55%" and "+249%". These are cross-benchmark
+  stitches and must not be quoted anywhere. Same-run figures put the minimum-ratio gain versus actual
+  practice at roughly +77% to +118% ("the worst-case floor roughly doubles"). Fix pending Julian's
+  wording.
 
 ## Key Design Decisions
 
 - **All state is client-side** (`useReducer` + React context). No backend yet.
-- **Provider status auto-expires** — off_floor at 15min, in_procedure/taking_signout at 30min.
 - **Team 4 (Trauma)** is visible but excluded from auto-recommendations; assignment only via manual override.
-- **Demo mode** randomizes provider names, team compositions, statuses, and simulates patient arrivals chronologically through the recommendation engine for balanced distribution.
-- **Buffer bar width** is computed directly from `remainingMs / (elapsed + remaining)` each render (not CSS animation) so it stays in sync with the app clock.
+- **Demo mode** randomizes provider names, team compositions, statuses, and simulates patient arrivals through the recommendation engine.
 - **Patient nomenclature**: `C-###` = critical/new arrival, `F-###` = floor upgrade, time display = minutes until next decay, `w:N` = current decayed weight.
 
 ## Agent rounds
 
-Cross-agent deliberation log: `.rounds/CCTrounds.md`. Run `/rounds` to read recent entries and append your own. **When creating a non-trivial plan or facing a substantive design decision, read rounds first and consider posting if peer input from a parallel agent would help.** Don't post for trivial work or pure execution tasks.
+Cross-agent deliberation log: `.rounds/CCTrounds.md`. Run `/rounds` to read recent entries and append
+your own. **When creating a non-trivial plan or facing a substantive design decision, read rounds first
+and consider posting if peer input from a parallel agent would help.** Don't post for trivial work or
+pure execution tasks.
 
 ## Next Step: Real-Time Backend
 
-The app needs a backend so multiple phones/tablets can share the same shift state. Requirements:
-- Real-time sync: all connected clients see updates instantly (provider status changes, new patient assignments, buffer countdowns)
+The app needs a backend so multiple phones/tablets can share the same shift state. It is also the only
+real protection for the weights, since a client-side engine must ship them to the browser. Requirements:
+- Real-time sync: all connected clients see updates instantly
 - Conflict resolution: two users assigning a patient simultaneously must not corrupt state
-- Minimal infrastructure: ideally a single service (e.g. WebSocket server, or Firebase/Supabase real-time)
-- The recommendation engine (`recommendation.ts`) is pure functions and can run on either client or server
-- State shape is already defined in `types.ts` — `ShiftState` is the single source of truth
-- Auth can be simple (shift code / room code) — no user accounts needed initially
+- Minimal infrastructure: ideally a single service (WebSocket server, or Firebase/Supabase real-time)
+- The recommendation engine is pure functions and can run on client or server
+- `ShiftState` in `types.ts` is the single source of truth
+- Auth can be simple (shift code / room code)
+- Planned trial requirement: an override log (every recommendation, accepted or overridden, with
+  structured reason codes plus free text) must exist before day one of the trial
