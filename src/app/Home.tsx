@@ -20,19 +20,18 @@ export default function Home({ dark, onToggleDark, onStart, onResume, onDemo, on
   return (
     <div className="home">
       <header className="appbar">
-        <div><div className="ttl" style={{ fontSize: 17, fontWeight: 600, letterSpacing: '-.2px' }}>Capacity Conscious Triage</div><div className="sub">A-side</div></div>
+        <div className="monogram" aria-hidden="true">C<br />C<br />T</div>
         <span className="sp" />
         <span className="clock num">{clock(state.now)}</span>
       </header>
       <main>
         <section className="hero">
-          <div className="sc muted">{running ? 'Shift in progress' : 'Ready for the next shift'}</div>
-          <h1>A shared view<br />of team capacity.</h1>
-          <p className="lede">Suggests which A-side team should take the next patient, based on who is on each team and how much load they carry. You make every assignment.</p>
+          <h1>Capacity<br />Conscious<br />Triage</h1>
+          <p className="lede">Choose the best team for the next patient,<br />every time.</p>
           {running
             ? <button className="btn primary lg full" onClick={onResume}>Resume shift →</button>
             : <button className="btn primary lg full" onClick={onStart}>Start shift →</button>}
-          <div className="muted" style={{ fontSize: 13, margin: '10px 2px 22px' }}>
+          <div className="muted" style={{ fontSize: 13, margin: '10px 0 22px', textAlign: 'center' }}>
             {running
               ? `Started ${started ? clock(started.at) : ''} · ${state.providers.length} providers · ${state.patients.length} patient${state.patients.length === 1 ? '' : 's'} placed`
               : draft ? `${draft} provider${draft === 1 ? '' : 's'} in your saved draft` : 'Set up the teams, then open the live board.'}
