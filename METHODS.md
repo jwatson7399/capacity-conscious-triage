@@ -405,6 +405,48 @@ A related build-time behaviour was surfaced and consciously accepted: Vite inlin
 
 ---
 
+## 7. Carbon Rebuild: New Interface on the Unchanged Engine
+
+### Objective
+Replace the pre-Carbon interface with the approved Carbon design (`design-previews/cct-carbon-final.html`; Roundtable 2026-09-28, Decisions 1 to 10) without changing how any team is scored or ranked. Proof required by the plan: the historical replay gives identical output before and after.
+
+### Methodology / data
+- Branch `carbon-rebuild`, cut from `main` at `f0f5bd4`. No deploy.
+- Kept byte-identical: `src/engine/*`, `src/constants.ts`, `src/uid.ts`, `src/utils/scheduleParser.ts` and its test, all of `scripts/`. Verified with `git diff --quiet f0f5bd4 HEAD` on those paths.
+- `src/context/ShiftContext.tsx`: the rebuild itself left the reducer body unchanged (only `export` added to `shiftReducer` and `initialState`); the audit fixes below then changed three shift rules. The provider now scores with a frozen copy of `CAPACITY_WEIGHTS` and no longer calls `useSurveyWeights` (Decision 7).
+- New session layer (`src/context/session.ts`) wraps the core reducer. It records the shift activity list (`src/activity.ts`) and adds five interface-only actions: `HYDRATE` (load a sample shift), `REMOVE_PROVIDER`, `REOPEN_TEAM`, `DEMO_ARRIVALS`, `UNDO_ASSIGN`. None touches scoring.
+- Audit fixes (Roundtable 2026-09-28, Carbon Rebuild Audit, Decisions 11 to 14) changed shift logic in the core reducer, not scoring: closed teams stay closed until reopened (60-minute auto-transfer and auto-reopen removed; sign-out keeps the closure); reassign keeps the patient's timer; upgrade accepts any higher color (`toTier`, default Red) and restarts at full weight. `types.ts` gained the optional `toTier`.
+- Undo is bound to the assignment's event id and ends at any later action on that patient, a demo reset or a new sample. Float primary patients count as not counted. The deceased tag shows on the gauge column. Focus is trapped in sheets and the activity drawer. The pre-Carbon walkthrough is archived, so the app makes no Google Fonts request.
+- Activity events are plain JSON objects with an id, sequence number, model time and device time. An assignment stores acuity, source, recommended and next-ranked team, chosen team, whether it followed the recommendation, the override reason code and note, and a snapshot of every team's capacity, load and ratio just before placement. Undo is its own event pointing at the assignment it reversed. Demo-clock placements are marked `auto`.
+- Isolation: the live shift's provider is mounted for the whole session; demo and tour mount their own providers. Home never wipes a shift; End shift is a separate confirmed action.
+- Display helpers (`src/ui/model.ts`) read engine outputs only. Infinity rule per Decision 3: zero load is always infinity; 100 or more shows as infinity unless two or more staffed A-side teams are at 100 or more, then those show whole numbers; trauma does not count toward the two. Gauge scale is ratio / (ratio + 22).
+- Research tools moved to a lazy-loaded `?lab` route. Simulations there still use the pre-Carbon Dashboard.
+- Fonts self-hosted via `@fontsource/inter` and `@fontsource/ibm-plex-sans` (both OFL-1.1); no Google Fonts request.
+
+### Results
+| Check | Result |
+|---|---|
+| Historical replay, `benchmark`, `benchmark-load-range`, `real-schedule-benchmark`: `f0f5bd4` vs `6a75acb`, same `data/` | Byte-identical output |
+| `decay-schedule-benchmark` | Identical `results` and `pairwise`; only run date, timing and output paths differ |
+| `tsc -b` and `vite build` | Pass |
+| `vitest` | 47 of 47 pass (26 existing parser tests, 21 new session and display tests) |
+| `eslint src` | Clean |
+| `check-no-real-schedules` on the new `dist/` | OK, only `schedules/demo-week-schedule.xlsx` shipped |
+| Visual checks (Playwright, 390x844 and 1180x820, dark and light) | Board with assign panel open, demo toolbar, undo chip, deceased team (row and gauge), float primary patient, tour step 3, plus the earlier set (setup, schedule import, override, activity drawer, several teams over 100, lab) |
+| Keyboard | Shift+Tab stays inside the activity drawer; Tab in tour step 3 cycles between the team sheet and the tour card |
+
+### Design rationale
+Wrapping the reducer instead of editing it for interface needs keeps every benchmark and the scoring record valid and makes the replay check meaningful. Separate providers make "demo and tour can never overwrite a live shift" structural rather than a matter of care. JSON-safe, append-only events let a server take the log later without a rewrite.
+
+### Implementation / congruency notes
+- Files: `src/activity.ts`, `src/types.ts` (`toTier`), `src/components/TeamCard.tsx` (lab: closed-team countdown replaced with Reopen), `src/app/focus.ts`, `src/context/session.ts`, `src/context/session.test.ts`, `src/ui/{model.ts,samples.ts,carbon.css}`, `src/app/*`, `src/lab/{LabApp.tsx,LabHome.tsx}` (LabHome is the old `RoleSelection.tsx`, moved), `archive/` (old `HelpSection.tsx`, `MethodologyDeepDive.tsx`, `EvidenceWalkthrough.tsx`, `public/walkthrough-v4.html`), edits to `src/App.tsx`, `src/main.tsx`, `src/index.css`, `index.html`, `eslint.config.js`, `package.json`, `package-lock.json`, `CLAUDE.md`.
+- Commit: `6a75acb` on `carbon-rebuild` (one commit: rebuild plus audit fixes). Merged to main with --no-ff; not deployed.
+- Removing the 60-minute closed-team rule also changes the in-app `?lab` simulator for teams closed by hand mid-run (they now stay closed until reopened). The benchmark and replay scripts call the engine directly and are unaffected.
+- CLAUDE.md corrected against the code: the float modifier multiplies the patient's load, not team capacity; the "not buffered first" rule is the first sort key and is active during the 30-minute deceased buffer.
+- Downgrade still removes the patient from the board (label kept by Julian's call).
+
+---
+
 # Historical Methodology Record
 
 _The sections below document earlier methodology work preserved from a prior version of this document._
