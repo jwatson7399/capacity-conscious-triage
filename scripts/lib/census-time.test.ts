@@ -8,12 +8,13 @@ import {
   atWallHour, dateStrDayOfWeek, excelSerialToWallMs, parseWallClockString, wallDateStr, wallHour, wallTimeLabel,
 } from './census-time';
 
-// Excel serials for known wall-clock times. Each would be misread by the old local-time conversion
-// on a New York machine: about 4 minutes early before 2026-03-08, about 56 minutes late after it.
+// Excel serials for known wall-clock times. On a New York machine the old local-time conversion read
+// arrivals from 2026-03-08 onward (daylight time) one hour late; earlier ones were read correctly.
 const CASES = [
-  { serial: 46037.373611111114, date: '2026-01-15', hour: 8, label: '8:58 AM' },  // before the DST change; old NY reading 8:54
-  { serial: 46101.354166666664, date: '2026-03-20', hour: 8, label: '8:30 AM' },  // after it; old NY reading 9:26
-  { serial: 46064.001388888886, date: '2026-02-11', hour: 0, label: '12:02 AM' }, // near midnight; old NY reading 11:58 PM on Feb 10
+  { serial: 46037.373611111114, date: '2026-01-15', hour: 8, label: '8:58 AM' },  // before the DST change
+  { serial: 46101.354166666664, date: '2026-03-20', hour: 8, label: '8:30 AM' },  // after it; old NY reading 9:30, the wrong cohort
+  { serial: 46064.001388888886, date: '2026-02-11', hour: 0, label: '12:02 AM' }, // just after midnight
+  { serial: 46101.979166666664, date: '2026-03-20', hour: 23, label: '11:30 PM' }, // daylight time near midnight; old NY reading 12:30 AM on Mar 21
 ];
 
 describe('census time helpers', () => {

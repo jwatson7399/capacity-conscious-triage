@@ -7,9 +7,10 @@
  * No zone conversion happens anywhere, so the result is the same on any machine.
  *
  * Why (METHODS.md section 10): the scripts used `new Date(1899, 11, 30)` and local-time getters.
- * On a New York machine the 1899 epoch is in local mean time (UTC-4:56:02), which read arrivals
- * about 4 minutes early before 2026-03-08 and about 56 minutes late after the switch to daylight
- * time. The UTC reading, which these helpers reproduce, matches the workbook clock.
+ * On a New York machine the 1899 epoch is at EST (UTC-5), so arrivals from 2026-03-08 onward
+ * (daylight time, UTC-4) were read exactly one hour late, and YYYY-MM-DD strings (parsed as UTC
+ * midnight) gave a day of week one day early. The UTC reading, which these helpers reproduce,
+ * matches the workbook clock.
  *
  * Wall ms are for data only. Run-date stamps (when a report was generated) stay in local time.
  */
