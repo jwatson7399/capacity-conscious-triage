@@ -114,7 +114,7 @@ function PatientCard({ p, now, onAction }: { p: Patient; now: number; onAction: 
       <div className="meta num">Placed {clock(p.assignedAt)}, {ago(p.assignedAt, now)}{p.upgradedAt ? ` · upgraded ${clock(p.upgradedAt)}` : ''}</div>
       <div className="contrib"><span className="num">{c.toFixed(2)}</span><small className="muted">load contribution{fm !== 'none' ? ` (${FLOAT_MODIFIER_LABELS[fm]}, ${Math.round(FLOAT_MODIFIER_MULTIPLIERS[fm] * 100)}%)` : ''}</small></div>
       <div className="track"><i style={{ width: `${Math.min(100, c / baseWeight('tier_one') * 100)}%`, background: `var(--${cls}-fill)` }} /></div>
-      <small className="muted">{primary ? 'Not counted (float primary)' : running ? `${duration(left)} until no longer counted` : 'No longer counted'}</small>
+      <small className="muted">{p.deceased ? 'Not counted (deceased)' : primary ? 'Not counted (float primary)' : running ? `${duration(left)} until no longer counted` : 'No longer counted'}</small>
       <div className="acts">
         <button className="btn sm" disabled={p.acuity === 'tier_one'} onClick={() => onAction('upgrade', p)}>Upgrade{p.acuity === 'tier_one' ? '' : '…'}</button>
         <button className="btn sm" onClick={() => onAction('downgrade', p)}>Downgrade</button>
@@ -231,7 +231,7 @@ export default function TeamDetail({ teamId, onClose, onNote }: { teamId: TeamId
         body={<p>This takes the patient off the board and out of team load, for a patient who no longer belongs on the A-side. It does not record a clinical outcome.</p>} confirmLabel="Downgrade" danger
         onCancel={() => setDialog(null)} onConfirm={() => { dispatch({ type: 'DOWNGRADE_PATIENT', patientId: dialog.patient.id }); done(`${dialog.patient.id} downgraded`); }} />}
       {dialog?.kind === 'deceased' && <Confirm title={`Mark ${dialog.patient.id} deceased?`}
-        body={<p>Starts a {DECEASED_MIN}-minute buffer on {teamName(teamId)}: the team is ranked last until it ends, unless every open team is buffered. The patient's load keeps following its timer.</p>} confirmLabel="Mark deceased" danger
+        body={<p>Starts a {DECEASED_MIN}-minute buffer on {teamName(teamId)}: the team is ranked last until it ends, unless every open team is buffered. The patient's load comes off the team now.</p>} confirmLabel="Mark deceased" danger
         onCancel={() => setDialog(null)} onConfirm={() => { dispatch({ type: 'DECEASE_PATIENT', patientId: dialog.patient.id }); done(`${dialog.patient.id} marked deceased`); }} />}
       {dialog?.kind === 'reassign' && <TeamPicker title={`Reassign ${dialog.patient.id}`} verb="Move to"
         sub="The patient keeps its timer; this corrects which team it is counted on." from={teamId} closedTeams={state.closedTeams}

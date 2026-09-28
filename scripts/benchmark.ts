@@ -1,16 +1,28 @@
 /**
- * Formula vs Round-Robin Statistical Benchmark
+ * Formula vs Round-Robin Statistical Benchmark (synthetic presets)
  *
- * Runs 200 seeded simulations per preset through both assignment modes
- * and reports statistical comparisons (paired t-test, Cohen's d, win/loss).
+ * Runs 200 seeded 8-hour simulations per preset through both assignment modes and
+ * reports each of ten metrics on its own: mean and SD per mode, paired t-test,
+ * Cohen's d on the paired differences, and per-metric win/tie/loss by seed.
+ * There is no composite score and no count of wins across metrics (Roundtable
+ * 2026-09-28, Decision 18): which metrics are counted changes any such tally.
  *
- * Usage: npx tsx scripts/benchmark.ts
+ * The synthetic patients use the model's parameters, including the Delphi-derived
+ * provider weights in constants.ts, so the run is not independent of NYU inputs.
+ *
+ * Usage: npx tsx scripts/benchmark.ts [--json <output.json>]
+ *   Do not write outputs into data/.
  */
 
-import type { Provider, ProviderType, ProviderStatus, TeamId, SimOverrides, SimStatusChangeEntry } from '../src/types';
+import type { Provider, ProviderType, ProviderStatus, TeamId, SimStatusChangeEntry } from '../src/types';
 import { generateTimeline, runShadowSim, getDefaultOverrides } from '../src/engine/simulation';
-import { statsFromEntries, computeFairness } from '../src/engine/fairness';
+import { statsFromEntries, countBackToBackHA, countSlams, countSpread, acuitySpread } from '../src/engine/fairness';
 import { getEffectiveCapacity } from '../src/engine/recommendation';
+import { writeFileSync } from 'node:fs';
+import { ACUITY_WEIGHTS, ACUITY_DECAY, CAPACITY_WEIGHTS, RED_ZONE_THRESHOLD, BUFFER_DURATIONS_MS } from '../src/constants';
+
+const jsonIdx = process.argv.indexOf('--json');
+const JSON_OUT = jsonIdx >= 0 ? process.argv[jsonIdx + 1] : null;
 
 // ── Preset definitions (mirror SimulationSetup.tsx) ──────────────────
 
@@ -164,19 +176,6 @@ function buildClosedTeams(preset: PresetDef, baseTime: number): Record<number, n
   return ct;
 }
 
-function getTeamCapacities(providers: Provider[], baseTime: number, overrides: SimOverrides): Record<number, number> {
-  const caps: Record<number, number> = {};
-  for (const teamId of [1, 2, 3, 4] as TeamId[]) {
-    const teamProviders = providers.filter(p => p.teamId === teamId);
-    const scoringOv = {
-      capacityWeights: overrides.capacityWeights,
-      statusMultipliers: overrides.statusMultipliers,
-    };
-    caps[teamId] = getEffectiveCapacity(teamProviders, baseTime, scoringOv);
-  }
-  return caps;
-}
-
 // ── Statistics ───────────────────────────────────────────────────────
 
 function mean(arr: number[]): number {
@@ -287,12 +286,43 @@ function fmtMeanStd(vals: number[], dec = 1): string {
 
 // ── Main benchmark ──────────────────────────────────────────────────
 
+// Every "ratio" below is the receiving team's capacity ratio just before the patient
+// is placed (ShadowEntry.ratioAtAssignment), not a team's ratio over the whole shift.
 interface RunMetrics {
-  fairness: number;
-  avgRatio: number;
-  minRatio: number;
-  overwhelms: number;
+  redZone: number;            // arrivals whose receiving team was below RED_ZONE_THRESHOLD (8.5)
+  minRatio: number;           // lowest receiving-team ratio at any assignment (0 if none)
+  avgRatio: number;           // mean receiving-team ratio at assignment (skewed by near-empty teams)
+  b2bHA: number;              // Red or Yellow onto a team that got a Red or Yellow within 30 min (inclusive)
+  slams: number;              // arrival onto a team that got any patient within 60 min (inclusive)
+  countSpread: number;        // max - min patients per eligible team
+  acuitySpread: number;       // max - min of 4:2:1-weighted arrivals per eligible team (no decay)
+  stressSpread: number;       // max - min of patients / steady-state team strength
+  acuityStressSpread: number; // max - min of 4:2:1-weighted arrivals / steady-state team strength
+  avgRatioSpread: number;     // max - min of per-team mean receiving ratio
 }
+
+const DEFINITIONS = [
+  'All ratios are the receiving team\'s capacity ratio just before placement.',
+  `Red-Zone Arrivals: placements onto a team below ${RED_ZONE_THRESHOLD} (p5 of historical ratios).`,
+  'B2B High-Acuity: a Red or Yellow onto a team that got a Red or Yellow within the prior 30 min (inclusive).',
+  'Slams: a patient onto a team that got any patient within the prior 60 min (inclusive), once per arrival.',
+  'Spreads: max minus min across open A-side teams (Trauma and closed teams excluded).',
+  'Stress spreads divide by steady-state team strength (temporary statuses expired), so they do not',
+  '  track time-varying staffing within the shift.',
+];
+
+const METRIC_DEFS: { label: string; key: keyof RunMetrics; higherBetter: boolean; dec: number }[] = [
+  { label: 'Red-Zone Arrivals', key: 'redZone', higherBetter: false, dec: 1 },
+  { label: 'Min Capacity', key: 'minRatio', higherBetter: true, dec: 1 },
+  { label: 'Avg Capacity', key: 'avgRatio', higherBetter: true, dec: 1 },
+  { label: 'B2B High-Acuity', key: 'b2bHA', higherBetter: false, dec: 1 },
+  { label: 'Slams', key: 'slams', higherBetter: false, dec: 1 },
+  { label: 'Count Spread', key: 'countSpread', higherBetter: false, dec: 1 },
+  { label: 'Acuity Spread', key: 'acuitySpread', higherBetter: false, dec: 1 },
+  { label: 'Stress Spread', key: 'stressSpread', higherBetter: false, dec: 3 },
+  { label: 'AcuityStress Sprd', key: 'acuityStressSpread', higherBetter: false, dec: 3 },
+  { label: 'AvgRatio Spread', key: 'avgRatioSpread', higherBetter: false, dec: 1 },
+];
 
 function runPreset(preset: PresetDef): {
   formula: RunMetrics[];
@@ -304,15 +334,25 @@ function runPreset(preset: PresetDef): {
 
   const permanentlyClosed = preset.closedTeams ?? [];
   const closedTeams = buildClosedTeams(preset, BASE_TIME);
+  const eligible = ([1, 2, 3, 4] as TeamId[]).filter(
+    t => t !== 4 && !permanentlyClosed.includes(t)
+  );
+
+  // Steady-state team strength: evaluate far in the future so temporary
+  // statuses (all presets use statusMinutes) have expired back to active.
+  const scoringOv = { capacityWeights: overrides.capacityWeights, statusMultipliers: overrides.statusMultipliers };
+  const steadyProviders = buildProviders(preset.providers, BASE_TIME);
+  const steadyCaps: Record<number, number> = {};
+  for (const t of eligible) {
+    steadyCaps[t] = getEffectiveCapacity(steadyProviders.filter(p => p.teamId === t), BASE_TIME + SHIFT_DURATION_MS * 10, scoringOv);
+  }
 
   const formula: RunMetrics[] = [];
   const roundRobin: RunMetrics[] = [];
 
   for (let seed = 1; seed <= NUM_SEEDS; seed++) {
-    const providers = buildProviders(preset.providers, BASE_TIME);
     const statusChanges = buildStatusChanges(preset, BASE_TIME);
     const timeline = generateTimeline(seed, SHIFT_DURATION_MS, overrides, BASE_TIME);
-    const teamCaps = getTeamCapacities(providers, BASE_TIME, overrides);
 
     for (const mode of ['formula', 'round_robin'] as const) {
       // Fresh provider copies per mode
@@ -322,12 +362,27 @@ function runPreset(preset: PresetDef): {
         overrides, BASE_TIME, mode, statusChanges,
       );
       const stats = statsFromEntries(result.entries);
-      const fairness = computeFairness(stats, permanentlyClosed, teamCaps);
+
+      // Capacity-conscious spreads: workload per unit of team strength.
+      const stress = eligible.map(t => (stats.teamCounts[t] ?? 0) / (steadyCaps[t] || 1));
+      const acuityStress = eligible.map(t => {
+        const al = stats.teamAcuityLoad[t];
+        const load = al ? al.tier_one * ACUITY_WEIGHTS.tier_one + al.tier_two * ACUITY_WEIGHTS.tier_two + al.tier_three * ACUITY_WEIGHTS.tier_three : 0;
+        return load / (steadyCaps[t] || 1);
+      });
+      const finiteAvgRatios = eligible.map(t => stats.avgRatioPerTeam[t]).filter(r => isFinite(r));
+
       const metrics: RunMetrics = {
-        fairness,
-        avgRatio: stats.avgRatio,
+        redZone: stats.redZoneEvents,
         minRatio: stats.minRatio === Infinity ? 0 : stats.minRatio,
-        overwhelms: stats.overwhelms,
+        avgRatio: stats.avgRatio,
+        b2bHA: countBackToBackHA(result.entries),
+        slams: countSlams(result.entries),
+        countSpread: countSpread(stats, eligible),
+        acuitySpread: acuitySpread(stats, eligible),
+        stressSpread: Math.max(...stress) - Math.min(...stress),
+        acuityStressSpread: Math.max(...acuityStress) - Math.min(...acuityStress),
+        avgRatioSpread: finiteAvgRatios.length > 0 ? Math.max(...finiteAvgRatios) - Math.min(...finiteAvgRatios) : 0,
       };
       if (mode === 'formula') formula.push(metrics);
       else roundRobin.push(metrics);
@@ -337,66 +392,93 @@ function runPreset(preset: PresetDef): {
   return { formula, roundRobin };
 }
 
-function printPresetReport(preset: PresetDef, f: RunMetrics[], rr: RunMetrics[]) {
-  console.log(`\n${'═'.repeat(60)}`);
-  console.log(`  PRESET: ${preset.name} — "${preset.label}" (${NUM_SEEDS} runs)`);
-  console.log('═'.repeat(60));
+/** Per-seed win/tie/loss for one metric (win = formula strictly better). Never summed across metrics. */
+function metricWinLoss(f: RunMetrics[], rr: RunMetrics[], key: keyof RunMetrics, higherBetter: boolean, eps = 0.01) {
+  let wins = 0, losses = 0, ties = 0;
+  for (let i = 0; i < f.length; i++) {
+    const diff = f[i][key] - rr[i][key];
+    if (Math.abs(diff) < eps) ties++;
+    else if (higherBetter ? diff > 0 : diff < 0) wins++;
+    else losses++;
+  }
+  return { wins, losses, ties };
+}
 
-  const metrics: { label: string; key: keyof RunMetrics; higherBetter: boolean }[] = [
-    { label: 'Fairness Score', key: 'fairness', higherBetter: true },
-    { label: 'Avg Ratio', key: 'avgRatio', higherBetter: true },
-    { label: 'Min Ratio', key: 'minRatio', higherBetter: true },
-    { label: 'Overwhelms', key: 'overwhelms', higherBetter: false },
-  ];
+interface MetricSummary {
+  key: keyof RunMetrics; label: string; higherBetter: boolean;
+  formulaMean: number; formulaSD: number; roundRobinMean: number; roundRobinSD: number;
+  delta: number; p: number; cohensD: number; wins: number; ties: number; losses: number; n: number;
+}
+
+function printReport(title: string, f: RunMetrics[], rr: RunMetrics[]): MetricSummary[] {
+  const n = f.length;
+  const out: MetricSummary[] = [];
+  console.log(`\n${'═'.repeat(60)}`);
+  console.log(`  ${title} (${n} runs)`);
+  console.log('═'.repeat(60));
 
   console.log(
     pad('', 18) +
-    rpad('Formula', 18) +
-    rpad('Round Robin', 18) +
-    rpad('Δ (F-RR)', 12) +
-    rpad('p-value', 10) +
-    rpad("Cohen's d", 10)
+    rpad('Formula', 16) +
+    rpad('Round Robin', 16) +
+    rpad('Δ (F-RR)', 10) +
+    rpad('p-value', 9) +
+    rpad("Cohen's d", 10) +
+    rpad('W/T/L', 16)
   );
-  console.log('-'.repeat(86));
+  console.log('-'.repeat(95));
 
-  let fWins = 0, rrWins = 0, ties = 0;
-
-  for (const m of metrics) {
+  for (const m of METRIC_DEFS) {
     const fVals = f.map(r => r[m.key]);
     const rrVals = rr.map(r => r[m.key]);
     const delta = mean(fVals) - mean(rrVals);
     const p = pairedTTest(fVals, rrVals);
     const d = cohenD(fVals, rrVals);
+    const eps = m.dec >= 2 ? 0.001 : 0.01;
+    const { wins, losses, ties } = metricWinLoss(f, rr, m.key, m.higherBetter, eps);
+    const winPct = ((wins / n) * 100).toFixed(0);
+    out.push({
+      key: m.key, label: m.label, higherBetter: m.higherBetter,
+      formulaMean: mean(fVals), formulaSD: stddev(fVals), roundRobinMean: mean(rrVals), roundRobinSD: stddev(rrVals),
+      delta, p, cohensD: d, wins, ties, losses, n,
+    });
 
     console.log(
       pad(m.label, 18) +
-      rpad(fmtMeanStd(fVals), 18) +
-      rpad(fmtMeanStd(rrVals), 18) +
-      rpad((delta >= 0 ? '+' : '') + fmt(delta, 2), 12) +
-      rpad(fmtPValue(p), 10) +
-      rpad(fmt(Math.abs(d), 2), 10)
+      rpad(fmtMeanStd(fVals, m.dec), 16) +
+      rpad(fmtMeanStd(rrVals, m.dec), 16) +
+      rpad((delta >= 0 ? '+' : '') + fmt(delta, m.dec + 1), 10) +
+      rpad(fmtPValue(p), 9) +
+      rpad(fmt(Math.abs(d), 2), 10) +
+      rpad(` ${wins}/${ties}/${losses} (${winPct}%)`, 18)
     );
   }
 
-  // Win/loss on fairness
-  for (let i = 0; i < NUM_SEEDS; i++) {
-    const diff = f[i].fairness - rr[i].fairness;
-    if (Math.abs(diff) < 0.01) ties++;
-    else if (diff > 0) fWins++;
-    else rrWins++;
-  }
-  const pct = (n: number) => ((n / NUM_SEEDS) * 100).toFixed(0);
-  console.log(
-    `\nFormula wins: ${fWins}/${NUM_SEEDS} (${pct(fWins)}%)  |  ` +
-    `RR wins: ${rrWins}/${NUM_SEEDS} (${pct(rrWins)}%)  |  ` +
-    `Ties: ${ties}/${NUM_SEEDS} (${pct(ties)}%)`
-  );
+  // No tally of wins across metrics (Decision 18): each metric above stands alone.
+  return out;
 }
 
 // ── Run ─────────────────────────────────────────────────────────────
 
+const decayMin = (t: keyof typeof ACUITY_DECAY) => Math.round((ACUITY_DECAY[t].at(-1)?.afterMs ?? 0) / 60000);
+const MODEL = {
+  acuityWeights: ACUITY_WEIGHTS,
+  decayToZeroMinutes: { tier_one: decayMin('tier_one'), tier_two: decayMin('tier_two'), tier_three: decayMin('tier_three') },
+  capacityWeights: CAPACITY_WEIGHTS,
+  bufferDurationsMs: BUFFER_DURATIONS_MS,
+  redZoneThreshold: RED_ZONE_THRESHOLD,
+  ranking: 'current ratio (post-assign off)',
+};
+
 console.log('Formula vs Round-Robin Benchmark');
-console.log(`Seeds: 1–${NUM_SEEDS} | Shift: 8h | ${PRESETS.length} presets\n`);
+console.log(`Seeds: 1-${NUM_SEEDS} | Shift: 8h | ${PRESETS.length} presets`);
+console.log(`Model: acuity ${MODEL.acuityWeights.tier_one}:${MODEL.acuityWeights.tier_two}:${MODEL.acuityWeights.tier_three}, linear decay to 0 at ` +
+  `${MODEL.decayToZeroMinutes.tier_one}/${MODEL.decayToZeroMinutes.tier_two}/${MODEL.decayToZeroMinutes.tier_three} min, ` +
+  `provider weights ${JSON.stringify(MODEL.capacityWeights)}, red zone < ${MODEL.redZoneThreshold}, ${MODEL.ranking}`);
+console.log('Definitions:');
+for (const line of DEFINITIONS) console.log(`  ${line}`);
+console.log('');
+const report: { preset: string; label: string; metrics: MetricSummary[] }[] = [];
 
 const allFormula: RunMetrics[] = [];
 const allRR: RunMetrics[] = [];
@@ -407,58 +489,15 @@ for (const preset of PRESETS) {
   allFormula.push(...formula);
   allRR.push(...roundRobin);
   process.stdout.write(' done\n');
-  printPresetReport(preset, formula, roundRobin);
+  report.push({ preset: preset.name, label: preset.label, metrics: printReport(`PRESET: ${preset.name}, "${preset.label}"`, formula, roundRobin) });
 }
 
-// Overall summary
-console.log(`\n${'═'.repeat(60)}`);
-console.log(`  OVERALL SUMMARY (${PRESETS.length * NUM_SEEDS} total runs)`);
-console.log('═'.repeat(60));
+const pooled = printReport('OVERALL SUMMARY, all presets pooled', allFormula, allRR);
 
-const metrics: { label: string; key: keyof RunMetrics }[] = [
-  { label: 'Fairness Score', key: 'fairness' },
-  { label: 'Avg Ratio', key: 'avgRatio' },
-  { label: 'Min Ratio', key: 'minRatio' },
-  { label: 'Overwhelms', key: 'overwhelms' },
-];
-
-console.log(
-  pad('', 18) +
-  rpad('Formula', 18) +
-  rpad('Round Robin', 18) +
-  rpad('Δ (F-RR)', 12) +
-  rpad('p-value', 10) +
-  rpad("Cohen's d", 10)
-);
-console.log('-'.repeat(86));
-
-for (const m of metrics) {
-  const fVals = allFormula.map(r => r[m.key]);
-  const rrVals = allRR.map(r => r[m.key]);
-  const delta = mean(fVals) - mean(rrVals);
-  const p = pairedTTest(fVals, rrVals);
-  const d = cohenD(fVals, rrVals);
-  console.log(
-    pad(m.label, 18) +
-    rpad(fmtMeanStd(fVals), 18) +
-    rpad(fmtMeanStd(rrVals), 18) +
-    rpad((delta >= 0 ? '+' : '') + fmt(delta, 2), 12) +
-    rpad(fmtPValue(p), 10) +
-    rpad(fmt(Math.abs(d), 2), 10)
-  );
+if (JSON_OUT) {
+  writeFileSync(JSON_OUT, JSON.stringify({
+    script: 'scripts/benchmark.ts', seeds: NUM_SEEDS, shiftHours: 8, model: MODEL, definitions: DEFINITIONS,
+    presets: report, pooled,
+  }, null, 2));
+  console.log(`\nWrote ${JSON_OUT}`);
 }
-
-let totalFWins = 0, totalRRWins = 0, totalTies = 0;
-for (let i = 0; i < allFormula.length; i++) {
-  const diff = allFormula[i].fairness - allRR[i].fairness;
-  if (Math.abs(diff) < 0.01) totalTies++;
-  else if (diff > 0) totalFWins++;
-  else totalRRWins++;
-}
-const total = allFormula.length;
-const pct = (n: number) => ((n / total) * 100).toFixed(0);
-console.log(
-  `\nFormula wins: ${totalFWins}/${total} (${pct(totalFWins)}%)  |  ` +
-  `RR wins: ${totalRRWins}/${total} (${pct(totalRRWins)}%)  |  ` +
-  `Ties: ${totalTies}/${total} (${pct(totalTies)}%)`
-);

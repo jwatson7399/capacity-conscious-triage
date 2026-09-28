@@ -28,6 +28,7 @@ If this file and the code disagree, the code wins and this file should be fixed.
 npm install
 npm run dev              # dev server (Vite)
 npm run build            # type-check + production build -> dist/
+npx vitest run           # unit tests (parser, session, simulator reducer, fairness, survey)
 ```
 
 ## Deploy = GitHub Pages (gh-pages branch)
@@ -152,6 +153,7 @@ Carbon rebuild (branch `carbon-rebuild`, 2026-09-28): a new interface on the unc
 - `src/constants.ts`: tuning parameters (see below)
 - `src/engine/recommendation.ts`: pure-function scoring engine
 - `src/engine/simulation.ts`, `src/engine/fairness.ts`: simulator and fairness metrics used by benchmarks
+  (see "Research metrics" below)
 - `src/context/ShiftContext.tsx`: the core `useReducer` shift reducer and `ShiftProvider`. The provider
   scores with frozen `CAPACITY_WEIGHTS` (no Delphi polling) and exposes the activity list. Shift rules
   changed 2026-09-28 (Roundtable, Carbon Rebuild Audit, Decisions 12 to 14; scoring untouched):
@@ -176,6 +178,10 @@ Carbon rebuild (branch `carbon-rebuild`, 2026-09-28): a new interface on the unc
 - `archive/`: files moved out of the build (`MethodologyDeepDive`, old `HelpSection`, the old walkthrough and
   `EvidenceWalkthrough`). Never imported or shipped.
 - `src/utils/scheduleParser.ts`: layout-sensitive parser for departmental schedule workbooks
+- `src/utils/delphiResponses.ts`: the survey missing-value policy (see "Delphi survey: missing values")
+- `src/components/benchmarkResults.ts`: numbers for the lab benchmark page, generated from
+  `npx tsx scripts/benchmark.ts --json <file outside data/>`; regenerate, never hand-edit
+- `docs/reviews/2026-06-11/`: screenshots and plan from the superseded June UI work (history only)
 - `scripts/`: Node-only benchmark, replay, de-identification and guard scripts (read from `data/`)
 
 ## Scoring Formula
@@ -195,6 +201,12 @@ auto-recommendations; a closed team stays out until someone reopens it. Tiebreak
 (The not-buffered-first rule is actually the first sort key, not a tiebreaker. Ordinary buffers are
 zero, so it only acts during the 30-minute deceased buffer, which ranks that team last unless every
 eligible team is buffered.)
+
+**Deceased patients** (Roundtable 2026-09-28, Decision 17): a patient marked deceased adds zero load
+at once (`getCurrentLoad` filters them; `src/ui/model.ts` `contribution()` and `timerRunning()` agree)
+and shows as "Not counted (deceased)". The 30-minute deceased buffer carries the effect. The patient
+stays in the record and still counts for "least recently assigned". The 30 minutes is a judgment, not a
+measured value; no benchmark generates deaths, so the session tests are the check.
 
 ### Provider weights
 
@@ -253,9 +265,49 @@ those show whole numbers; zero load is always infinity (`src/ui/model.ts`).
 | >= 8.5  | High Demand |
 | < 8.5   | Red Zone    |
 
-`OVERWHELM_THRESHOLD` = 8.5 (p5 of the empirical distribution under the recommended config). Card
+`RED_ZONE_THRESHOLD` = 8.5 (p5 of the empirical distribution under the recommended config; formerly
+`OVERWHELM_THRESHOLD`, renamed 2026-09-28). A placement onto a team below it is a "red-zone event"
+(`ModeStats.redZoneEvents`, `ShadowResult.redZoneEvents`). The scripts' JSON keeps the old field names
+`overwhelms` and `overwhelmAvoidance` so older result files stay readable. Card
 color and battery fill are anchored to per-arrival percentiles of the 4:2:1 historical replay
 (1,958 arrivals, 121 shift-days). See `METHODS.md` for derivations.
+
+## Research metrics (lab and scripts only)
+
+- **Composite fairness score is versioned** (METHODS.md section 9). v1 (`computeFairnessV1`,
+  `computeFairnessDetailedV1`) weights acuity balance 5:3:1 and reproduces every composite figure
+  recorded before 2026-09-28. v2 (`computeFairness`, `computeFairnessDetailed`, the scripts' default)
+  uses `ACUITY_WEIGHTS` (4:2:1) as one fixed scale for every condition; passing other `acuityWeights`
+  answers a different question and must be labeled. Only acuity balance (15%) differs.
+- **No composite or win tally on screen.** The lab simulation summary and the benchmark page show each
+  measure on its own (Decision 18). Do not reintroduce an overall winner or a count of wins across
+  metrics: which metrics are counted changes it (81% on four chosen metrics, 59% on all ten).
+- Individual helpers (`countBackToBackHA`, `countSlams`, `countSpread`, `acuitySpread`) expect entries
+  in arrival order, use inclusive 30 and 60 minute windows, and measure acuity at 4:2:1 with no decay.
+  All "ratio" metrics are the receiving team's ratio just before placement, not a shift minimum.
+- Real Week Backtest stays under `?lab`, labeled as a dated March 2026 report on composite v1
+  (Decision 19). Its numbers are not current.
+
+## Delphi survey: missing values
+
+`src/utils/delphiResponses.ts`, used by `useSurveyWeights`, `DelphiAdminPanel` and `DelphiSurvey`: a
+blank, missing or non-numeric cell is a non-response for that role (left out of its mean, quartiles and
+n); 0 is a valid rating (scale 0 to 20); off-scale values are missing. Decide missingness on the raw cell,
+never after `Number()` (which turns blanks into 0). A row of all zeros is a response. Research only:
+scoring never reads the survey.
+
+## Landmines
+
+- **Replay time zone.** `scripts/historical-replay.ts`, `scripts/decay-schedule-benchmark.ts` and
+  `scripts/extract-worked-example.ts` convert Excel serials with `new Date(1899, 11, 30)` in local time.
+  On the Mac (America/New_York) that reads census arrivals about 4 minutes early before 2026-03-08 and
+  about 56 minutes late after it, and the replay cohorts become 1,541 / 417. Under `TZ=UTC` they are
+  1,540 / 418 and match the workbook clock and METHODS section 6. Run these scripts with `TZ=UTC` until
+  the conversion is fixed (open item; a fix changes results and needs Julian's go).
+- The lab reducer's TICK applies a tick's scheduled status changes before expiring earlier ones;
+  skip-ahead is chronological. The shared simulation and replay status ordering is an open item.
+- Scripts that write results (historical replay) write into `data/`; for comparison runs use a scratch
+  copy with its own copy of `data/provider-schedules/`, not a symlink.
 
 ## Known inaccuracies still in the app
 
@@ -264,6 +316,7 @@ color and battery fill are anchored to per-arrival percentiles of the 4:2:1 hist
   and quotes no figures.
 - The pre-Carbon walkthrough (`public/walkthrough-v4.html`) is archived; How it works is text only and
   the app makes no Google Fonts request.
+- Pre-Carbon lab screens still show some em dashes (simulation setup, lab Dashboard, lab TeamCard).
 
 ## Key Design Decisions
 

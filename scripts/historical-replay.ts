@@ -31,7 +31,7 @@ import {
   getDecayedAcuityWeight,
 } from '../src/engine/recommendation';
 import type { ScoringOverrides } from '../src/engine/recommendation';
-import { TRAUMA_TEAM_ID, OVERWHELM_THRESHOLD, ACUITY_WEIGHTS } from '../src/constants';
+import { TRAUMA_TEAM_ID, RED_ZONE_THRESHOLD, ACUITY_WEIGHTS } from '../src/constants';
 import { uid } from '../src/uid';
 
 // ── CLI flags ──────────────────────────────────────────────────────
@@ -169,7 +169,7 @@ interface CohortMetrics {
   teamCounts: Record<number, number>;
   avgRatio: number;
   minRatio: number;
-  overwhelms: number;
+  overwhelms: number;  // red-zone events (ratio < RED_ZONE_THRESHOLD); field name kept so older JSON stays readable
   backToBackHA: number;
   slams: number;
   teamSpread: number;
@@ -751,7 +751,7 @@ function replayCohort(
       teamCounts: counts,
       avgRatio: stats.avgRatio,
       minRatio: stats.minRatio === Infinity ? 0 : stats.minRatio,
-      overwhelms: stats.overwhelms,
+      overwhelms: stats.redZoneEvents,
       backToBackHA: countBackToBackHA(entries),
       slams: countSlams(entries),
       teamSpread: teamSpread(counts, eligibleTeams),
@@ -1176,7 +1176,7 @@ function printCohortReport(
     { label: 'Gini (acuity-weighted)', key: 'giniAcuity', dec: 3, higherBetter: false },
     { label: 'Avg Ratio', key: 'avgRatio', dec: 1, higherBetter: true },
     { label: 'Min Ratio', key: 'minRatio', dec: 1, higherBetter: true },
-    { label: 'Overwhelm Events/day', key: 'overwhelms', dec: 1, higherBetter: false },
+    { label: 'Red-zone events/day', key: 'overwhelms', dec: 1, higherBetter: false },
     { label: 'Daily Team Spread', key: 'teamSpread', dec: 1, higherBetter: false },
     { label: 'Acuity-Weighted Spread', key: 'acuitySpread', dec: 1, higherBetter: false },
     { label: 'Back-to-back HA', key: 'backToBackHA', dec: 1, higherBetter: false },
@@ -1218,7 +1218,7 @@ function printCohortReport(
   const subDefs: { label: string; key: SubKey }[] = [
     { label: 'Capacity Balance (25%)', key: 'capacityBalance' },
     { label: 'Acuity Balance (15%)', key: 'acuityBalance' },
-    { label: 'Overwhelm Avoidance (30%)', key: 'overwhelmAvoidance' },
+    { label: 'Red-zone avoidance (30%)', key: 'overwhelmAvoidance' },
     { label: 'Min Ratio Score (15%)', key: 'minRatioScore' },
     { label: 'Stress Equity (15%)', key: 'stressEquity' },
   ];
@@ -1453,11 +1453,11 @@ if (threeTeamDays.length > 0) {
   console.log(`  Formula vs Actual: ${sigLabel} (p=${fmtPValue(pFA)}, d=${fmt(Math.abs(dFA), 2)}, ${effectLabel} effect)`);
   console.log(`  Formula wins ${fWinPctA}% of days against historical assignments.`);
 
-  const fOverwhelms = mean(threeTeamDays.map(d => d.formula.overwhelms));
-  const aOverwhelms = mean(threeTeamDays.map(d => d.actual.overwhelms));
-  const overwhelmDelta = aOverwhelms - fOverwhelms;
-  if (overwhelmDelta > 0) {
-    console.log(`  Formula reduces overwhelm events by ${fmt(overwhelmDelta, 1)}/day on average.`);
+  const fRedZone = mean(threeTeamDays.map(d => d.formula.overwhelms));
+  const aRedZone = mean(threeTeamDays.map(d => d.actual.overwhelms));
+  const redZoneDelta = aRedZone - fRedZone;
+  if (redZoneDelta > 0) {
+    console.log(`  Formula reduces red-zone events by ${fmt(redZoneDelta, 1)}/day on average.`);
   }
 
   const fB2B = mean(threeTeamDays.map(d => d.formula.backToBackHA));
@@ -1476,7 +1476,7 @@ if (threeTeamDays.length > 0) {
 
   console.log(`\n  "If we had been using this app during daytime shifts over the last 4 months`);
   console.log(`   for A-side patient assignment, fairness would have been ${fmt(fFairness - aFairness, 1)} points`);
-  console.log(`   higher on average, with ${fmt(overwhelmDelta * threeTeamDays.length, 0)} fewer total overwhelm events,`);
+  console.log(`   higher on average, with ${fmt(redZoneDelta * threeTeamDays.length, 0)} fewer total red-zone events,`);
   console.log(`   ${fmt(b2bDelta * threeTeamDays.length, 0)} fewer back-to-back high-acuity dumps,`);
   console.log(`   and ${fmt(slamDelta * threeTeamDays.length, 0)} fewer slams across Teams 1–3."`);
 
@@ -1488,7 +1488,7 @@ if (threeTeamDays.length > 0) {
   const fnbFairness = mean(threeTeamDays.map(d => d.formulaNoBuffer.fairness));
   const fnbSlams = mean(threeTeamDays.map(d => d.formulaNoBuffer.slams));
   const fnbB2B = mean(threeTeamDays.map(d => d.formulaNoBuffer.backToBackHA));
-  const fnbOverwhelms = mean(threeTeamDays.map(d => d.formulaNoBuffer.overwhelms));
+  const fnbRedZone = mean(threeTeamDays.map(d => d.formulaNoBuffer.overwhelms));
   const fnbMinRatio = mean(threeTeamDays.map(d => d.formulaNoBuffer.minRatio));
 
   console.log(`\n  Mean metrics across ${threeTeamDays.length} three-team days:`);
@@ -1498,7 +1498,7 @@ if (threeTeamDays.length > 0) {
   console.log(`  ${'Fairness Score'.padEnd(24)} ${fmt(aFairness, 1).padStart(10)} ${fmt(fFairness, 1).padStart(10)} ${fmt(fnbFairness, 1).padStart(10)} ${fmt(rrFairness, 1).padStart(10)}`);
   console.log(`  ${'Slams/day'.padEnd(24)} ${fmt(aSlams, 2).padStart(10)} ${fmt(fSlams, 2).padStart(10)} ${fmt(fnbSlams, 2).padStart(10)} ${fmt(mean(threeTeamDays.map(d => d.roundRobin.slams)), 2).padStart(10)}`);
   console.log(`  ${'Back-to-back HA/day'.padEnd(24)} ${fmt(aB2B, 2).padStart(10)} ${fmt(fB2B, 2).padStart(10)} ${fmt(fnbB2B, 2).padStart(10)} ${fmt(mean(threeTeamDays.map(d => d.roundRobin.backToBackHA)), 2).padStart(10)}`);
-  console.log(`  ${'Overwhelms/day'.padEnd(24)} ${fmt(aOverwhelms, 2).padStart(10)} ${fmt(fOverwhelms, 2).padStart(10)} ${fmt(fnbOverwhelms, 2).padStart(10)} ${fmt(mean(threeTeamDays.map(d => d.roundRobin.overwhelms)), 2).padStart(10)}`);
+  console.log(`  ${'Red-zone events/day'.padEnd(24)} ${fmt(aRedZone, 2).padStart(10)} ${fmt(fRedZone, 2).padStart(10)} ${fmt(fnbRedZone, 2).padStart(10)} ${fmt(mean(threeTeamDays.map(d => d.roundRobin.overwhelms)), 2).padStart(10)}`);
   console.log(`  ${'Min Ratio'.padEnd(24)} ${fmt(mean(threeTeamDays.map(d => d.actual.minRatio)), 1).padStart(10)} ${fmt(mean(threeTeamDays.map(d => d.formula.minRatio)), 1).padStart(10)} ${fmt(fnbMinRatio, 1).padStart(10)} ${fmt(mean(threeTeamDays.map(d => d.roundRobin.minRatio)), 1).padStart(10)}`);
 
   // Decomposition: Formula vs Actual improvement, split by capacity vs buffers

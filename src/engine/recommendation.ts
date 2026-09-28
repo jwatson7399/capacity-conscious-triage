@@ -53,7 +53,9 @@ export function getDecayedAcuityWeight(patient: Patient, now: number, overrides?
 
 export function getCurrentLoad(patients: Patient[], teamId: TeamId, now: number, overrides?: ScoringOverrides): number {
   return patients
-    .filter(p => p.assignedTeamId === teamId)
+    // A deceased patient adds no load; the 30-minute deceased buffer carries the effect
+    // (Roundtable 2026-09-28, Decision 17).
+    .filter(p => p.assignedTeamId === teamId && !p.deceased)
     .reduce((sum, p) => {
       const decayed = getDecayedAcuityWeight(p, now, overrides);
       const floatMult = FLOAT_MODIFIER_MULTIPLIERS[p.floatModifier ?? 'none'];

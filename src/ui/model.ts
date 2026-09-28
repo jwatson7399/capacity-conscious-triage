@@ -46,8 +46,12 @@ export function baseWeight(tier: AcuityTier): number {
   return ACUITY_WEIGHTS[tier];
 }
 
-/** What this patient adds to its team's load right now (decay times float modifier). */
+/**
+ * What this patient adds to its team's load right now (decay times float modifier).
+ * A deceased patient adds nothing, matching getCurrentLoad (Decision 17).
+ */
 export function contribution(p: Patient, now: number): number {
+  if (p.deceased) return 0;
   return getDecayedAcuityWeight(p, now) * FLOAT_MODIFIER_MULTIPLIERS[p.floatModifier ?? 'none'];
 }
 
@@ -62,9 +66,9 @@ export function isCounted(p: Patient, now: number): boolean {
   return contribution(p, now) > 0;
 }
 
-/** True while the patient's decay timer is still running, whatever its float modifier. */
+/** True while the patient's decay timer is still running, whatever its float modifier. Deceased stops it. */
 export function timerRunning(p: Patient, now: number): boolean {
-  return getDecayedAcuityWeight(p, now) > 0;
+  return !p.deceased && getDecayedAcuityWeight(p, now) > 0;
 }
 
 export function isFloatPrimary(p: Patient): boolean {

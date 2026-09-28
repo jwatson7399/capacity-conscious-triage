@@ -33,6 +33,7 @@ body {
   font-family: 'IBM Plex Sans', ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.05em;
+  white-space: nowrap;
 }
 
 .dashboard-bg {

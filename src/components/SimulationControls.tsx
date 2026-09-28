@@ -2,8 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { useShift } from '../context/ShiftContext';
 import SimulationParams from './SimulationParams';
 import type { TeamId } from '../types';
-import { statsFromEntries, computeFairness } from '../engine/fairness';
-import { getEffectiveCapacity } from '../engine/recommendation';
+import { statsFromEntries, countSpread } from '../engine/fairness';
 
 const SPEEDS = [1, 5, 10, 15, 20, 30, 40, 50, 100, 200, 400];
 
@@ -30,21 +29,12 @@ function ComparisonPanel({ sim, arrivedCount }: { sim: NonNullable<ReturnType<ty
   const liveStats = useMemo(() => statsFromEntries(liveEntries), [liveEntries]);
   const shadowStats = useMemo(() => statsFromEntries(shadowEntries), [shadowEntries]);
 
-  const teamCapacities = useMemo(() => {
-    const caps: Record<number, number> = {};
-    const providers = sim.initialProviders ?? [];
-    for (const t of [1, 2, 3, 4] as (1|2|3|4)[]) {
-      caps[t] = getEffectiveCapacity(providers.filter(p => p.teamId === t), sim.baseTime);
-    }
-    return caps;
-  }, [sim.initialProviders, sim.baseTime]);
-
-  const liveFairness = useMemo(() => computeFairness(liveStats, sim.permanentlyClosedTeams, teamCapacities), [liveStats, sim.permanentlyClosedTeams, teamCapacities]);
-  const shadowFairness = useMemo(() => computeFairness(shadowStats, sim.permanentlyClosedTeams, teamCapacities), [shadowStats, sim.permanentlyClosedTeams, teamCapacities]);
-
   const eligible = ([1, 2, 3, 4] as TeamId[]).filter(
     t => t !== 4 && !sim.permanentlyClosedTeams.includes(t)
   );
+
+  const liveSpread = countSpread(liveStats, eligible);
+  const shadowSpread = countSpread(shadowStats, eligible);
 
   const f = (n: number) => !isFinite(n) ? '-' : n.toFixed(1);
   const hi = (a: number, b: number, higher: boolean) => {
@@ -85,18 +75,18 @@ function ComparisonPanel({ sim, arrivedCount }: { sim: NonNullable<ReturnType<ty
         <span className={`text-left font-mono text-slate-300 ${hi(shadowStats.minRatio, liveStats.minRatio, true)}`}>{f(shadowStats.minRatio)}</span>
       </div>
 
-      {/* Overwhelms */}
+      {/* Red-zone arrivals (receiving team below p5 of historical capacity distribution) */}
       <div className="grid grid-cols-[1fr_auto_1fr] gap-1 items-center py-0.5">
-        <span className={`text-right font-mono text-slate-300 ${hi(liveStats.overwhelms, shadowStats.overwhelms, false)}`}>{liveStats.overwhelms}</span>
-        <span className="w-20 text-center text-slate-500">Overwhelms</span>
-        <span className={`text-left font-mono text-slate-300 ${hi(shadowStats.overwhelms, liveStats.overwhelms, false)}`}>{shadowStats.overwhelms}</span>
+        <span className={`text-right font-mono text-slate-300 ${hi(liveStats.redZoneEvents, shadowStats.redZoneEvents, false)}`}>{liveStats.redZoneEvents}</span>
+        <span className="w-20 text-center text-slate-500">Red-zone</span>
+        <span className={`text-left font-mono text-slate-300 ${hi(shadowStats.redZoneEvents, liveStats.redZoneEvents, false)}`}>{shadowStats.redZoneEvents}</span>
       </div>
 
-      {/* Fairness */}
+      {/* Count spread (max minus min patients across open A-side teams) */}
       <div className="grid grid-cols-[1fr_auto_1fr] gap-1 items-center py-0.5">
-        <span className={`text-right font-mono text-slate-300 ${hi(liveFairness, shadowFairness, true)}`}>{liveFairness.toFixed(0)}</span>
-        <span className="w-20 text-center text-slate-500">Fairness</span>
-        <span className={`text-left font-mono text-slate-300 ${hi(shadowFairness, liveFairness, true)}`}>{shadowFairness.toFixed(0)}</span>
+        <span className={`text-right font-mono text-slate-300 ${hi(liveSpread, shadowSpread, false)}`}>{liveSpread}</span>
+        <span className="w-20 text-center text-slate-500">Count spread</span>
+        <span className={`text-left font-mono text-slate-300 ${hi(shadowSpread, liveSpread, false)}`}>{shadowSpread}</span>
       </div>
     </div>
   );
@@ -110,6 +100,17 @@ export default function SimulationControls() {
   const [showCompare, setShowCompare] = useState(false);
   const speedBtnRef = useRef<HTMLButtonElement>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  // Mini controls appear only while the control bar is actually out of view.
+  const [barEl, setBarEl] = useState<HTMLDivElement | null>(null);
+  const [barOffscreen, setBarOffscreen] = useState(false);
+
+  useEffect(() => {
+    if (!barEl) return;
+    const io = new IntersectionObserver(([entry]) => setBarOffscreen(!entry.isIntersecting));
+    io.observe(barEl);
+    return () => io.disconnect();
+  }, [barEl]);
+  const showMini = barEl !== null && barOffscreen;
 
   useEffect(() => {
     if (showSpeedMenu && speedBtnRef.current) {
@@ -132,7 +133,7 @@ export default function SimulationControls() {
 
   return (
     <>
-      <div className="bg-slate-800/90 backdrop-blur border-b border-white/10 px-3 py-2 overflow-visible">
+      <div ref={setBarEl} className="bg-slate-800/90 backdrop-blur border-b border-white/10 px-3 py-2 overflow-visible">
         {/* Controls row */}
         <div className="flex items-center gap-2">
           {/* Rewind */}
@@ -241,7 +242,8 @@ export default function SimulationControls() {
         )}
       </div>
 
-      {/* Floating mini controls */}
+      {/* Floating mini controls: only while the control bar is out of view */}
+      {showMini && (
       <div className="fixed bottom-6 left-6 z-20 flex items-center gap-1.5 bg-slate-800/90 backdrop-blur rounded-2xl px-3 py-2 shadow-lg border border-white/10">
         <button
           onClick={() => {
@@ -271,6 +273,7 @@ export default function SimulationControls() {
         </button>
         <span className="text-[10px] text-slate-400 font-mono ml-1">{formatTime(elapsed)}</span>
       </div>
+      )}
 
       {showSpeedMenu && menuPos && (
         <>

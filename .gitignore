@@ -33,3 +33,6 @@ Outside Counsel Briefing Packet*
 Informatics Outlook thread*
 informatics outlook thread*
 data/provider-schedules/
+
+# Playwright MCP session artifacts
+.playwright-mcp/

@@ -212,3 +212,53 @@ run were already exempt. Benchmark and replay scripts call the engine directly a
 unaffected. METHODS.md section 7 records this.
 
 ---
+
+## [2026-09-28 13:24 EDT] Claude 4
+
+**Plan: June reconciliation** (`ER Triage App/HANDOFF_june-reconciliation.md`, spec
+`ER Triage App/AUDIT_june-fixes.md`, Roundtable Decisions 16 to 19). Approved through step 9
+only: no merge into `main`, no push of `main`, no deploy, no `gh-pages`.
+
+1. Back up Carbon: `git push origin main:carbon-main`; record `gh-pages` hash (expect 610b6f5).
+2. `reconcile-june` from local `main` (`8f1a6ab`); `git merge --no-ff --no-commit origin/main`
+   (`025fe05`). Carbon wins for Carbon files; archived files stay archived; engine takes June's
+   deceased filter (Decision 17); June's survey averaging and skip-ahead lines not taken as written.
+3. Topic commits: deceased model/TeamDetail/Help; reducer TICK + chronological skip-ahead
+   (respects round-robin); one survey missingness policy (blank = non-response, 0 valid);
+   versioned fairness (legacy 5:3:1 kept, corrected 4:2:1 added, individual helpers);
+   `OVERWHELM_THRESHOLD` -> `RED_ZONE_THRESHOLD` (8.5, old JSON fields readable); lab UI items;
+   benchmark script + per-metric report page (no winner headline, NYU notice, no em dashes);
+   Real Week Backtest dated label; favicon; June PNGs to `docs/reviews/2026-06-11/`.
+4. Tests for all of the above. 5. Reruns in scratch copies of `f0f5bd4`, `8f1a6ab`, branch;
+   nothing written into `data/`. 6. Lint, build, `check:schedules`, screenshots. 7. CLAUDE.md,
+   METHODS sections 8 and 9, dated notes on two results docs. 8. Push `reconcile-june` only.
+
+Not in scope: the shared simulation/replay status-ordering repair (open item 12). If anything
+does not match the handoff or audit, I stop and report. Please do not touch `main` or these
+files while this runs.
+
+---
+
+## [2026-09-28 14:20 EDT] Claude 4
+
+**June reconciliation done through step 8, on `reconcile-june`. Not merged into `main`, `main`
+not pushed, nothing deployed.** Backup `carbon-main` = `8f1a6ab`; `gh-pages` = `610b6f5`.
+
+Commits: merge `b7e50bb` (parents `8f1a6ab`, `025fe05`); `e468438` deceased zero load (Decision 17);
+`4b3c549` lab reducer skip-ahead chronological + round-robin; `10e9739` survey missing values;
+`d2287d4` composite v1 (5:3:1) / v2 (4:2:1); `6c841b3` red-zone rename (JSON fields kept);
+`a4da317` lab panels, no win tally; `602dd94` ten-metric benchmark + rebuilt report page
+(Decision 18); `bf9eea7` backtest labeled dated (Decision 19); `cd4e296` favicon; `754b45a`
+June PNGs to `docs/reviews/2026-06-11/`; `d8e0d2c` METHODS 8 and 9, CLAUDE.md.
+
+Checks: 70/70 tests (23 new), eslint, build, `check:schedules` OK. Reruns in scratch copies:
+pre-Carbon = Carbon byte-identical; Carbon vs branch differs only in `acuityBalance`,
+`composite`, `fairness`; branch with composite v1 = Carbon byte-identical.
+
+**For anyone running the replay:** the cohort gap (1,541/417 on the Mac vs 1,540/418 in
+METHODS 6) is the time zone. `excelDateToMs` uses a local-time 1899 epoch; on America/New_York
+arrivals are skewed (about -4 min before 2026-03-08, about +56 min after). Run with `TZ=UTC`;
+Carbon under UTC reproduces the September record byte for byte. Same code in
+`decay-schedule-benchmark.ts` and `extract-worked-example.ts`. Not fixed (open item).
+
+---

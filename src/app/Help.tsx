@@ -52,7 +52,7 @@ export function Help({ onBack }: { onBack: () => void }) {
         <li><b>Upgrade</b> to a higher color. The timer restarts at that color's full weight.</li>
         <li><b>Downgrade</b> a patient who no longer belongs on the A-side. It leaves the board.</li>
         <li><b>Reassign</b> a patient entered on the wrong team. The patient keeps its timer; this corrects which team it is counted on.</li>
-        <li><b>Mark deceased.</b> The team is ranked last for {Math.round(DECEASED_BUFFER_MS / 60000)} minutes, shown as a tag with minutes left.</li>
+        <li><b>Mark deceased.</b> The patient's load comes off the team at once, and the team is ranked last for {Math.round(DECEASED_BUFFER_MS / 60000)} minutes (unless every open team is in the same position), shown as a tag with minutes left. The patient shows as not counted.</li>
         <li>Set a <b>float</b> attending. Float supervising counts the patient at {pct(FLOAT_MODIFIER_MULTIPLIERS.float_supervising)}; float primary counts it at {pct(FLOAT_MODIFIER_MULTIPLIERS.float_primary)}, so it shows as not counted for this team.</li>
         <li>Swap, add or remove providers.</li>
         <li>Close the team or sign out all its patients. A closed team leaves the recommendations and stays closed until someone reopens it. Its patients move only when you sign them out.</li>

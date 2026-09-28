@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { R2_MIN_RESPONSES } from '../constants';
+import { isSurveyResponse, meanRating, ratingsFor, type SheetRow } from '../utils/delphiResponses';
 
 const SHEETS_API = import.meta.env.VITE_DELPHI_SHEETS_URL || '';
 const ACTIVE_ROUND_KEY = 'delphi-active-round';
@@ -12,7 +13,7 @@ const ROLES = [
   { key: 'rotator', sheet: 'Rotator', label: 'Rotator' },
 ];
 
-type Row = Record<string, string | number>;
+type Row = SheetRow;
 
 function getActiveRound(): 1 | 2 {
   const raw = localStorage.getItem(ACTIVE_ROUND_KEY);
@@ -28,16 +29,14 @@ function parseRound(v: unknown): 1 | 2 {
   return Number(v) === 2 ? 2 : 1;
 }
 
-function meansFor(rows: Row[]): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const r of ROLES) {
-    if (rows.length === 0) { out[r.key] = 0; continue; }
-    let sum = 0;
-    for (const row of rows) sum += Number(row[r.sheet] ?? 0);
-    out[r.key] = sum / rows.length;
-  }
+// Blank is a non-response, 0 is a valid rating (src/utils/delphiResponses.ts).
+function meansFor(rows: Row[]): Record<string, number | null> {
+  const out: Record<string, number | null> = {};
+  for (const r of ROLES) out[r.key] = meanRating(ratingsFor(rows, r.sheet));
   return out;
 }
+
+const fmtMean = (m: number | null) => (m === null ? '–' : m.toFixed(1));
 
 export default function DelphiAdminPanel() {
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -52,10 +51,7 @@ export default function DelphiAdminPanel() {
         const res = await fetch(SHEETS_API);
         const data: Row[] = await res.json();
         if (cancelled) return;
-        setRows(data.filter(r => r['Type'] !== 'attestation' && ROLES.some(role => {
-          const v = r[role.sheet];
-          return v !== '' && v != null && Number(v) !== 0;
-        })));
+        setRows(data.filter(r => isSurveyResponse(r, ROLES.map(role => role.sheet))));
       } catch { /* ignore */ }
     };
     poll();
@@ -106,10 +102,10 @@ export default function DelphiAdminPanel() {
               <div key={r.key} className="contents">
                 <div className="text-slate-700 dark:text-slate-300">{r.label}</div>
                 <div className="text-right tabular-nums text-slate-600 dark:text-slate-400">
-                  {r1.length > 0 ? r1Means[r.key].toFixed(1) : '—'}
+                  {fmtMean(r1Means[r.key])}
                 </div>
                 <div className="text-right tabular-nums text-slate-900 dark:text-white font-semibold">
-                  {r2.length > 0 ? r2Means[r.key].toFixed(1) : '—'}
+                  {fmtMean(r2Means[r.key])}
                 </div>
               </div>
             ))}

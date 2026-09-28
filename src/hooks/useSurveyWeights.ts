@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { ProviderType } from '../types';
 import { CAPACITY_WEIGHTS } from '../constants';
+import { isSurveyResponse, meanRating, ratingsFor, type SheetRow } from '../utils/delphiResponses';
 
 const SHEETS_API = import.meta.env.VITE_DELPHI_SHEETS_URL || '';
 const POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
@@ -23,11 +24,9 @@ async function fetchSurveyAverages(activeRound: 1 | 2): Promise<Record<ProviderT
   if (!SHEETS_API) return null;
   try {
     const res = await fetch(SHEETS_API);
-    const allRows: Record<string, string | number>[] = await res.json();
-    const validRows = allRows.filter(row => {
-      if (row['Type'] === 'attestation') return false;
-      return ROLE_KEYS.some(({ sheet }) => row[sheet] !== '' && row[sheet] != null && Number(row[sheet]) !== 0);
-    });
+    const allRows: SheetRow[] = await res.json();
+    const columns = ROLE_KEYS.map(r => r.sheet);
+    const validRows = allRows.filter(row => isSurveyResponse(row, columns));
 
     const rowsForRound = (round: 1 | 2) => validRows.filter(r => {
       const n = Number(r['Round']);
@@ -42,9 +41,9 @@ async function fetchSurveyAverages(activeRound: 1 | 2): Promise<Record<ProviderT
 
     const weights: Record<string, number> = { attending: 20 };
     for (const { sheet, type } of ROLE_KEYS) {
-      let sum = 0;
-      for (const row of rows) sum += Number(row[sheet] ?? 0);
-      weights[type] = Math.round((sum / rows.length) * 10) / 10;
+      // Blank is a non-response, 0 is a valid rating (src/utils/delphiResponses.ts).
+      const m = meanRating(ratingsFor(rows, sheet));
+      weights[type] = m === null ? CAPACITY_WEIGHTS[type] : Math.round(m * 10) / 10;
     }
     return weights as Record<ProviderType, number>;
   } catch {

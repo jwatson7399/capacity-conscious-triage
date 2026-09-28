@@ -129,21 +129,25 @@ export interface CapacityTerm {
   color: string;
 }
 
-export const OVERWHELM_THRESHOLD = 8.5;  // p5 of empirical distribution (23,193 obs) under recommended config
+// Red-zone boundary: p5 of the empirical capacity-ratio distribution (23,193 obs)
+// under the recommended config. Purely descriptive — "this team-state is in the
+// historically rarest, busiest 5%"; it makes no claim about subjective overwhelm.
+// Formerly OVERWHELM_THRESHOLD (renamed 2026-09-28; value unchanged).
+export const RED_ZONE_THRESHOLD = 8.5;
 
 export const CAPACITY_TERMS: Array<{ minRatio: number; label: string; color: string }> = [
   { minRatio: 50, label: 'Comfortable', color: 'text-emerald-500' },     // top 25% (≥ p75)
   { minRatio: 23, label: 'Manageable', color: 'text-green-500' },        // p50–p75 (above median)
   { minRatio: 16, label: 'Busy', color: 'text-yellow-600' },             // p33–p50
   { minRatio: 11.5, label: 'Very Busy', color: 'text-orange-500' },      // p15–p33 (modal plateau)
-  { minRatio: OVERWHELM_THRESHOLD, label: 'High Demand', color: 'text-red-500' },  // p5–p15
+  { minRatio: RED_ZONE_THRESHOLD, label: 'High Demand', color: 'text-red-500' },  // p5–p15
 ];
 
 // Color stops anchored to per-arrival percentiles of real 4:2:1 historical replay data
 // (1,958 arrivals, 121 shift-days). p1=12 · p5=19 · p15=31 · p25=47.
 const COLOR_STOPS: Array<{ ratio: number; r: number; g: number; b: number }> = [
   { ratio: 0, r: 153, g: 27, b: 27 },        // red-800
-  { ratio: 8.5, r: 220, g: 38, b: 38 },      // red-600 (overwhelm threshold)
+  { ratio: 8.5, r: 220, g: 38, b: 38 },      // red-600 (RED_ZONE_THRESHOLD)
   { ratio: 12, r: 239, g: 68, b: 68 },       // red-500
   { ratio: 19, r: 249, g: 115, b: 22 },      // orange-500
   { ratio: 31, r: 234, g: 179, b: 8 },       // yellow-500
@@ -168,13 +172,13 @@ export const CAPACITY_GRADIENT_CSS = `linear-gradient(to right, ${COLOR_STOPS.ma
 
 // Battery fill percentage (0–100) for the capacity widget.
 // Anchored to per-arrival percentiles of 4:2:1 historical replay (1,958 arrivals across 121 shift-days):
-// ratio 8.5 (overwhelm) → 7% · 12 (p1) → 20% · 19 (p5) → 40% · 31 (p15) → 60% · 47 (p25) → 80% · 60+ → 100%
+// ratio 8.5 (red zone) → 7% · 12 (p1) → 20% · 19 (p5) → 40% · 31 (p15) → 60% · 47 (p25) → 80% · 60+ → 100%
 export function capacityFillPercent(ratio: number): number {
   if (!isFinite(ratio) || ratio >= 60) return 100;
   if (ratio <= 0) return 0;
   const stops: Array<{ r: number; pct: number }> = [
     { r: 0, pct: 0 },
-    { r: OVERWHELM_THRESHOLD, pct: 7 },
+    { r: RED_ZONE_THRESHOLD, pct: 7 },
     { r: 12, pct: 20 },
     { r: 19, pct: 40 },
     { r: 31, pct: 60 },
