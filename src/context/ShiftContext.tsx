@@ -1,13 +1,15 @@
 import { createContext, useContext, useReducer, useMemo, type ReactNode } from 'react';
 import type { ShiftState, ShiftAction, Recommendation, SimulationState } from '../types';
 import type { ProviderType } from '../types';
-import { STATUS_EXPIRE_MS_MAP, BUFFER_DURATIONS_MS, TEAM_CLOSE_TRANSFER_MS, TEAM_CLOSE_TRANSFER_TARGETS, DECEASED_BUFFER_MS, TRAUMA_TEAM_ID, QUICK_UNDO_WINDOW_MS } from '../constants';
+import { STATUS_EXPIRE_MS_MAP, BUFFER_DURATIONS_MS, DECEASED_BUFFER_MS, TRAUMA_TEAM_ID, QUICK_UNDO_WINDOW_MS } from '../constants';
 import { getRecommendation, createBuffer, type ScoringOverrides } from '../engine/recommendation';
 import { uid } from '../uid';
 import type { Provider, Patient, Buffer, TeamId } from '../types';
 import { generateTimeline, generateStatusChanges, takeSnapshot, addSnapshot, runShadowSim, replayToTime } from '../engine/simulation';
 import { getProvidersForShift } from '../utils/scheduleParser';
-import { useSurveyWeights } from '../hooks/useSurveyWeights';
+import { CAPACITY_WEIGHTS } from '../constants';
+import type { ActivityEvent } from '../activity';
+import { emptySession, makeSessionReducer, type SessionAction, type SessionState } from './session';
 
 function simOverridesToScoring(sim: SimulationState | undefined): ScoringOverrides | undefined {
   if (!sim) return undefined;
@@ -20,7 +22,7 @@ function simOverridesToScoring(sim: SimulationState | undefined): ScoringOverrid
   };
 }
 
-const initialState: ShiftState = {
+export const initialState: ShiftState = {
   providers: [],
   patients: [],
   buffers: [],
@@ -33,7 +35,7 @@ const initialState: ShiftState = {
   floatAttendings: [],
 };
 
-function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
+export function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
   const now = state.now;
 
   switch (action.type) {
@@ -77,26 +79,11 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
       });
       // Remove expired buffers
       const buffers = state.buffers.filter(b => b.expiresAt > tickNow);
-      // Auto-transfer patients from closed teams after timeout
-      // Skip permanently closed teams (from simulation setup)
-      const permaClosed = sim?.permanentlyClosedTeams;
-      let patients = state.patients;
-      let closedTeams = state.closedTeams;
-      for (const [teamIdStr, closedAt] of Object.entries(closedTeams)) {
-        const teamId = Number(teamIdStr);
-        if (permaClosed?.includes(teamId)) continue;
-        if (tickNow >= closedAt + TEAM_CLOSE_TRANSFER_MS) {
-          const target = TEAM_CLOSE_TRANSFER_TARGETS[teamId];
-          if (target) {
-            patients = patients.map(p =>
-              p.assignedTeamId === teamId ? { ...p, assignedTeamId: target } : p
-            );
-          }
-          const rest = { ...closedTeams };
-          delete rest[teamId];
-          closedTeams = rest;
-        }
-      }
+      // Closed teams stay closed until someone reopens them (Roundtable 2026-09-28,
+      // Decision 12). The former 60-minute auto-transfer and auto-reopen rule is removed;
+      // patients leave a closed team only by sign-out.
+      const patients = state.patients;
+      const closedTeams = state.closedTeams;
 
       let newState: ShiftState = { ...state, now: tickNow, providers, buffers, patients, closedTeams };
 
@@ -261,20 +248,26 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
     }
 
     case 'UPGRADE_PATIENT': {
+      // Upgrade to any higher color (Decision 14): the patient restarts at the new
+      // color's full weight and count time. Default target is Red.
+      const toTier = action.toTier ?? 'tier_one';
+      const rank = { tier_one: 0, tier_two: 1, tier_three: 2 } as const;
+      const current = state.patients.find(p => p.id === action.patientId);
+      if (!current || rank[toTier] >= rank[current.acuity]) return state;
       const patients = state.patients.map(p => {
         if (p.id !== action.patientId) return p;
         return {
           ...p,
-          originalAcuity: p.acuity,
-          acuity: 'tier_one' as const,
+          originalAcuity: p.originalAcuity ?? p.acuity,
+          acuity: toTier,
           upgradedAt: now,
         };
       });
-      const upgraded = state.patients.find(p => p.id === action.patientId);
+      const upgraded = current;
       let finalBuffers = state.buffers;
       if (upgraded) {
         const scoringOv = simOverridesToScoring(state.simulation);
-        const newBuffer = createBuffer(upgraded.assignedTeamId, 'tier_one', now, scoringOv);
+        const newBuffer = createBuffer(upgraded.assignedTeamId, toTier, now, scoringOv);
         const existingTeamBuffers = finalBuffers.filter(b => b.teamId === upgraded.assignedTeamId && b.expiresAt > now && !b.deceasedPatientId);
         const otherBuffers = finalBuffers.filter(b => !(b.teamId === upgraded.assignedTeamId && b.expiresAt > now && !b.deceasedPatientId));
         if (existingTeamBuffers.length > 0) {
@@ -301,7 +294,9 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
       const original = state.patients.find(p => p.id === action.patientId);
       const patients = state.patients.map(p => {
         if (p.id !== action.patientId) return p;
-        return { ...p, assignedTeamId: action.toTeamId, assignedAt: now };
+        // Reassign corrects which team the patient is counted on (Decision 13): the
+        // patient keeps its timer, so assignedAt and upgradedAt are unchanged.
+        return { ...p, assignedTeamId: action.toTeamId };
       });
       const overrides = original
         ? [...state.overrides, {
@@ -313,7 +308,7 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
           }]
         : state.overrides;
 
-      // Create buffer on receiving team (Fix 1 & 4: buffer + fresh assignedAt)
+      // Buffer on the receiving team, as before. Buffer durations are zero, so this is inert.
       let finalBuffers = state.buffers;
       if (original) {
         const scoringOv = simOverridesToScoring(state.simulation);
@@ -362,9 +357,8 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
       const patients = state.patients.map(p =>
         p.assignedTeamId === action.fromTeamId ? { ...p, assignedTeamId: action.toTeamId } : p
       );
-      const closedTeams = { ...state.closedTeams };
-      delete closedTeams[action.fromTeamId];
-      return { ...state, patients, closedTeams };
+      // A closed team stays closed after sign-out; only Reopen brings it back (Decision 12).
+      return { ...state, patients };
     }
 
     case 'DECEASE_PATIENT': {
@@ -912,22 +906,43 @@ function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
 
 interface ShiftContextValue {
   state: ShiftState;
-  dispatch: React.Dispatch<ShiftAction>;
+  dispatch: React.Dispatch<SessionAction>;
   recommendation: Recommendation;
   capacityWeights: Record<ProviderType, number>;
+  /** Shift activity events, oldest first (see src/activity.ts). */
+  activity: ActivityEvent[];
+  /** The assignment that can still be undone, if any. */
+  undoable: SessionState['undoable'];
 }
+
+// Provider weights are frozen for the whole study at the constants.ts values
+// (Roundtable 2026-09-28, Decision 7). The app no longer polls the Delphi sheet for
+// scoring; the survey and its endpoint stay in place for research (?lab).
+const FROZEN_CAPACITY_WEIGHTS: Record<ProviderType, number> = { ...CAPACITY_WEIGHTS };
+
+export function scoringFor(state: ShiftState): ScoringOverrides {
+  // Simulation overrides (lab and demo clock) take precedence, as before.
+  return { capacityWeights: FROZEN_CAPACITY_WEIGHTS, ...simOverridesToScoring(state.simulation) };
+}
+
+const sessionReducer = makeSessionReducer(shiftReducer, scoringFor);
+const initialSession: SessionState = emptySession(initialState);
 
 const ShiftContext = createContext<ShiftContextValue | null>(null);
 
+/**
+ * One provider holds one shift. The live shift, the demo and the tour each mount their
+ * own provider, so a demo or tour can never overwrite a live shift.
+ */
 export function ShiftProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(shiftReducer, initialState);
-  const capacityWeights = useSurveyWeights();
+  const [session, dispatch] = useReducer(sessionReducer, initialSession);
+  const state = session.shift;
+  const capacityWeights = FROZEN_CAPACITY_WEIGHTS;
 
-  const scoringOverrides = useMemo((): ScoringOverrides | undefined => {
-    const simOv = simOverridesToScoring(state.simulation);
-    // Merge survey weights as base, let simulation overrides take precedence
-    return { capacityWeights, ...simOv };
-  }, [state.simulation, capacityWeights]);
+  const scoringOverrides = useMemo(
+    (): ScoringOverrides => ({ capacityWeights: FROZEN_CAPACITY_WEIGHTS, ...simOverridesToScoring(state.simulation) }),
+    [state.simulation],
+  );
 
   const recommendation = useMemo(
     () => getRecommendation(state.providers, state.patients, state.buffers, state.now, state.closedTeams, scoringOverrides),
@@ -935,8 +950,8 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ state, dispatch, recommendation, capacityWeights }),
-    [state, dispatch, recommendation, capacityWeights],
+    () => ({ state, dispatch, recommendation, capacityWeights, activity: session.activity, undoable: session.undoable }),
+    [state, dispatch, recommendation, capacityWeights, session.activity, session.undoable],
   );
 
   return <ShiftContext.Provider value={value}>{children}</ShiftContext.Provider>;

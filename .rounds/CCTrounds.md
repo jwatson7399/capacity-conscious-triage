@@ -124,3 +124,91 @@ public.
   intentionally down.
 
 ---
+
+## [2026-09-28 03:55 EDT] Claude 1
+
+**Starting the Carbon rebuild** (`ER Triage App/HANDOFF_carbon-rebuild.md`, Roundtable
+2026-09-28 Decisions 4 to 10). Branch `carbon-rebuild`; `main` untouched; no deploy.
+
+Plan: new interface on the unchanged engine. `src/engine/*`, `src/constants.ts`,
+`src/types.ts`, `src/uid.ts`, `scheduleParser` and `scripts/` are not edited. The core
+reducer in `ShiftContext.tsx` keeps every action as is; a thin session layer wraps it to add
+the activity event list plus a few UI-only actions (hydrate a sample shift, remove provider,
+reopen team, demo arrivals on/off). Weights frozen at `CAPACITY_WEIGHTS` (the provider no
+longer calls `useSurveyWeights`). Live shift, demo and tour each get their own provider
+instance so demo/tour can never touch a live shift. Research tools move to `?lab` (old
+Dashboard kept there for simulations). Fonts self-hosted via @fontsource.
+
+Check: historical replay run before and after on this machine; outputs must match.
+
+Astra's team-detail and shift-setup mockups are marked "not yet reviewed" in the
+Roundtable; building from them anyway and flagging for Julian's review.
+
+---
+
+## [2026-09-28 04:40 EDT] Claude 2
+
+**Carbon rebuild built on `carbon-rebuild`, uncommitted.** A stale `.git/index.lock`
+(0 bytes, 00:02 EDT, predates this session) blocks staging; I did not remove it. If you are
+the process holding it, finish; otherwise Julian decides.
+
+Verified: `src/engine`, `constants.ts`, `types.ts`, `uid.ts`, `utils/`, `scripts/` unchanged
+vs HEAD; historical replay output byte-identical before and after; build, 40/40 tests,
+eslint and the schedule guard pass (run in a Linux copy with fresh node_modules; the Mac's
+node_modules still needs `npm install` for the two @fontsource packages).
+
+For anyone touching state: new actions go in `src/context/session.ts`, not the core reducer.
+Reducer quirks surfaced, not changed: `SIGNOUT_PATIENTS` deletes the closure of the
+from-team; closed Teams 1/2 reopen on their own after 60 min.
+
+---
+
+## [2026-09-28 12:20 EDT] Claude 3
+
+**Carbon audit fixes done** (`ER Triage App/HANDOFF_carbon-audit-fixes.md`, Roundtable
+2026-09-28 Carbon Rebuild Audit, Decisions 11 to 14). Committed with the rebuild on
+`carbon-rebuild` as one commit. No deploy.
+
+Shift-logic changes in the core reducer (`ShiftContext.tsx`), scoring untouched:
+- Closed teams stay closed until Reopen. The 60-minute auto-transfer/auto-reopen is gone for
+  every team; `SIGNOUT_PATIENTS` no longer deletes the closure. `TEAM_CLOSE_TRANSFER_*`
+  constants left in `constants.ts` (unreferenced by the app now). The lab TeamCard countdown
+  was replaced by "Closed until reopened" plus a Reopen button; permanently closed sim teams
+  were already skipped by the old rule, so the lab simulator is unaffected.
+- `REASSIGN_PATIENT` keeps `assignedAt` and `upgradedAt`.
+- `UPGRADE_PATIENT` takes optional `toTier` (any higher color, default Red; a non-higher
+  target is a no-op) and restarts at full weight via `upgradedAt`. `types.ts` changed for this.
+
+**Replay and benchmarks: confirmed unaffected, explicitly.** The scripts call the engine
+directly and never dispatch reducer actions. Run in clean Linux copies of HEAD (`f0f5bd4`)
+and of the working tree against the same `data/`: `historical-replay`, `benchmark`,
+`benchmark-load-range`, `real-schedule-benchmark` byte-identical; `decay-schedule-benchmark`
+identical `results` and `pairwise` (only run date, timing and output paths differ).
+
+UI: undo is now a session-level `undoable` bound to the assign event id (`UNDO_ASSIGN`),
+cleared by any later action on that patient and by HYDRATE/RESET/START_SHIFT. Float primary
+counts as not counted. Deceased tag on the gauge. Focus trapped in sheets and the drawer with
+the tour card as a focus companion. Assign panel height published as `--keys-h`.
+`public/walkthrough-v4.html` and `EvidenceWalkthrough.tsx` archived.
+
+Checks: 47/47 tests (21 session tests), eslint, build, `check:schedules` with `data/` present.
+The stale `.git/index.lock` was removed with Julian's approval. My verification run of the
+decay benchmark wrote two JSONs into `data/decay-benchmark-runs/` through a symlink; both
+deleted.
+
+---
+
+## [2026-09-28 12:42 EDT] Cowork advisor
+
+Carbon rebuild (`6a75acb` on `carbon-rebuild`) approved by Julian for merge to `main` with
+`--no-ff` and push. Not deployed; `npm run deploy` stays off until the Pages and
+publish-versus-hold decisions are settled. Pre-merge checks on Julian's Mac: `npm install`
+(lockfile unchanged), 47/47 tests, eslint, build, `check:schedules` OK with `data/` present.
+
+**Correction to Claude 3, 12:20:** the lab simulator is affected for teams closed by hand
+mid-run. Under the old rule they reopened (Team 3 and Trauma also moved patients) after 60
+minutes; now they stay closed until reopened. Only teams the simulator closes for the whole
+run were already exempt. Benchmark and replay scripts call the engine directly and are
+unaffected. METHODS.md section 7 records this.
+
+---

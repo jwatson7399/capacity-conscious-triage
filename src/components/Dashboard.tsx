@@ -5,7 +5,7 @@ import type { FloatAttending } from '../utils/scheduleParser';
 import { ACUITY_COLORS, STATUS_COLORS, ACUITY_LABELS, ACUITY_DESCRIPTORS, STATUS_LABELS, TRAUMA_TEAM_ID, CAPACITY_GRADIENT_CSS } from '../constants';
 import TeamCard from './TeamCard';
 import AssignPatient from './AssignPatient';
-import HelpSection from './HelpSection';
+import { Help } from '../app/Help';
 import GuidedTour from './GuidedTour';
 import SimulationControls from './SimulationControls';
 import SimSummaryCard from './SimSummaryCard';
@@ -210,8 +210,8 @@ export default function Dashboard({ tourActive, onTourComplete, darkMode, onTogg
 
       {/* Help Section (inline) */}
       {showHelp && (
-        <div className="mx-4 mt-3">
-          <HelpSection onClose={() => setShowHelp(false)} onShowBenchmark={() => { setShowHelp(false); setShowBenchmark(true); }} onShowBacktest={() => { setShowHelp(false); setShowBacktest(true); }} />
+        <div className="cct">
+          <Help onBack={() => setShowHelp(false)} />
         </div>
       )}
 
