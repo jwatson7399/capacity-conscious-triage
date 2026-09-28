@@ -1288,11 +1288,12 @@ printCohortReport(
   [1, 2] as TeamId[],
 );
 
-// Usability implication
+// Two-team hours, combined score: numbers only. No advice is derived from the combined score
+// (METHODS.md sections 9 and 10).
 if (twoTeamDays.length > 0) {
   const fFairness2 = mean(twoTeamDays.map(d => d.formula.fairness));
   const rrFairness2 = mean(twoTeamDays.map(d => d.roundRobin.fairness));
-  console.log(`\n  Usability implication: Formula ${fFairness2 >= rrFairness2 ? '≥' : '<'} Round-Robin in two-team hours → ${fFairness2 >= rrFairness2 ? '"leave tool on all the time"' : 'consider toggling by time of day'}`);
+  console.log(`\n  Two-team hours, combined fairness score (mean): formula ${fmt(fFairness2, 2)}, round-robin ${fmt(rrFairness2, 2)}, difference ${fmt(fFairness2 - rrFairness2, 2)}`);
 }
 
 // ── Day-of-week breakdown (three-team cohort) ──
