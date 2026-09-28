@@ -212,7 +212,7 @@ export default function LabHome({ darkMode, onToggleDarkMode }: { darkMode: bool
             onClick={() => setShowRealBenchmark(true)}
             className="flex-1 text-left hover:text-slate-600 dark:hover:text-slate-400"
           >
-            Real Week Backtest
+            Real Week Backtest <span className="whitespace-nowrap">(dated, March 2026; old combined score)</span>
           </button>
         </div>
         <div className="flex items-center justify-center gap-3 pt-4">

@@ -42,6 +42,12 @@ export default function RealScheduleBenchmarkReport({ onBack }: Props) {
           ← Back
         </button>
 
+        {/* Dated report (Roundtable 2026-09-28, Decision 19): kept for the research record. */}
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200 text-left space-y-1">
+          <p className="font-semibold">Dated research report, March 2026</p>
+          <p>These results have not been rerun on the current model. The fairness figures use the old combined fairness score (version 1, with acuity balance weighted 5:3:1). They are kept as a record, not as current evidence.</p>
+        </div>
+
         {/* Hero */}
         <div className="text-center space-y-3">
           <h1 className="text-xl font-bold text-slate-900 dark:text-white">Your Schedule. Real Providers. 1,000 Shifts.</h1>
@@ -162,6 +168,7 @@ export default function RealScheduleBenchmarkReport({ onBack }: Props) {
           </ul>
         </Section>
 
+        <p className="text-center text-[11px] text-slate-500 dark:text-slate-400">© 2026 New York University</p>
       </div>
     </div>
   );
