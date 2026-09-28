@@ -23,3 +23,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Private project material: never commit (legal, TOV, real schedules)
+ER Triage App/
+CCT Legal Dossier.md
+Counsel Memo - CCT*
+IP Policy Excerpts*
+Outside Counsel Briefing Packet*
+Informatics Outlook thread*
+informatics outlook thread*
+data/provider-schedules/

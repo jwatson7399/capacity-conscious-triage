@@ -16,8 +16,9 @@ If this file and the code disagree, the code wins and this file should be fixed.
 - `METHODS.md` (this repo): numbered methodology log. New sections go above the
   "# Historical Methodology Record" divider. `/methods` skill appends one.
 - `CCT Legal Dossier.md` (this repo, untracked on purpose): IP, TOV and counsel record.
-- `Cowork Roundtable.md` lives in `/Users/julian/Claude CoWork/ER Triage App`, not here. It is the
-  decision log for product and strategy decisions.
+- `ER Triage App/` (subfolder, gitignored): advisory workspace moved here 2026-09-27 from
+  `/Users/julian/Claude CoWork/`. Holds `Cowork Roundtable.md` (the decision log for product and
+  strategy decisions), paper versions, TOV correspondence and meeting prep. Never commit it.
 - `.rounds/CCTrounds.md`: cross-agent deliberation log, see "Agent rounds" below.
 
 ## Setup
@@ -81,7 +82,8 @@ types, teams and shift windows) and that no real name survives.
 - **Never rebase, squash, amend, force-push, or delete branches.** Project history is part of the
   legal record. Real schedules remain in history on `main` and `gh-pages`; acceptable only while the
   repo is private.
-- **Never `git add .` or `git add -A`.** Legal and counsel files sit untracked in the repo root
+- **Never `git add .` or `git add -A`.** `.gitignore` now excludes `ER Triage App/`, the legal files and
+  `data/provider-schedules/`, but stage files by name anyway. Legal and counsel files sit in the repo root
   (`CCT Legal Dossier.md`, `Counsel Memo - CCT*`, `IP Policy Excerpts*`, `Outside Counsel Briefing
   Packet*`, the Informatics thread PDFs) and must not be committed. Stage files by name.
 - The unauthenticated Delphi Apps Script endpoint and the hardcoded fallback weights in
