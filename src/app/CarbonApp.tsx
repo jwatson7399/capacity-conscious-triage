@@ -28,7 +28,7 @@ function Screens() {
   const { state, dispatch } = useShift();
   const [dark, toggleDark] = useTheme();
   const [screen, setScreen] = useState<Screen>(() => (hasParam('tour') ? 'tour' : 'home'));
-  const [overlay, setOverlay] = useState<Overlay>(null);
+  const [overlay, setOverlay] = useState<Overlay>(() => (hasParam('walkthrough') ? 'how' : null));
 
   const go = useCallback((s: Screen) => {
     setScreen(s);
@@ -38,7 +38,10 @@ function Screens() {
   const home = useCallback(() => go('home'), [go]);
   const help = useCallback(() => setOverlay('help'), []);
   const how = useCallback(() => setOverlay('how'), []);
-  const closeOverlay = useCallback(() => setOverlay(null), []);
+  const closeOverlay = useCallback(() => {
+    setOverlay(null);
+    if (hasParam('walkthrough')) history.replaceState(null, '', window.location.pathname);
+  }, []);
 
   const start = (providers: Provider[], floats: string[]) => {
     dispatch({ type: 'START_SHIFT', providers });
@@ -62,7 +65,7 @@ function Screens() {
     {screen === 'demo' && <ShiftProvider><Ticker /><Demo {...common} /></ShiftProvider>}
     {screen === 'tour' && <ShiftProvider><Ticker /><Tour {...common} onExit={home} onDemo={() => go('demo')} /></ShiftProvider>}
     {overlay === 'help' && <Help onBack={closeOverlay} />}
-    {overlay === 'how' && <HowItWorks onBack={closeOverlay} />}
+    {overlay === 'how' && <HowItWorks onBack={closeOverlay} startWalk={hasParam('walkthrough')} />}
   </>;
 }
 
