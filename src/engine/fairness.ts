@@ -138,7 +138,7 @@ export interface FairnessBreakdown {
   composite: number;           // 0-100 weighted score
   capacityBalance: number;     // 0-1
   acuityBalance: number;       // 0-1
-  overwhelmAvoidance: number;  // 0-1
+  overwhelmAvoidance: number;  // 0-1, red-zone avoidance (key kept so older JSON stays readable)
   minRatioScore: number;       // 0-1
   stressEquity: number;        // 0-1
 }
@@ -212,7 +212,7 @@ function compositeWithAcuityScale(
     acuityBalance = Math.max(0, Math.min(1, 1 - Math.sqrt(loadVar) / loadMean));
   }
 
-  // Overwhelm Avoidance (30%): 1 - (overwhelmEvents / totalAssignments)
+  // Red-zone avoidance (30%): 1 - (redZoneEvents / totalAssignments)
   const overwhelmAvoidance = Math.max(0, Math.min(1, 1 - stats.redZoneEvents / totalAssignments));
 
   // Min Ratio (15%): min(minRatio / RED_ZONE_THRESHOLD, 1)

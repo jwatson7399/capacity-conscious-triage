@@ -539,7 +539,7 @@ interface RunMetrics {
   fairness: number;       // rolling fairness
   avgRatio: number;
   minRatio: number;
-  overwhelms: number;
+  overwhelms: number;  // red-zone events (ratio < RED_ZONE_THRESHOLD); field name kept so older JSON stays readable
   demandSpread: number;   // stddev of team patient counts / mean
   slams: number;
   backToBackHA: number;
@@ -962,7 +962,7 @@ const metricDefs: { label: string; key: keyof RunMetrics; higherBetter: boolean 
   { label: 'Fairness Score', key: 'fairness', higherBetter: true },
   { label: 'Avg Ratio', key: 'avgRatio', higherBetter: true },
   { label: 'Min Ratio', key: 'minRatio', higherBetter: true },
-  { label: 'Overwhelms', key: 'overwhelms', higherBetter: false },
+  { label: 'Red-zone events', key: 'overwhelms', higherBetter: false },
   { label: 'Demand Spread', key: 'demandSpread', higherBetter: false },
   { label: 'Slams', key: 'slams', higherBetter: false },
   { label: 'Back-to-back HA', key: 'backToBackHA', higherBetter: false },
