@@ -1,48 +1,28 @@
 import { useMemo } from 'react';
 import type { SimulationState, TeamId } from '../types';
-import { statsFromEntries, computeFairness } from '../engine/fairness';
-import { getEffectiveCapacity } from '../engine/recommendation';
+import { statsFromEntries, countBackToBackHA, countSlams, countSpread, acuitySpread } from '../engine/fairness';
 
 interface Props {
   simulation: SimulationState;
 }
 
-function StatRow({ label, liveVal, shadowVal, higherBetter }: { label: string; liveVal: string; shadowVal: string; higherBetter: boolean }) {
-  const liveNum = parseFloat(liveVal);
-  const shadowNum = parseFloat(shadowVal);
-  const tie = isNaN(liveNum) || isNaN(shadowNum) || Math.abs(liveNum - shadowNum) < 0.01;
-  const liveWins = !tie && (higherBetter ? liveNum > shadowNum : liveNum < shadowNum);
-  const shadowWins = !tie && (higherBetter ? shadowNum > liveNum : shadowNum < liveNum);
-
-  return (
-    <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center py-1.5 border-b border-white/5 last:border-b-0">
-      <span className={`text-right font-mono text-sm ${liveWins ? 'text-emerald-400 font-semibold' : 'text-slate-300'}`}>{liveVal}</span>
-      <span className="text-[10px] text-slate-500 font-medium w-24 text-center">{label}</span>
-      <span className={`text-left font-mono text-sm ${shadowWins ? 'text-emerald-400 font-semibold' : 'text-slate-300'}`}>{shadowVal}</span>
-    </div>
-  );
+interface MetricRow {
+  label: string;
+  hint?: string;
+  live: number;
+  shadow: number;
+  higherBetter: boolean;
+  fmt: (n: number) => string;
 }
 
-function FairnessBar({ score, label }: { score: number; label: string }) {
-  return (
-    <div className="space-y-1">
-      <div className="flex justify-between text-[10px] text-slate-400">
-        <span>{label}</span>
-        <span className="font-mono">{score.toFixed(0)}</span>
-      </div>
-      <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-        <div
-          className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400"
-          style={{ width: `${Math.min(100, Math.max(0, score))}%` }}
-        />
-      </div>
-    </div>
-  );
-}
+const int = (n: number) => String(n);
+const dec1 = (n: number) => (isFinite(n) ? n.toFixed(1) : '-');
 
-function fmt(n: number): string {
-  if (!isFinite(n)) return '-';
-  return n.toFixed(1);
+function metricWinner(row: MetricRow): 'live' | 'shadow' | null {
+  if (!isFinite(row.live) || !isFinite(row.shadow)) return null;
+  if (Math.abs(row.live - row.shadow) < 0.01) return null;
+  const liveWins = row.higherBetter ? row.live > row.shadow : row.live < row.shadow;
+  return liveWins ? 'live' : 'shadow';
 }
 
 export default function SimSummaryCard({ simulation: sim }: Props) {
@@ -55,29 +35,89 @@ export default function SimSummaryCard({ simulation: sim }: Props) {
   const liveStats = useMemo(() => statsFromEntries(liveShadow?.entries ?? []), [liveShadow?.entries]);
   const shadowStats = useMemo(() => statsFromEntries(shadow?.entries ?? []), [shadow?.entries]);
 
-  const teamCapacities = useMemo(() => {
-    const caps: Record<number, number> = {};
-    const providers = sim.initialProviders ?? [];
-    for (const t of [1, 2, 3, 4] as TeamId[]) {
-      caps[t] = getEffectiveCapacity(providers.filter(p => p.teamId === t), sim.baseTime);
-    }
-    return caps;
-  }, [sim.initialProviders, sim.baseTime]);
-
-  const liveFairness = useMemo(() => computeFairness(liveStats, sim.permanentlyClosedTeams, teamCapacities), [liveStats, sim.permanentlyClosedTeams, teamCapacities]);
-  const shadowFairness = useMemo(() => computeFairness(shadowStats, sim.permanentlyClosedTeams, teamCapacities), [shadowStats, sim.permanentlyClosedTeams, teamCapacities]);
-
-  if (!shadow || !liveShadow) return null;
-
   const eligible = ([1, 2, 3, 4] as TeamId[]).filter(
     t => t !== 4 && !sim.permanentlyClosedTeams.includes(t)
   );
 
+  const rows = useMemo((): MetricRow[] => {
+    const liveEntries = liveShadow?.entries ?? [];
+    const shadowEntries = shadow?.entries ?? [];
+    return [
+      {
+        label: 'B2B High-Acuity',
+        hint: '2 red/yellow to one team within 30 min',
+        live: countBackToBackHA(liveEntries),
+        shadow: countBackToBackHA(shadowEntries),
+        higherBetter: false,
+        fmt: int,
+      },
+      {
+        label: 'Slams',
+        hint: '2+ patients to one team within 1 hr',
+        live: countSlams(liveEntries),
+        shadow: countSlams(shadowEntries),
+        higherBetter: false,
+        fmt: int,
+      },
+      {
+        label: 'Red-Zone Arrivals',
+        hint: 'team below p5 of historical capacity at assignment',
+        live: liveStats.redZoneEvents,
+        shadow: shadowStats.redZoneEvents,
+        higherBetter: false,
+        fmt: int,
+      },
+      {
+        label: 'Min Capacity',
+        hint: 'lowest ratio at any assignment',
+        live: liveStats.minRatio,
+        shadow: shadowStats.minRatio,
+        higherBetter: true,
+        fmt: dec1,
+      },
+      {
+        label: 'Avg Capacity',
+        hint: 'mean ratio across assignments',
+        live: liveStats.avgRatio,
+        shadow: shadowStats.avgRatio,
+        higherBetter: true,
+        fmt: dec1,
+      },
+      {
+        label: 'Count Spread',
+        hint: 'max − min patients per team',
+        live: countSpread(liveStats, eligible),
+        shadow: countSpread(shadowStats, eligible),
+        higherBetter: false,
+        fmt: int,
+      },
+      {
+        label: 'Acuity Spread',
+        hint: 'max − min weighted load per team',
+        live: acuitySpread(liveStats, eligible),
+        shadow: acuitySpread(shadowStats, eligible),
+        higherBetter: false,
+        fmt: int,
+      },
+    ];
+  }, [liveShadow?.entries, shadow?.entries, liveStats, shadowStats, eligible]);
+
+  if (!shadow || !liveShadow) return null;
+
   const liveCountStr = eligible.map(t => liveStats.teamCounts[t] ?? 0).join(' | ');
   const shadowCountStr = eligible.map(t => shadowStats.teamCounts[t] ?? 0).join(' | ');
 
-  const winner = liveFairness > shadowFairness + 0.5 ? liveMode : shadowFairness > liveFairness + 0.5 ? shadowMode : null;
-  const diff = Math.abs(liveFairness - shadowFairness).toFixed(0);
+  // Per-metric tally — no composite score, no weights.
+  let liveWins = 0;
+  let shadowWins = 0;
+  for (const row of rows) {
+    const w = metricWinner(row);
+    if (w === 'live') liveWins++;
+    else if (w === 'shadow') shadowWins++;
+  }
+  const ties = rows.length - liveWins - shadowWins;
+  const leader = liveWins > shadowWins ? liveMode : shadowWins > liveWins ? shadowMode : null;
+  const leaderWins = Math.max(liveWins, shadowWins);
 
   return (
     <div className="mx-4 mb-4 glass-card rounded-xl overflow-hidden">
@@ -92,28 +132,46 @@ export default function SimSummaryCard({ simulation: sim }: Props) {
         {/* Column headers */}
         <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center mb-2">
           <span className="text-right text-xs font-semibold text-cyan-300">{liveMode}</span>
-          <span className="w-24 text-center text-[10px] text-slate-600">vs</span>
+          <span className="w-28 text-center text-[10px] text-slate-600">vs</span>
           <span className="text-left text-xs font-semibold text-amber-300">{shadowMode}</span>
         </div>
 
-        <StatRow label="Patients" liveVal={liveCountStr} shadowVal={shadowCountStr} higherBetter={false} />
-        <StatRow label="Avg Capacity" liveVal={fmt(liveStats.avgRatio)} shadowVal={fmt(shadowStats.avgRatio)} higherBetter={true} />
-        <StatRow label="Min Capacity" liveVal={fmt(liveStats.minRatio)} shadowVal={fmt(shadowStats.minRatio)} higherBetter={true} />
-        <StatRow label="Overwhelms" liveVal={String(liveStats.overwhelms)} shadowVal={String(shadowStats.overwhelms)} higherBetter={false} />
-
-        {/* Fairness bars */}
-        <div className="mt-3 space-y-2">
-          <FairnessBar score={liveFairness} label={liveMode} />
-          <FairnessBar score={shadowFairness} label={shadowMode} />
+        {/* Patients per team (context, not a scored metric) */}
+        <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center py-1.5 border-b border-white/5">
+          <span className="text-right font-mono text-xs whitespace-nowrap text-slate-300">{liveCountStr}</span>
+          <span className="text-[10px] text-slate-500 font-medium w-28 text-center">Patients</span>
+          <span className="text-left font-mono text-xs whitespace-nowrap text-slate-300">{shadowCountStr}</span>
         </div>
 
-        {/* Winner callout */}
+        {/* Individual metrics — each compared on its own; no composite */}
+        {rows.map(row => {
+          const w = metricWinner(row);
+          return (
+            <div key={row.label} className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center py-1.5 border-b border-white/5 last:border-b-0">
+              <span className={`text-right font-mono text-sm ${w === 'live' ? 'text-emerald-400 font-semibold' : 'text-slate-300'}`}>
+                {row.fmt(row.live)}
+              </span>
+              <span className="w-28 text-center">
+                <span className="block text-[10px] text-slate-500 font-medium leading-tight">{row.label}</span>
+                {row.hint && <span className="block text-[8px] text-slate-600 leading-tight">{row.hint}</span>}
+              </span>
+              <span className={`text-left font-mono text-sm ${w === 'shadow' ? 'text-emerald-400 font-semibold' : 'text-slate-300'}`}>
+                {row.fmt(row.shadow)}
+              </span>
+            </div>
+          );
+        })}
+
+        {/* Metric tally — counts wins, doesn't weight them */}
         <div className="mt-3 text-center py-2 rounded-lg bg-white/5">
-          {!winner ? (
-            <span className="text-xs text-slate-400">Both modes scored equally</span>
+          {!leader ? (
+            <span className="text-xs text-slate-400">
+              Even split — {liveWins} metric{liveWins !== 1 ? 's' : ''} each{ties > 0 ? `, ${ties} tied` : ''}
+            </span>
           ) : (
             <span className="text-xs text-slate-300">
-              <span className="font-semibold text-emerald-400">{winner}</span> scored {diff} points higher
+              <span className="font-semibold text-emerald-400">{leader}</span> leads on {leaderWins} of {rows.length} metrics
+              {ties > 0 ? ` (${ties} tied)` : ''}
             </span>
           )}
         </div>
@@ -132,7 +190,7 @@ export default function SimSummaryCard({ simulation: sim }: Props) {
                   <span className="text-right font-mono text-slate-300">
                     {liveCount}p {liveAcuity ? `(${liveAcuity.tier_one}R/${liveAcuity.tier_two}Y/${liveAcuity.tier_three}P)` : ''}
                   </span>
-                  <span className="w-24 text-center text-slate-500 font-medium">Team {t}</span>
+                  <span className="w-28 text-center text-slate-500 font-medium">Team {t}</span>
                   <span className="text-left font-mono text-slate-300">
                     {shadowCount}p {shadowAcuity ? `(${shadowAcuity.tier_one}R/${shadowAcuity.tier_two}Y/${shadowAcuity.tier_three}P)` : ''}
                   </span>

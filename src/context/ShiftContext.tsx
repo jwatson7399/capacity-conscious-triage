@@ -129,7 +129,7 @@ export function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState
             teamId = eligible[rrIdx];
             rrNext++;
           } else {
-            const rec = getRecommendation(providers, simPatients, simBuffers, tickNow, closedTeams, scoringOverrides);
+            const rec = getRecommendation(simProviders, simPatients, simBuffers, tickNow, closedTeams, scoringOverrides);
             teamId = rec.first ?? (1 as TeamId);
           }
 

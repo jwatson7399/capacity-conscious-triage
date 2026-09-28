@@ -26,7 +26,7 @@ import { mulberry32, getDefaultOverrides, generateStatusChanges } from '../src/e
 import { statsFromEntries, computeFairness } from '../src/engine/fairness';
 import { getRecommendation, scoreTeam, createBuffer, getEffectiveCapacity } from '../src/engine/recommendation';
 import type { ScoringOverrides } from '../src/engine/recommendation';
-import { TRAUMA_TEAM_ID, OVERWHELM_THRESHOLD } from '../src/constants';
+import { TRAUMA_TEAM_ID, RED_ZONE_THRESHOLD } from '../src/constants';
 import { uid } from '../src/uid';
 
 // ── Constants ───────────────────────────────────────────────────────
@@ -350,7 +350,7 @@ function runScheduleSim(
   const ratioSums: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
   const ratioCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
   const minRatioPerTeam: Record<number, number> = { 1: Infinity, 2: Infinity, 3: Infinity, 4: Infinity };
-  const overwhelmEvents: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
+  const redZoneEvents: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
 
   for (const e of entries) {
     teamPatientCounts[e.teamId]++;
@@ -358,7 +358,7 @@ function runScheduleSim(
     ratioSums[e.teamId] += e.ratioAtAssignment;
     ratioCounts[e.teamId]++;
     if (e.ratioAtAssignment < minRatioPerTeam[e.teamId]) minRatioPerTeam[e.teamId] = e.ratioAtAssignment;
-    if (e.ratioAtAssignment < OVERWHELM_THRESHOLD) overwhelmEvents[e.teamId]++;
+    if (e.ratioAtAssignment < RED_ZONE_THRESHOLD) redZoneEvents[e.teamId]++;
   }
 
   const avgRatioPerTeam: Record<number, number> = {};
@@ -374,7 +374,7 @@ function runScheduleSim(
       teamAcuityLoad,
       avgRatioPerTeam,
       minRatioPerTeam,
-      overwhelmEvents,
+      redZoneEvents,
     },
     rollingFairness: fairnessCount > 0 ? fairnessSum / fairnessCount : 50,
   };
@@ -888,7 +888,7 @@ for (let run = 0; run < NUM_RUNS; run++) {
     fairness: fRollingFairness,
     avgRatio: fStats.avgRatio,
     minRatio: fStats.minRatio === Infinity ? 0 : fStats.minRatio,
-    overwhelms: fStats.overwhelms,
+    overwhelms: fStats.redZoneEvents,
     demandSpread: computeDemandSpread(fResult, permanentlyClosedTeams),
     slams: countSlams(fResult.entries),
     backToBackHA: countBackToBackHA(fResult.entries),
@@ -907,7 +907,7 @@ for (let run = 0; run < NUM_RUNS; run++) {
     fairness: fnbRollingFairness,
     avgRatio: fnbStats.avgRatio,
     minRatio: fnbStats.minRatio === Infinity ? 0 : fnbStats.minRatio,
-    overwhelms: fnbStats.overwhelms,
+    overwhelms: fnbStats.redZoneEvents,
     demandSpread: computeDemandSpread(fnbResult, permanentlyClosedTeams),
     slams: countSlams(fnbResult.entries),
     backToBackHA: countBackToBackHA(fnbResult.entries),
@@ -922,7 +922,7 @@ for (let run = 0; run < NUM_RUNS; run++) {
     fairness: rrRollingFairness,
     avgRatio: rrStats.avgRatio,
     minRatio: rrStats.minRatio === Infinity ? 0 : rrStats.minRatio,
-    overwhelms: rrStats.overwhelms,
+    overwhelms: rrStats.redZoneEvents,
     demandSpread: computeDemandSpread(rrResult, permanentlyClosedTeams),
     slams: countSlams(rrResult.entries),
     backToBackHA: countBackToBackHA(rrResult.entries),

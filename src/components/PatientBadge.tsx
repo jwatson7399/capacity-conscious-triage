@@ -18,7 +18,7 @@ function getNextDecayInfo(patient: Patient, now: number, currentWeight: number):
   if (!last || elapsed >= last.afterMs) return { label: '(stabilized)', decaying: false };
   const remainMs = last.afterMs - elapsed;
   const mins = Math.ceil(remainMs / 60000);
-  return { label: `current load ${currentWeight.toFixed(1)}; stabilizes in [${formatDuration(mins)}]`, decaying: true };
+  return { label: `current load ${currentWeight.toFixed(1)}; stabilizes in ${formatDuration(mins)}`, decaying: true };
 }
 
 // Progress (0–1) within the patient's current decay window — i.e. elapsed time
