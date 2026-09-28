@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Provider, ShiftState, TeamScore } from '../types';
 import { initialState, scoringFor, shiftReducer } from './ShiftContext';
 import { emptySession, makeSessionReducer, type SessionState } from './session';
-import { formatRatio, highCount, gaugeLevel, contribution, isCounted, minutesLeft } from '../ui/model';
+import { formatRatio, highCount, gaugeLevel, contribution, isCounted, minutesLeft, timerRunning } from '../ui/model';
 import { getRecommendation } from '../engine/recommendation';
 import { CAPACITY_WEIGHTS, DECEASED_BUFFER_MS } from '../constants';
 
@@ -238,5 +238,84 @@ describe('session layer', () => {
     expect(isCounted(s.shift.patients[0], s.shift.now)).toBe(false);
     s = reducer(s, { type: 'SET_FLOAT_MODIFIER', patientId: 'C-001', modifier: 'float_supervising', floatName: 'X' });
     expect(contribution(s.shift.patients[0], s.shift.now)).toBeCloseTo(2.6);
+  });
+});
+
+describe('deceased patients (Roundtable 2026-09-28, Decision 17)', () => {
+  const at = (s: SessionState, now: number): SessionState => ({ ...s, shift: { ...s.shift, now } });
+  const recOf = (s: SessionState) =>
+    getRecommendation(s.shift.providers, s.shift.patients, s.shift.buffers, s.shift.now, s.shift.closedTeams, scoringFor(s.shift));
+  const loadOf = (s: SessionState, t: 1 | 2 | 3 | 4) => recOf(s).scores.find(x => x.teamId === t)!.load;
+
+  it('takes the load off at once and shows the patient as not counted', () => {
+    let s = started();
+    s = reducer(s, { type: 'ASSIGN_PATIENT', tier: 'tier_one', teamId: 1, source: 'critical' });
+    expect(loadOf(s, 1)).toBe(4);
+    s = reducer(s, { type: 'DECEASE_PATIENT', patientId: 'C-001' });
+    const p = s.shift.patients[0];
+    expect(loadOf(s, 1)).toBe(0);
+    expect(contribution(p, s.shift.now)).toBe(0);
+    expect(isCounted(p, s.shift.now)).toBe(false);
+    expect(timerRunning(p, s.shift.now)).toBe(false);
+  });
+
+  it('ranks the team last for 30 minutes, then leaves no residual load', () => {
+    const t0 = 1_000_000_000;
+    let s = started(t0);
+    s = reducer(s, { type: 'ASSIGN_PATIENT', tier: 'tier_one', teamId: 1, source: 'critical' });
+    s = reducer(s, { type: 'ASSIGN_PATIENT', tier: 'tier_three', teamId: 2, source: 'critical' });
+    s = reducer(s, { type: 'ASSIGN_PATIENT', tier: 'tier_three', teamId: 3, source: 'critical' });
+    s = reducer(s, { type: 'DECEASE_PATIENT', patientId: 'C-001' });
+    // Team 1 has zero load (infinite ratio) but is buffered, so it is ranked last.
+    s = at(s, t0 + DECEASED_BUFFER_MS - MIN);
+    const during = recOf(s);
+    expect(during.scores.find(x => x.teamId === 1)!.isBuffered).toBe(true);
+    expect(during.first).not.toBe(1);
+    expect(during.second).not.toBe(1);
+    // After the buffer, nothing of the deceased patient remains on team 1.
+    s = at(s, t0 + DECEASED_BUFFER_MS + MIN);
+    expect(loadOf(s, 1)).toBe(0);
+    expect(recOf(s).first).toBe(1);
+  });
+
+  it('when every open team is buffered, still recommends a team (least recently assigned)', () => {
+    const t0 = 1_000_000_000;
+    let s = started(t0);
+    s = reducer(s, { type: 'ASSIGN_PATIENT', tier: 'tier_two', teamId: 1, source: 'critical' });
+    s = at(s, t0 + MIN);
+    s = reducer(s, { type: 'ASSIGN_PATIENT', tier: 'tier_two', teamId: 2, source: 'critical' });
+    s = at(s, t0 + 2 * MIN);
+    s = reducer(s, { type: 'ASSIGN_PATIENT', tier: 'tier_two', teamId: 3, source: 'critical' });
+    for (const id of ['C-001', 'C-002', 'C-003']) s = reducer(s, { type: 'DECEASE_PATIENT', patientId: id });
+    const rec = recOf(s);
+    expect(rec.scores.filter(x => x.teamId !== 4).every(x => x.isBuffered)).toBe(true);
+    expect(rec.first).toBe(1);
+  });
+
+  it('a closed team with a deceased patient stays out of recommendations and carries no load', () => {
+    let s = started();
+    s = reducer(s, { type: 'ASSIGN_PATIENT', tier: 'tier_one', teamId: 1, source: 'critical' });
+    s = reducer(s, { type: 'DECEASE_PATIENT', patientId: 'C-001' });
+    s = reducer(s, { type: 'CLOSE_TEAM', teamId: 1 });
+    expect(loadOf(s, 1)).toBe(0);
+    const rec = recOf(s);
+    expect(rec.first).not.toBe(1);
+    expect(rec.second).not.toBe(1);
+  });
+
+  it('reassigning a deceased patient moves no load and leaves the buffer on the original team', () => {
+    let s = started();
+    s = reducer(s, { type: 'ASSIGN_PATIENT', tier: 'tier_one', teamId: 1, source: 'critical' });
+    s = reducer(s, { type: 'ASSIGN_PATIENT', tier: 'tier_three', teamId: 2, source: 'critical' });
+    s = reducer(s, { type: 'DECEASE_PATIENT', patientId: 'C-001' });
+    const before2 = loadOf(s, 2);
+    s = reducer(s, { type: 'REASSIGN_PATIENT', patientId: 'C-001', toTeamId: 2, reason: 'wrong team' });
+    const p = s.shift.patients.find(x => x.id === 'C-001')!;
+    expect(p.assignedTeamId).toBe(2);
+    expect(p.deceased).toBe(true);
+    expect(loadOf(s, 2)).toBe(before2);
+    const rec = recOf(s);
+    expect(rec.scores.find(x => x.teamId === 1)!.isBuffered).toBe(true);
+    expect(rec.scores.find(x => x.teamId === 2)!.isBuffered).toBe(false);
   });
 });
