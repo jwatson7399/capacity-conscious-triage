@@ -4,7 +4,7 @@ import type { ProviderType } from '../types';
 import { STATUS_EXPIRE_MS_MAP, BUFFER_DURATIONS_MS, DECEASED_BUFFER_MS, TRAUMA_TEAM_ID, QUICK_UNDO_WINDOW_MS } from '../constants';
 import { getRecommendation, createBuffer, type ScoringOverrides } from '../engine/recommendation';
 import { uid } from '../uid';
-import type { Provider, Patient, Buffer, TeamId } from '../types';
+import type { Provider, Patient, Buffer, TeamId, SimStatusChangeEntry } from '../types';
 import { generateTimeline, generateStatusChanges, takeSnapshot, addSnapshot, runShadowSim, replayToTime } from '../engine/simulation';
 import { getProvidersForShift } from '../utils/scheduleParser';
 import { CAPACITY_WEIGHTS } from '../constants';
@@ -34,6 +34,46 @@ export const initialState: ShiftState = {
   closedTeams: {},
   floatAttendings: [],
 };
+
+/** Providers whose timed status has ended by `at` return to active. */
+function expireStatuses(providers: Provider[], at: number): Provider[] {
+  return providers.map(p =>
+    p.statusExpiresAt !== null && p.statusExpiresAt <= at ? { ...p, status: 'active' as const, statusExpiresAt: null } : p,
+  );
+}
+
+/**
+ * Applies the simulation's scheduled status changes up to `until` in time order:
+ * before each change, statuses that ended by then expire, so back-to-back changes for
+ * one provider both take effect. A change only applies to a provider who is active at
+ * that moment. Returns the providers and the next unprocessed change index.
+ */
+export function applyStatusChangesUntil(
+  providers: Provider[],
+  changes: SimStatusChangeEntry[],
+  startIndex: number,
+  until: number,
+): { providers: Provider[]; nextIndex: number } {
+  let out = providers;
+  let i = startIndex;
+  while (i < changes.length && changes[i].time <= until) {
+    const change = changes[i];
+    i++;
+    out = expireStatuses(out, change.time).map(p => {
+      if (p.id !== change.providerId || p.status !== 'active') return p;
+      return { ...p, status: change.status, statusExpiresAt: change.time + change.durationMs };
+    });
+  }
+  return { providers: expireStatuses(out, until), nextIndex: i };
+}
+
+/** Round-robin pick among open A-side teams; returns the team and the advanced counter. */
+function roundRobinTeam(sim: SimulationState, closedTeams: Record<number, number>, rrNext: number): { teamId: TeamId; rrNext: number } {
+  const eligible = ([1, 2, 3, 4] as TeamId[]).filter(
+    t => t !== TRAUMA_TEAM_ID && !(t in closedTeams) && !sim.permanentlyClosedTeams.includes(t)
+  );
+  return { teamId: eligible[rrNext % eligible.length], rrNext: rrNext + 1 };
+}
 
 export function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState {
   const now = state.now;
@@ -122,12 +162,7 @@ export function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState
           // Get team assignment — round-robin or formula-driven
           let teamId: TeamId;
           if (sim.roundRobin) {
-            const eligible = ([1, 2, 3, 4] as TeamId[]).filter(
-              t => t !== TRAUMA_TEAM_ID && !(t in closedTeams) && !sim.permanentlyClosedTeams.includes(t)
-            );
-            const rrIdx = rrNext % eligible.length;
-            teamId = eligible[rrIdx];
-            rrNext++;
+            ({ teamId, rrNext } = roundRobinTeam(sim, closedTeams, rrNext));
           } else {
             const rec = getRecommendation(simProviders, simPatients, simBuffers, tickNow, closedTeams, scoringOverrides);
             teamId = rec.first ?? (1 as TeamId);
@@ -738,14 +773,12 @@ export function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState
       // Jump time to the next arrival, then let the TICK-like logic process it
       const skipNow = nextEntry.arrivalTime;
 
-      // Auto-expire providers at the new time
-      const providers = state.providers.map(p => {
-        if (p.statusExpiresAt !== null && p.statusExpiresAt <= skipNow) {
-          return { ...p, status: 'active' as const, statusExpiresAt: null };
-        }
-        return p;
-      });
+      // Apply the scheduled status changes up to the new time in time order, with
+      // expiries in between, so the arrival is scored on the providers of that moment.
+      const { providers, nextIndex: nextStatusChangeIndex } =
+        applyStatusChangesUntil(state.providers, sim.statusChanges, sim.nextStatusChangeIndex, skipNow);
       const buffers = state.buffers.filter(b => b.expiresAt > skipNow);
+      let rrNext = sim.roundRobinNext ?? 0;
 
       // Process all arrivals up to skipNow
       let nextIdx = sim.nextArrivalIndex;
@@ -763,8 +796,14 @@ export function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState
         const count = patientCounter[prefix] + 1;
         const id = `${prefix}-${String(count).padStart(3, '0')}`;
 
-        const rec = getRecommendation(providers, simPatients, simBuffers, skipNow, state.closedTeams, scoringOverrides);
-        const teamId = rec.first ?? (1 as TeamId);
+        // Same assignment mode as TICK: round-robin runs stay round-robin.
+        let teamId: TeamId;
+        if (sim.roundRobin) {
+          ({ teamId, rrNext } = roundRobinTeam(sim, state.closedTeams, rrNext));
+        } else {
+          const rec = getRecommendation(providers, simPatients, simBuffers, skipNow, state.closedTeams, scoringOverrides);
+          teamId = rec.first ?? (1 as TeamId);
+        }
 
         const patient = { id, acuity: entry.acuity, assignedTeamId: teamId, assignedAt: skipNow };
         const newBuffer = createBuffer(teamId, entry.acuity, skipNow, scoringOverrides);
@@ -804,7 +843,7 @@ export function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState
         patients: simPatients,
         buffers: simBuffers,
         patientCounter,
-        simulation: { ...sim, nextArrivalIndex: nextIdx, snapshots, paused: sim.paused },
+        simulation: { ...sim, nextArrivalIndex: nextIdx, nextStatusChangeIndex, roundRobinNext: rrNext, snapshots, paused: sim.paused },
       };
     }
 
