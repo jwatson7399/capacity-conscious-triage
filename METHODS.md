@@ -383,6 +383,28 @@ A related build-time behaviour was surfaced and consciously accepted: Vite inlin
 
 ---
 
+## 6. Post-Assign Scoring Recheck Under the Current Configuration
+
+**Objective.** Check whether ranking teams on their post-assignment ratio, capacity / (load + incoming weight), beats ranking on the current ratio, under the configuration now in use: 4:2:1 acuity weights, D6 linear decay (180 / 180 / 90 min), zero buffers, and Delphi Round 1 fallback provider weights. The only prior test (historical Section 16 in `docs/reference/METHODS.md`) used stepped decay with buffers on.
+
+**Methodology / data.**
+- `scripts/historical-replay.ts` run twice with no `--weights` or `--decay` flags, so scoring comes from `getDefaultOverrides()`, which is the live `src/constants.ts` configuration. (Passing `--weights 4:2:1` would *not* reproduce the current setup: `parseWeightFlag` rebuilds a stepped decay schedule. The console label "5:3:1" printed when no flag is given is stale and does not reflect the weights used.)
+- Run A: `tsx scripts/historical-replay.ts --json`. Run B: the same plus `--post-assign`, which passes each arrival's acuity as `incomingTier` to `getRecommendation()` for the formula arms.
+- Data: the Dec 2025 to Mar 2026 A-side census (2,597 rows; 1,958 after excluding Team 4 trauma), 18 schedule files, 121 days. Primary cohort: three-team hours (9A to 12A), 1,540 encounters. Secondary: two-team hours, 418 encounters, 119 days.
+- Comparison: per-day paired differences on the formula arm between runs, with a paired t statistic (n = 121 days).
+- Environment: run from a copy of the repo at commit `4b7cec6` inside the Cowork Linux workspace, with a Linux build of `tsx` (the repo's `node_modules` contains macOS esbuild binaries). Output copied back as `data/historical-replay-runs/historical-replay-results-current-2026-09-27.json`, `historical-replay-results-current-post-2026-09-27.json`, and matching `.log` files.
+
+**Results (three-team cohort, formula arm, current vs post-assign).** Fairness 90.2 vs 86.4 (t = -6.2). Gini count 0.055 vs 0.111 (t = 7.9). Gini acuity 0.063 vs 0.118 (t = 7.8). Daily team spread 1.0 vs 2.0 (t = 8.8). Acuity-weighted spread 2.0 vs 3.8 (t = 8.5). Load-minutes SD 80.8 vs 141.2 (t = 7.7). Min ratio 56.3 vs 54.3 (t = -2.6). Avg ratio 138.6 vs 152.5 (t = 1.6, not significant). Slams and back-to-back HA essentially unchanged. Formula vs actual daily win rate 81.0% vs 60.3%. Two-team cohort: fairness 89.1 vs 86.5 (t = -3.3), same direction on the Ginis.
+
+**Design rationale.** Post-assign divides a smaller-capacity team's strength by a larger relative jump in load, so it steers patients, starting with Reds, toward the strongest team. That concentrates both count and acuity, which is what every equity metric picks up. The small rise in average ratio comes from that concentration (idle capacity on the other teams), not from better distribution. The April conclusion holds under the current configuration and is stronger.
+
+**Implementation / congruency notes.**
+- No engine change. `incomingTier` stays unused by the app and simulator. `CLAUDE.md` now states that ranking uses the current ratio, that acuity does not change the pick, and that post-assign must not be enabled without Julian.
+- This behavior is what makes a one-tap assign UI valid: the recommendation can be shown before acuity is chosen.
+- Decision recorded in `ER Triage App/Cowork Roundtable.md`, Session September 27, 2026.
+
+---
+
 # Historical Methodology Record
 
 _The sections below document earlier methodology work preserved from a prior version of this document._

@@ -167,8 +167,11 @@ Team Capacity  = sum(provider weight x status multiplier x float modifier)
 Patient Load   = sum(decayed acuity weight)
 ```
 
-When recommending for an incoming patient, each team's ratio is computed as if that patient's acuity
-weight were already added to its load. Highest ratio among eligible teams is recommended. Team 4 (Trauma) and closed teams are excluded from
+Teams are ranked on their **current** ratio. The incoming patient's acuity does not change the pick, so
+the recommended team is known before the patient's tier is chosen. `getRecommendation()` has an optional
+`incomingTier` argument ("post-assign" mode: capacity / (load + incoming weight)) that nothing in the
+app or simulator passes; it was tested and rejected in April (see Roundtable, Session September 27,
+2026). Do not turn it on without Julian. Highest ratio among eligible teams is recommended. Team 4 (Trauma) and closed teams are excluded from
 auto-recommendations. Tiebreakers: highest ratio, then least recent assignment, then lowest team ID.
 (The not-buffered-first tiebreaker still exists in code but is inert because buffers are zero.)
 
