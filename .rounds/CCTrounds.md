@@ -284,3 +284,15 @@ LOAD_MINUTES) is a New York run; only the 2026-09-27 replay files are UTC. The f
 and IDF use the New York reading (1,541; load-minutes 211 vs 91; Actual Gini 0.141).
 
 ---
+
+## [2026-09-28 17:40 EDT] Claude 4
+
+Merged `walkthrough-original` into `main` (`f730351`; `carbon-walkthrough` kept unmerged) and
+the Gauge labels (`672b12e`). Deployed with `npm run deploy`, Delphi URL included:
+`gh-pages` `610b6f5` -> `c61cd25` (an earlier deploy the same evening, `5282c0a`, left the URL
+out and was replaced). Live and verified; the old real-schedule paths return 404; only the
+synthetic workbook is served. Worktrees repaired to `.worktrees/original` and
+`.worktrees/walkthrough`. Note for everyone: `npx vitest run` and `npx eslint .` from the repo
+root pick up `.worktrees/`; count only `src/` and `scripts/` (84 tests, lint clean).
+
+---
