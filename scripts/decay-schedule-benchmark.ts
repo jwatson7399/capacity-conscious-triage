@@ -23,6 +23,7 @@ import { getDefaultOverrides } from '../src/engine/simulation';
 import { getRecommendation, scoreTeam, createBuffer, getEffectiveCapacity, getDecayedAcuityWeight } from '../src/engine/recommendation';
 import type { ScoringOverrides } from '../src/engine/recommendation';
 import { ACUITY_WEIGHTS, ACUITY_DECAY } from '../src/constants';
+import { atWallHour, excelSerialToWallMs, localDateToWallMs, parseWallClockString, wallDateStr, wallHour } from './lib/census-time';
 
 // ── Paths ──────────────────────────────────────────────────────────
 
@@ -156,9 +157,8 @@ function parseTeamId(teamStr: string | null | undefined): TeamId | null {
 }
 
 function excelDateToMs(serial: number): number {
-  const msPerDay = 86400000;
-  const excelEpoch = new Date(1899, 11, 30).getTime();
-  return excelEpoch + serial * msPerDay;
+  // Wall-clock time, independent of the machine time zone (scripts/lib/census-time.ts).
+  return excelSerialToWallMs(serial);
 }
 
 // ── Census loading ───────────────────────────────────────────────
@@ -211,9 +211,9 @@ function loadCensusData(): { all: HistoricalArrival[]; excludedCount: number; to
     if (typeof rawArrival === 'number') {
       arrivalMs = excelDateToMs(rawArrival);
     } else if (rawArrival instanceof Date) {
-      arrivalMs = rawArrival.getTime();
+      arrivalMs = localDateToWallMs(rawArrival);
     } else if (typeof rawArrival === 'string') {
-      arrivalMs = new Date(rawArrival).getTime();
+      arrivalMs = parseWallClockString(rawArrival);
     } else {
       continue;
     }
@@ -241,13 +241,12 @@ function loadCensusData(): { all: HistoricalArrival[]; excludedCount: number; to
     const doorToDispoMin = colDoorDispo && typeof row[colDoorDispo] === 'number' ? row[colDoorDispo] : null;
     const edLosMin = colEdLos && typeof row[colEdLos] === 'number' ? row[colEdLos] : null;
 
-    const d = new Date(arrivalMs);
-    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const dateStr = wallDateStr(arrivalMs);
 
     arrivals.push({
       arrivalTime: arrivalMs,
       date: dateStr,
-      hour: d.getHours(),
+      hour: wallHour(arrivalMs),
       esi: validEsi,
       acuity: esiToTier(validEsi),
       actualTeam: teamId as TeamId,
@@ -958,10 +957,8 @@ function computeLoadMinutesSDs(
 ): { loadMinutesSD: number; normalizedLoadMinutesSD: number } {
   if (arrivals.length === 0 || patients.length === 0) return { loadMinutesSD: 0, normalizedLoadMinutesSD: 0 };
   const firstArrivalMs = arrivals[0].arrivalTime;
-  const anchor = new Date(firstArrivalMs);
   const isThreeTeam = eligibleTeams.length >= 3;
-  anchor.setHours(isThreeTeam ? 9 : 0, 0, 0, 0);
-  const shiftStartMs = anchor.getTime();
+  const shiftStartMs = atWallHour(firstArrivalMs, isThreeTeam ? 9 : 0);
   const shiftEndMs = shiftStartMs + (isThreeTeam ? 15 : 9) * 3_600_000;
   const windowStartMs = Math.min(firstArrivalMs, shiftStartMs);
   const STEP_MS = 60_000;
@@ -971,7 +968,7 @@ function computeLoadMinutesSDs(
   for (const t of eligibleTeams) { loadMins[t] = 0; capMins[t] = 0; }
 
   for (let now = windowStartMs; now < shiftEndMs; now += STEP_MS) {
-    const hourOfDay = new Date(now).getHours();
+    const hourOfDay = wallHour(now);
     const { providers: scheduledProviders } = getProvidersForShift(day, hourOfDay);
     const simProviders = toProviders(scheduledProviders);
     for (const team of eligibleTeams) {

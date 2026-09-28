@@ -24,6 +24,7 @@ import {
 import type { ScoringOverrides } from '../src/engine/recommendation';
 import { CAPACITY_WEIGHTS, ACUITY_WEIGHTS } from '../src/constants';
 import { uid } from '../src/uid';
+import { excelSerialToWallMs, localDateToWallMs, parseWallClockString, wallDateStr, wallHour, wallTimeLabel } from './lib/census-time';
 
 // ── Config ───────────────────────────────────────────────────────
 
@@ -92,9 +93,8 @@ function parseTeamId(teamStr: string | null | undefined): TeamId | null {
 }
 
 function excelDateToMs(serial: number): number {
-  const msPerDay = 86400000;
-  const excelEpoch = new Date(1899, 11, 30).getTime();
-  return excelEpoch + serial * msPerDay;
+  // Wall-clock time, independent of the machine time zone (scripts/lib/census-time.ts).
+  return excelSerialToWallMs(serial);
 }
 
 function stableProviderId(sp: ScheduleProvider): string {
@@ -155,8 +155,8 @@ function loadCensusForDate(): HistoricalArrival[] {
     const rawArrival = row[colArrival];
     let arrivalMs: number;
     if (typeof rawArrival === 'number') arrivalMs = excelDateToMs(rawArrival);
-    else if (rawArrival instanceof Date) arrivalMs = rawArrival.getTime();
-    else if (typeof rawArrival === 'string') arrivalMs = new Date(rawArrival).getTime();
+    else if (rawArrival instanceof Date) arrivalMs = localDateToWallMs(rawArrival);
+    else if (typeof rawArrival === 'string') arrivalMs = parseWallClockString(rawArrival);
     else continue;
     if (isNaN(arrivalMs)) continue;
 
@@ -167,8 +167,7 @@ function loadCensusForDate(): HistoricalArrival[] {
     if (source === 'trauma' || source === 'both') continue;
     if (teamId === 4) continue;
 
-    const d = new Date(arrivalMs);
-    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const dateStr = wallDateStr(arrivalMs);
     if (dateStr !== TARGET_DATE) continue;
 
     const rawEsi = row[colEsi ?? ''];
@@ -176,12 +175,12 @@ function loadCensusForDate(): HistoricalArrival[] {
     const validEsi = esi && esi >= 1 && esi <= 5 ? esi : null;
 
     // Three-team hours only (9A–midnight)
-    if (d.getHours() < 9) continue;
+    if (wallHour(arrivalMs) < 9) continue;
 
     arrivals.push({
       arrivalTime: arrivalMs,
       date: dateStr,
-      hour: d.getHours(),
+      hour: wallHour(arrivalMs),
       esi: validEsi,
       acuity: esiToTier(validEsi),
       actualTeam: teamId as TeamId,
@@ -275,7 +274,7 @@ const rrCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0 };
 for (let i = 0; i < arrivals.length; i++) {
   const arr = arrivals[i];
   const now = arr.arrivalTime;
-  const timeStr = new Date(now).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  const timeStr = wallTimeLabel(now);
   const hourOfDay = arr.hour;
 
   // Get providers for this hour
