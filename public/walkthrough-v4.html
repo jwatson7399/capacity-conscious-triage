@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Capacity Conscious Triage — Walkthrough Prototype</title>
+<title>Capacity Conscious Triage: Walkthrough</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -265,6 +265,8 @@
   nav.controls button:hover:not(:disabled) { background: var(--ink); color: white; border-color: var(--ink); }
   nav.controls button:disabled { opacity: 0.4; cursor: not-allowed; }
   nav.controls .step-counter { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  nav.controls .step-meta { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  nav.controls .copyright { font-size: 10px; color: var(--muted); letter-spacing: 0.02em; }
 
   .placeholder {
     background: var(--surface);
@@ -274,7 +276,7 @@
     text-align: center;
     color: var(--muted);
   }
-  /* Slide layout — fills viewport, no scroll */
+  /* Slide layout: fills viewport, no scroll */
   main { min-height: calc(100vh - 140px); display: flex; flex-direction: column; }
   .step { flex: 1; display: none; }
   .step.active { display: flex; flex-direction: column; }
@@ -617,7 +619,7 @@
     font-size: 14px;
   }
 
-  /* Slide 10 — 9:54 AM zero-state */
+  /* Slide 10: 9:54 AM zero-state */
   .s955-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
@@ -663,7 +665,7 @@
     100% { transform: scale(1);    opacity: 1; box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
   }
 
-  /* Animated Divide slide — numbers tumble into the formula template */
+  /* Animated Divide slide: numbers tumble into the formula template */
   .dv-stack { display: flex; flex-direction: column; gap: 14px; }
   .dv-row {
     display: flex; align-items: center; justify-content: center;
@@ -817,12 +819,12 @@
   .dv-mp.purple { background: #7b1fa2; }
   .dv-mp.yellow { background: #b8a000; }
 
-  /* Capacity-cap shading — rendered into every chart that passes capShade,
+  /* Capacity-cap shading: rendered into every chart that passes capShade,
      but hidden by default. The parent slide adds `.slide-shades` to reveal. */
   .cap-shade { opacity: 0; transition: opacity 500ms ease; }
   .slide-shades .cap-shade { opacity: 1; }
 
-  /* Team-focus AUC mode — parent slide adds `.focus-T1|T2|T3` to fill the
+  /* Team-focus AUC mode: parent slide adds `.focus-T1|T2|T3` to fill the
      focused team's area and dim the other two teams' lines + dots. */
   .team-area { opacity: 0; transition: opacity 400ms ease; }
   .focus-T1 .area-T1, .focus-T2 .area-T2, .focus-T3 .area-T3 { opacity: 0.32; }
@@ -840,7 +842,7 @@
   .focus-T3 .patient-dot[data-team="T1"], .focus-T3 .patient-dot[data-team="T2"],
   .focus-T3 .patient-dot-label[data-team="T1"], .focus-T3 .patient-dot-label[data-team="T2"] { opacity: 0.07; }
 
-  /* Dynamic "Decide." slide — disables all fade-in animations, adds live card */
+  /* Dynamic "Decide." slide: disables all fade-in animations, adds live card */
   .dyn-slide .dv-team,
   .dyn-slide .dv-num,
   .dyn-slide .dv-den,
@@ -909,12 +911,12 @@
   }
 
   /* ============================================================
-     Mobile / iPhone — fit every slide in viewport without scrolling
+     Mobile / iPhone: fit every slide in viewport without scrolling
      ============================================================ */
   @media (max-width: 600px) {
     main { padding: 6px 8px 68px; min-height: calc(100vh - 110px); max-width: 100%; }
 
-    /* Compact header — one row, truncated title, no dots */
+    /* Compact header: one row, truncated title, no dots */
     header { padding: 6px 12px; flex-wrap: nowrap; gap: 8px; }
     .title-stack { flex: 1; min-width: 0; overflow: hidden; }
     .eyebrow { font-size: 9px; letter-spacing: 0.08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -962,7 +964,7 @@
       width: 100%;
     }
 
-    /* Problem/strength/load rows — must stay side-by-side on mobile */
+    /* Problem/strength/load rows: must stay side-by-side on mobile */
     .teams-row, .patients-row { gap: 4px; flex-wrap: nowrap; width: 100%; }
     .neq { font-size: 18px; }
     .team-list-card, .patient-card { min-width: 0; padding: 6px 6px; flex: 1; }
@@ -999,7 +1001,7 @@
     .rule h3 { font-size: 15px; margin: 0 0 4px; }
     .rule p { font-size: 11px; line-height: 1.35; }
 
-    /* Patient slides — the biggest offender */
+    /* Patient slides: the biggest offender */
     .patient-header { padding: 6px 8px; margin-bottom: 6px; gap: 6px; border-radius: 8px; }
     .pnum { font-size: 20px; }
     .ptime { font-size: 11px; }
@@ -1041,10 +1043,10 @@
     .dv-mp { height: 14px; font-size: 8px; }
     .dyn-caption { font-size: 11px; margin-bottom: 4px; }
 
-    /* NYUBK intro (slide 9) — let lede wrap naturally */
+    /* NYUBK intro (slide 9): let lede wrap naturally */
     .lede { max-width: 100%; width: auto; }
 
-    /* Walkthrough slides 10-27 — stack team rows and chart vertically */
+    /* Walkthrough slides 10-27: stack team rows and chart vertically */
     .s955-grid { grid-template-columns: 1fr; gap: 8px; }
     .s955-card { padding: 6px 8px !important; }
     .s955-row {
@@ -1063,12 +1065,26 @@
     .s955-right .chart-title { font-size: 11px !important; margin-bottom: 4px !important; }
     .s955-right .chart-legend { font-size: 9px !important; gap: 6px !important; }
 
-    /* Comparison slides 28-32 — stack the two charts vertically */
+    /* Comparison slides 28-32: stack the two charts vertically */
     .compare-charts { flex-direction: column; gap: 10px !important; }
     .compare-charts .chart-wrap { padding: 6px 8px 4px !important; width: 100%; }
     .compare-slide .chart-title { font-size: 11px !important; margin-bottom: 4px !important; }
     .compare-slide .chart-legend { font-size: 9px !important; gap: 6px !important; }
   }
+
+  /* Dark mode: the cards and navy capacity numbers were built for light mode only. */
+  body.dark .formula-card, body.dark .group-card {
+    background: linear-gradient(180deg, #1e293b 0%, #172033 100%);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.2);
+  }
+  body.dark .dv-cap, body.dark .dv-cap-lbl, body.dark .f-capacity,
+  body.dark .formula-mini .fm-capacity,
+  body.dark .cap-row .cap-score .cap-num, body.dark .cap-row .cap-score .cap-label { color: #9db8f2; }
+  /* Inline styles get rewritten during phase animations, so match by slide, not by style text. */
+  body.dark .problem-eyebrow[style*="#1a3a7b"],
+  body.dark .s955-slide .problem-eyebrow, body.dark .compare-slide .problem-eyebrow { color: #9db8f2 !important; }
+  body.dark .slide-title { color: var(--ink) !important; }
+  body.dark .interlude { background: #3a2f10; }
 
 </style>
 </head>
@@ -1086,102 +1102,42 @@
 
 <nav class="controls">
   <button id="prevBtn">← Previous</button>
-  <span class="step-counter" id="counter">Step 1 of 14</span>
+  <div class="step-meta">
+    <span class="step-counter" id="counter">Step 1 of 14</span>
+    <span class="copyright">© 2026 New York University</span>
+  </div>
   <button id="nextBtn">Next →</button>
 </nav>
 
+<script src="walkthrough-model.js"></script>
 <script>
 // ============================================================
-// SCENARIO DATA — hard-coded from paper Section 2
+// SCENARIO DATA: every number comes from walkthrough-model.js (CCTWalk),
+// which a test ties to the app's constants and scoring engine.
 // ============================================================
-const DECAY = {
-  Red:    { w: 4, minutes: 180 },
-  Yellow: { w: 2, minutes: 180 },
-  Purple: { w: 1, minutes: 90 },
-};
+const WK = window.CCTWalk;
+const DECAY = WK.ACUITY;
 
-const TEAMS = {
-  T1: { name: 'Team 1', color: 'var(--t1)', strengthPre: 37.5, strengthPost: 42.5, roster: 'Attending (20) + Senior Resident (15.2) + Intern (6.6 at noon)' },
-  T2: { name: 'Team 2', color: 'var(--t2)', strength: 42.2, roster: 'Attending (20) + PA (11.4) + Junior Resident (10.8)' },
-  T3: { name: 'Team 3', color: 'var(--t3)', strength: 37.6, roster: 'Attending (20) + Senior Resident (15.2) + Rotator (2.4)' },
-};
-
-// Minutes from 09:55 (T+0)
-const PATIENTS = [
-  { n: 1, t: 0,   time: '09:55', acuity: 'Purple', actual: 'T1', formula: 'T1', verdict: 'AGREE',
-    ratios: { T1: '∞', T2: '∞', T3: '∞' },
-    narrative: 'The window opens. All three teams are empty with infinite capacity ratios. The first arrival is an ESI-3 Purple (weight 1.0). The formula routes to Team 1 by tiebreak (lowest team ID when all ratios are equal). The charge nurse also sends to Team 1. An easy call on an empty board.' },
-  { n: 2, t: 50,  time: '10:45', acuity: 'Yellow', actual: 'T1', formula: 'T2', verdict: 'DISAGREE',
-    ratios: { T1: '84.4', T2: '∞', T3: '∞' },
-    narrative: 'Fifty minutes of quiet. The first Yellow of the window. Team 1 has residual load from a nearly-decayed Purple. Teams 2 and 3 are both empty. The formula favors the empty teams. The charge nurse sends to the team that already has a patient. A minor difference on its own, but it sets up a compounding problem.' },
-  { n: 3, t: 51,  time: '10:46', acuity: 'Red',    actual: 'T2', formula: 'T2', verdict: 'AGREE',
-    ratios: { T1: '15.5', T2: '∞', T3: '∞' },
-    narrative: 'One minute later, the sickest patient of the morning arrives. Team 1 just absorbed Patient 2 and carries a combined load of about 2.4. Teams 2 and 3 are both still empty. Both the formula and the charge nurse agree: send the ESI-1 Red to an empty team. The right call by any measure.' },
-  { n: 4, t: 64,  time: '10:59', acuity: 'Yellow', actual: 'T1', formula: 'T3', verdict: 'DISAGREE',
-    ratios: { T1: '17.6', T2: '9.4', T3: '∞' },
-    narrative: 'Thirteen minutes later. Team 2 is weighed down by the ESI-1 Red (weight 3.71), pushing its ratio to 9.4. Team 1 carries two patients, but its stronger complement keeps its ratio at 17.6. Team 3 is still completely empty, 64 minutes into the window, with an infinite ratio. The formula sends to Team 3, the only team with zero patients. The charge nurse sends back to Team 1 instead, giving it a third patient. Team 3 remains idle.' },
-  { n: 5, t: 86,  time: '11:21', acuity: 'Yellow', actual: 'T2', formula: 'T3', verdict: 'DISAGREE',
-    ratios: { T1: '11.0', T2: '10.9', T3: '∞' },
-    narrative: 'Twenty-two minutes of quiet. The Red on Team 2 has decayed from 4.0 to about 3.22, improving Team 2\u2019s ratio to 10.9. Team 1 carries three patients and sits at 11.0. Team 3 is still empty with an infinite ratio. The formula again recommends Team 3. The charge nurse sends to Team 2. The attending and senior resident on Team 3 remain completely unused, 86 minutes into the window.' },
-  { n: 6, t: 127, time: '12:02', acuity: 'Yellow', actual: 'T2', formula: 'T3', verdict: 'DISAGREE',
-    ratios: { T1: '17.4', T2: '9.1', T3: '∞' }, interlude: true,
-    narrative: 'Forty-one minutes of quiet, and a staffing change: a PGY-1 intern has joined Team 1 at noon, pushing its strength from 37.5 to 42.5. Combined with decay reducing Team 1\u2019s load, its ratio climbs to 17.4. Team 2 sits at 9.1 with two patients. Team 3 is still empty, over two hours into the window, with an infinite ratio. For the third consecutive patient, the formula recommends Team 3. The charge nurse sends to Team 2, giving it a third patient.' },
-  { n: 7, t: 131, time: '12:06', acuity: 'Yellow', actual: 'T3', formula: 'T3', verdict: 'AGREE',
-    ratios: { T1: '18.0', T2: '6.2', T3: '∞' },
-    narrative: 'Four minutes later. Team 2 now carries three patients and its ratio has dropped to 6.2. Team 1 is at 18.0 with its enhanced strength. Team 3, with one of the most experienced residents in the department, is still empty, 131 minutes into the window, with an infinite ratio. Both the formula and the charge nurse finally agree: Team 3 gets its first patient.' },
-  { n: 8, t: 146, time: '12:21', acuity: 'Yellow', actual: 'T1', formula: 'T1', verdict: 'AGREE',
-    ratios: { T1: '21.0', T2: '7.0', T3: '19.1' },
-    narrative: 'The final patient of the window. By now all three teams carry load and all three ratios are finite for the first time. Team 1\u2019s enhanced strength (42.5) combined with significant decay on its older patients gives it the highest ratio at 21.0. Team 3, with only one patient and 15 minutes of decay, sits at 19.1. Team 2, carrying three patients including the aging Red, has the lowest ratio at 7.0. Both routing methods agree on Team 1.' },
-];
+// The real morning, minutes from 09:55. "formula" is what capacity suggested at
+// that moment, given where the earlier patients actually went.
+const PATIENTS = WK.replay('actual').map(s => ({
+  n: s.n, t: s.t, time: WK.clock(s.t), acuity: s.acuity, actual: s.actual, formula: s.suggested,
+}));
 
 const CHART_MIN = 0;
 const CHART_MAX = 150; // minutes from T+0 = 09:55
 
 // Compute a team's instantaneous load under an assignment history
 function loadAt(team, mins, assignments) {
-  // assignments: array of {patient, team, tArrive}
-  let load = 0;
-  for (const a of assignments) {
-    if (a.team !== team) continue;
-    if (a.tArrive > mins) continue;
-    const d = DECAY[a.acuity];
-    const age = mins - a.tArrive;
-    if (age >= d.minutes) continue;
-    load += d.w * (1 - age / d.minutes);
-  }
-  return load;
+  // assignments: array of { acuity, team, tArrive }
+  return WK.loadAt(team, mins, assignments.map(a => ({ acuity: a.acuity, team: a.team, t: a.tArrive })));
 }
 
-// "Formula from scratch" replay — routes each patient by picking the max
-// strength/load ratio team, using assignments made so far (not the historical
-// ones). Ties break by lowest team ID (T1 < T2 < T3).
+// "Formula from scratch" replay: every patient goes to the team capacity suggests,
+// from the first arrival on (highest ratio, then least recently assigned, then
+// lowest team number, as in the app).
 function formulaReplayAssignments() {
-  if (formulaReplayAssignments._cached) return formulaReplayAssignments._cached;
-  const assigns = [];
-  for (const p of PATIENTS) {
-    const t = p.t;
-    const load = { T1: 0, T2: 0, T3: 0 };
-    for (const a of assigns) {
-      if (a.tArrive > t) continue;
-      const d = DECAY[a.acuity];
-      const age = t - a.tArrive;
-      if (age >= d.minutes) continue;
-      load[a.team] += d.w * (1 - age / d.minutes);
-    }
-    const strengths = {
-      T1: t >= 125 ? 42.5 : 37.5,
-      T2: 42.2,
-      T3: 37.6,
-    };
-    let bestTeam = null, bestRatio = -Infinity;
-    for (const team of ['T1', 'T2', 'T3']) {
-      const ratio = load[team] === 0 ? Infinity : strengths[team] / load[team];
-      if (ratio > bestRatio) { bestRatio = ratio; bestTeam = team; }
-    }
-    assigns.push({ acuity: p.acuity, team: bestTeam, tArrive: p.t });
-  }
-  formulaReplayAssignments._cached = assigns;
-  return assigns;
+  return WK.assignsOf('formula').map(a => ({ acuity: a.acuity, team: a.team, tArrive: a.t }));
 }
 
 // Build curves for a given assignment strategy up to step index (1-8)
@@ -1208,7 +1164,7 @@ function renderChart({ patientsShown, currentPatient, strategy = 'actual', width
   const { pts: allPts, assignments } = curvesThrough(patientsShown, strategy);
   const effectiveCutoff = cutoffMinute == null ? xEnd : cutoffMinute;
   // When fullDomain is true, we draw the whole path to CHART_MAX regardless
-  // of cutoffMinute — the caller animates visibility via stroke-dashoffset.
+  // of cutoffMinute: the caller animates visibility via stroke-dashoffset.
   const pts = fullDomain
     ? allPts.filter(p => p.m >= xStart && p.m <= xEnd)
     : allPts.filter(p => p.m >= xStart && p.m <= effectiveCutoff);
@@ -1230,7 +1186,7 @@ function renderChart({ patientsShown, currentPatient, strategy = 'actual', width
   const allXTicks = [-5, 0, 30, 60, 90, 120, 150];
   const allTimeLabels = { [-5]: '09:50', 0: '09:55', 30: '10:25', 60: '10:55', 90: '11:25', 120: '11:55', 150: '12:25' };
   const xTicks = allXTicks.filter(x => x >= xStart && x <= xEnd)
-    // Suppress the 09:50 tick whenever the chart starts at -5 — at any plot
+    // Suppress the 09:50 tick whenever the chart starts at -5: at any plot
     // width it ends up crowding the 09:55 label to the point of overlap.
     .filter(x => !(x === -5 && xStart === -5));
   const timeLabels = allTimeLabels;
@@ -1249,7 +1205,7 @@ function renderChart({ patientsShown, currentPatient, strategy = 'actual', width
     svg += `<line x1="${xScale(x)}" x2="${xScale(x)}" y1="${margin.t}" y2="${margin.t+H}" stroke="var(--grid)" />`;
     svg += `<text x="${xScale(x)}" y="${margin.t+H+18}" text-anchor="middle" font-size="11" fill="var(--muted)">${timeLabels[x]}</text>`;
   }
-  // capacity-cap shading (top region above a load threshold) — always emitted
+  // capacity-cap shading (top region above a load threshold): always emitted
   // when capShade is provided, but visibility is controlled by `.slide-shades`
   // on the parent slide so steps can fade the shade in/out without re-render.
   if (capShade) {
@@ -1260,13 +1216,13 @@ function renderChart({ patientsShown, currentPatient, strategy = 'actual', width
       svg += `<text class="cap-shade" x="${margin.l+W-8}" y="${yCap-6}" text-anchor="end" font-size="11" font-weight="700" fill="${capShade.stroke}">${capShade.label}</text>`;
     }
   }
-  // noon marker — always emitted so the walkthrough can fade it in/out with
+  // noon marker: always emitted so the walkthrough can fade it in/out with
   // the staffing-change phase. Visibility managed by setupWalkthroughChart.
   if (patientsShown >= 6) {
     svg += `<line class="noon-marker" x1="${noonX}" x2="${noonX}" y1="${margin.t}" y2="${margin.t+H}" stroke="#f59e0b" stroke-dasharray="4,3" stroke-width="1.2" opacity="0" />`;
     svg += `<text class="noon-label" x="${noonX-6}" y="${margin.t+14}" text-anchor="end" font-size="10" fill="#b45309" opacity="0">noon · intern joins <tspan font-weight="700" fill="var(--t1)">T1</tspan></text>`;
   }
-  // areas (skipped in strokeOnly mode — e.g. during the early walkthrough
+  // areas (skipped in strokeOnly mode: e.g. during the early walkthrough
   // where we haven't introduced load-minutes / area-under-curve yet). When
   // `areasControlled` is true, emit paths with the `team-area` CSS hook
   // so the parent slide can fade them in via a `.focus-T{N}` class.
@@ -1285,7 +1241,7 @@ function renderChart({ patientsShown, currentPatient, strategy = 'actual', width
   if (showLine('T2')) svg += `<path class="line-T2" data-team="T2" d="${pathFor('T2')}" fill="none" stroke="var(--t2)" stroke-width="2" />`;
   if (showLine('T3')) svg += `<path class="line-T3" data-team="T3" d="${pathFor('T3')}" fill="none" stroke="var(--t3)" stroke-width="2" />`;
 
-  // AUC labels for team-focus mode — three stacked team-colored labels in
+  // AUC labels for team-focus mode: three stacked team-colored labels in
   // the top-left of the plot area (clear of the noon marker on the right).
   // Visibility is controlled by `.focus-T{N}` on the parent slide.
   if (aucLabels) {
@@ -1330,14 +1286,6 @@ function renderChart({ patientsShown, currentPatient, strategy = 'actual', width
 // ============================================================
 // STEP RENDERERS
 // ============================================================
-function stepScene() {
-  return `
-    <h1 class="hero-title">Saturday morning. Three teams.<br/>Eight patients between 9:55 AM and 12:21 PM.</h1>
-    <p class="lede">The morning the rest of the walkthrough explores. Everything from here forward is real data from the historical replay of December 29, 2025 — one 146-minute sliver of the 1,541 arrivals this formula was tested against.</p>
-    <div class="chart-wrap">${renderChart({ patientsShown: 0, currentPatient: null, strokeOnly: true })}</div>
-  `;
-}
-
 function stepNYUBK() {
   return `
     <div class="slide">
@@ -1345,12 +1293,12 @@ function stepNYUBK() {
       <p class="lede" style="margin: 18px 0">One morning, 146 minutes, eight critical patients arrived to NYU BK.<br>
 Here’s how capacity-conscious routing would have compared to what actually occurred. These were the teams that day:</p>
       <div class="group-card strength-teams" style="padding:16px 24px; margin-top:12px"><div class="teams-row" style="gap:14px">
-        ${tsCard('Team 1', [['Attending',20],['Senior Resident',15.2],['Intern',6.6]], 't1')}
-        ${tsCard('Team 2', [['Attending',20],['PA',11.4],['Junior Resident',10.8]], 't2')}
-        ${tsCard('Team 3', [['Attending',20],['Senior Resident',15.2],['Rotator',2.4]], 't3')}
+        ${tsCard('Team 1', WK.providerRows(WK.rolesAt('T1', 0)), 't1')}
+        ${tsCard('Team 2', WK.providerRows(WK.rolesAt('T2', 0)), 't2')}
+        ${tsCard('Team 3', WK.providerRows(WK.rolesAt('T3', 0)), 't3')}
       </div></div>
       <p style="margin-top:20px;font-size:12px;color:var(--muted);font-style:italic;text-align:center">
-        Actual provider schedules on this day; names replaced with role titles.
+        Actual provider schedules on this day; names replaced with role titles. An intern joined Team 1 at noon.
       </p>
     </div>
   `;
@@ -1360,215 +1308,167 @@ Here’s how capacity-conscious routing would have compared to what actually occ
 // Tracks cumulative state per phase. Phase 0 = empty board (9:54).
 // Phase N = after patient N arrives.
 const S955_TEAMS = {
-  T1: { name: 'Team 1', cls: 't1', strength: 37.5,
-        providers: [['Attending',20],['Senior Resident',15.2],['Rotator',2.3]] },
-  T2: { name: 'Team 2', cls: 't2', strength: 42.2,
-        providers: [['Attending',20],['PA',11.4],['Junior Resident',10.8]] },
-  T3: { name: 'Team 3', cls: 't3', strength: 37.6,
-        providers: [['Attending',20],['Senior Resident',15.2],['Rotator',2.4]] },
+  T1: { name: 'Team 1', cls: 't1' },
+  T2: { name: 'Team 2', cls: 't2' },
+  T3: { name: 'Team 3', cls: 't3' },
 };
 
-// Each phase defines: time label, heading, subtitle, which team(s) to highlight,
-// and a map of team-id → list of patient chips currently on that team
-// (each chip = { tone: 'red'|'yellow'|'purple', w: number }).
+// A team's roster, strength and patient chips at a phase, all from the model.
+// "at" is the minute the phase shows; "patientsShown" is how many patients have
+// been placed (where they actually went).
+function phaseTeam(ph, tid) {
+  const roles = WK.rolesAt(tid, ph.at);
+  return {
+    ...S955_TEAMS[tid],
+    strength: WK.strengthAt(tid, ph.at),
+    providers: WK.providerRows(roles, tid === 'T1' && ph.at >= WK.NOON ? 'intern' : null),
+  };
+}
+function phaseChips(ph, tid) {
+  return WK.chipsAt(tid, ph.at, WK.assignsOf('actual', ph.patientsShown));
+}
+
+// Helpers for the phase text.
+const HIST = WK.replay('actual');
+const rAt = (tid, min, k) => WK.formatRatio(WK.ratio(WK.strengthAt(tid, min), WK.loadAt(tid, min, WK.assignsOf('actual', k))));
+const wAt = (n, min) => { const a = WK.ARRIVALS[n - 1]; return WK.weightAt(a.acuity, min - a.t); };
+const teamName = tid => 'Team ' + tid.slice(1);
+const recLine = (n, again) => `<span style="color:#2e7d32">Formula ${again ? 'again ' : ''}recommends ${teamName(HIST[n - 1].suggested)}.</span>`;
+const DISAGREEMENTS = HIST.filter(s => s.suggested !== s.actual).length;
+const HIST_COUNTS = WK.counts('actual');
+
+// Each phase: time label, heading, subtitle, which team(s) to outline, the minute it
+// shows ("at"), how many patients have been placed, and where the chart pen stops.
+// Strengths, loads, ratios and suggestions in the text come from the model.
+const Y = '<span style="color:#b8a000">';
+const arrive = n => ({ kind: 'arrive', n, highlights: [HIST[n - 1].suggested], patientsShown: n - 1, currentPatient: n > 1 ? n - 1 : null, at: WK.ARRIVALS[n - 1].t });
+const place = n => ({ kind: 'place', n, highlights: [HIST[n - 1].actual], disagree: HIST[n - 1].suggested !== HIST[n - 1].actual, patientsShown: n, currentPatient: n, at: WK.ARRIVALS[n - 1].t });
 const S955_PHASES = [
   {
     time: '09:54 AM',
     heading: 'All three teams start with zero patients.',
     subtitle: 'Infinite capacities all around, no wrong decision.',
-    highlights: [],
-    chips: { T1: [], T2: [], T3: [] },
-    patientsShown: 0,
-    currentPatient: null,
+    highlights: [], patientsShown: 0, currentPatient: null, at: 0,
     cutoffMinute: -1,
   },
   {
     time: '09:55 · <span style="color:var(--purple)">PATIENT 1</span>',
     heading: 'A <span style="color:var(--purple)">purple</span> patient arrives.',
     subtitle: '<span style="color:#2e7d32">Formula recommends any of these teams.</span>',
-    highlights: ['T1', 'T2', 'T3'],
-    chips: { T1: [], T2: [], T3: [] },
-    patientsShown: 0,
-    currentPatient: null,
+    ...arrive(1), highlights: ['T1', 'T2', 'T3'],
     cutoffMinute: -1,
   },
   {
     time: '09:55 · <span style="color:var(--purple)">PATIENT 1</span>',
     heading: 'A <span style="color:var(--purple)">purple</span> patient arrives.',
     subtitle: 'Historical routing sends it to Team 1. No disagreements here.<br><span style="color:#2e7d32">Formula recommends any of these teams.</span>',
-    highlights: ['T1'],
-    chips: { T1: [{ tone: 'purple', w: 1.0 }], T2: [], T3: [] },
-    patientsShown: 1,
-    currentPatient: 1,
+    ...place(1),
     cutoffMinute: 0,
   },
   {
-    time: '10:45 · <span style="color:#b8a000">PATIENT 2</span>',
-    heading: 'Fifty minutes of quiet, then a <span style="color:#b8a000">yellow</span> patient arrives.',
-    subtitle: 'Team 1\'s purple has decayed to 0.4. T1\'s ratio is high but finite; T2 and T3 are still empty.<br><span style="color:#2e7d32">Formula recommends Team 2.</span>',
-    highlights: ['T2'],
-    chips: { T1: [{ tone: 'purple', w: 0.444 }], T2: [], T3: [] },
-    patientsShown: 1,
-    currentPatient: 1,
+    time: `${WK.clock(50)} · ${Y}PATIENT 2</span>`,
+    heading: `Fifty minutes of quiet, then a ${Y}yellow</span> patient arrives.`,
+    subtitle: `Team 1's purple has decayed to ${wAt(1, 50).toFixed(1)}. T1's ratio is high but finite; T2 and T3 are still empty.<br>${recLine(2)}`,
+    ...arrive(2),
     cutoffMinute: 50,
   },
   {
-    time: '10:45 · <span style="color:#b8a000">PATIENT 2</span>',
-    heading: 'The <span style="color:#b8a000">Yellow</span> goes to Team 1. <span style="color:var(--red)">Methods disagree.</span>',
-    subtitle: 'T1 now carries two patients while T2 and T3 sit empty.<br>A minor difference on its own —<br>but it sets up a compounding problem.',
-    highlights: ['T1'],
-    disagree: true,
-    chips: { T1: [{ tone: 'purple', w: 0.433 }, { tone: 'yellow', w: 1.989 }], T2: [], T3: [] },
-    patientsShown: 2,
-    currentPatient: 2,
+    time: `${WK.clock(50)} · ${Y}PATIENT 2</span>`,
+    heading: `The ${Y}Yellow</span> goes to Team 1. <span style="color:var(--red)">Methods disagree.</span>`,
+    subtitle: 'T1 now carries two patients while T2 and T3 sit empty.<br>A minor difference on its own,<br>but it sets up a compounding problem.',
+    ...place(2),
     cutoffMinute: 51,
   },
   {
-    time: '10:46 · <span style="color:var(--red)">PATIENT 3</span>',
+    time: `${WK.clock(51)} · <span style="color:var(--red)">PATIENT 3</span>`,
     heading: 'A minute later, a <span style="color:var(--red)">red</span> patient arrives, the sickest of the morning.',
-    subtitle: 'Team 1 just absorbed Patient 2, dropping its ratio to 15.5. Teams 2 and 3 are still empty.<br><span style="color:#2e7d32">Formula recommends Team 2.</span>',
-    highlights: ['T2'],
-    chips: { T1: [{ tone: 'purple', w: 0.433 }, { tone: 'yellow', w: 1.989 }], T2: [], T3: [] },
-    patientsShown: 2,
-    currentPatient: 2,
+    subtitle: `Team 1 just absorbed Patient 2, dropping its ratio to ${rAt('T1', 51, 2)}. Teams 2 and 3 are still empty.<br>${recLine(3)}`,
+    ...arrive(3),
     cutoffMinute: 51,
   },
   {
-    time: '10:46 · <span style="color:var(--red)">PATIENT 3</span>',
+    time: `${WK.clock(51)} · <span style="color:var(--red)">PATIENT 3</span>`,
     heading: 'The <span style="color:var(--red)">Red</span> goes to Team 2. <span style="color:#2e7d32">Both agree.</span>',
     subtitle: 'The right call by any measure, the sickest patient goes to an empty team.',
-    highlights: ['T2'],
-    chips: { T1: [{ tone: 'purple', w: 0.422 }, { tone: 'yellow', w: 1.978 }], T2: [{ tone: 'red', w: 4.0 }], T3: [] },
-    patientsShown: 3,
-    currentPatient: 3,
+    ...place(3),
     cutoffMinute: 52,
   },
   {
-    time: '10:59 · <span style="color:#b8a000">PATIENT 4</span>',
-    heading: 'Thirteen minutes later, another <span style="color:#b8a000">yellow</span> patient arrives.',
-    subtitle: 'Team 2\'s Red (weight 3.71) is pushing its capacity to 9.4. T1 still carries two, now at 17.6.<br>Team 3 is still empty, 64 minutes in.<br><span style="color:#2e7d32">Formula recommends Team 3.</span>',
-    highlights: ['T3'],
-    chips: { T1: [{ tone: 'purple', w: 0.289 }, { tone: 'yellow', w: 1.844 }], T2: [{ tone: 'red', w: 3.711 }], T3: [] },
-    capOverride: { T2: '9.4' },
-    patientsShown: 3,
-    currentPatient: 3,
+    time: `${WK.clock(64)} · ${Y}PATIENT 4</span>`,
+    heading: `Thirteen minutes later, another ${Y}yellow</span> patient arrives.`,
+    subtitle: `Team 2's Red (weight ${wAt(3, 64).toFixed(2)}) is pushing its capacity to ${rAt('T2', 64, 3)}. T1 still carries two, now at ${rAt('T1', 64, 3)}.<br>Team 3 is still empty, 64 minutes in.<br>${recLine(4)}`,
+    ...arrive(4),
     cutoffMinute: 64,
   },
   {
-    time: '10:59 · <span style="color:#b8a000">PATIENT 4</span>',
-    heading: 'The <span style="color:#b8a000">Yellow</span> goes to Team 1. <span style="color:var(--red)">Methods disagree.</span>',
+    time: `${WK.clock(64)} · ${Y}PATIENT 4</span>`,
+    heading: `The ${Y}Yellow</span> goes to Team 1. <span style="color:var(--red)">Methods disagree.</span>`,
     subtitle: 'Historical routing lands the Yellow on Team 1, now at three patients. Team 3 stays idle.',
-    highlights: ['T1'],
-    disagree: true,
-    chips: { T1: [{ tone: 'purple', w: 0.278 }, { tone: 'yellow', w: 1.833 }, { tone: 'yellow', w: 2.0 }], T2: [{ tone: 'red', w: 3.689 }], T3: [] },
-    capOverride: { T2: '9.4' },
-    patientsShown: 4,
-    currentPatient: 4,
+    ...place(4),
     cutoffMinute: 65,
   },
   {
-    time: '11:21 · <span style="color:#b8a000">PATIENT 5</span>',
-    heading: 'Twenty-two minutes of quiet, then another <span style="color:#b8a000">yellow</span> patient arrives.',
-    subtitle: 'Team 2\'s Red has decayed from 4.0 to about 3.22, improving its ratio to 10.9.<br>Team 1 carries three patients at 11.0. Team 3 is still empty with an infinite ratio.<br><span style="color:#2e7d32">Formula again recommends Team 3.</span>',
-    highlights: ['T3'],
-    chips: { T1: [{ tone: 'purple', w: 0.044 }, { tone: 'yellow', w: 1.6 }, { tone: 'yellow', w: 1.756 }], T2: [{ tone: 'red', w: 3.222 }], T3: [] },
-    capOverride: { T2: '10.9' },
-    patientsShown: 4,
-    currentPatient: 4,
+    time: `${WK.clock(86)} · ${Y}PATIENT 5</span>`,
+    heading: `Twenty-two minutes of quiet, then another ${Y}yellow</span> patient arrives.`,
+    subtitle: `Team 2's Red has decayed from ${DECAY.Red.w.toFixed(1)} to about ${wAt(3, 86).toFixed(2)}, improving its ratio to ${rAt('T2', 86, 4)}.<br>Team 1 carries three patients at ${rAt('T1', 86, 4)}. Team 3 is still empty with an infinite ratio.<br>${recLine(5, true)}`,
+    ...arrive(5),
     cutoffMinute: 85,
   },
   {
-    time: '11:21 · <span style="color:#b8a000">PATIENT 5</span>',
+    time: `${WK.clock(86)} · ${Y}PATIENT 5</span>`,
     heading: 'Historical routing sends to Team 2, <span style="color:var(--red)">another disagreement.</span>',
     subtitle: 'The attending and senior resident on Team 3 remain unused, 86 minutes into the window.',
-    highlights: ['T2'],
-    disagree: true,
-    chips: { T1: [{ tone: 'purple', w: 0.033 }, { tone: 'yellow', w: 1.589 }, { tone: 'yellow', w: 1.744 }], T2: [{ tone: 'red', w: 3.2 }, { tone: 'yellow', w: 2.0 }], T3: [] },
-    patientsShown: 5,
-    currentPatient: 5,
+    ...place(5),
     cutoffMinute: 87,
   },
   {
     time: '12:00 PM · NOON',
     heading: 'A <span style="color:var(--t1)">PGY-1 intern</span> joins Team 1.',
-    subtitle: 'Team 1\'s strength rises from 37.5 to 42.5.',
-    highlights: ['T1'],
-    staffing: true,
-    chips: { T1: [{ tone: 'yellow', w: 1.167 }, { tone: 'yellow', w: 1.322 }], T2: [{ tone: 'red', w: 2.356 }, { tone: 'yellow', w: 1.567 }], T3: [] },
-    patientsShown: 5,
-    currentPatient: 5,
+    subtitle: `Team 1's strength rises from ${WK.strengthAt('T1', WK.NOON - 1).toFixed(1)} to ${WK.strengthAt('T1', WK.NOON).toFixed(1)}.`,
+    highlights: ['T1'], staffing: true, patientsShown: 5, currentPatient: 5, at: WK.NOON,
     cutoffMinute: 125,
-    teamOverrides: { T1: { strength: 42.5, providers: [['Attending', 20], ['Senior Resident', 15.2], ['PGY-1 Intern', 5.0], ['Rotator', 2.3]] } },
   },
   {
-    time: '12:02 · <span style="color:#b8a000">PATIENT 6</span>',
-    heading: 'Forty-one minutes of quiet, then another <span style="color:#b8a000">yellow</span> patient arrives.',
-    subtitle: 'With the intern on board and the Yellows decaying, Team 1\'s capacity climbs to 17.4.<br>Team 2 sits at 9.1 with two patients. Team 3 is still empty, over two hours in.<br><span style="color:#2e7d32">Formula recommends Team 3.</span>',
-    highlights: ['T3'],
-    chips: { T1: [{ tone: 'yellow', w: 1.144 }, { tone: 'yellow', w: 1.3 }], T2: [{ tone: 'red', w: 2.311 }, { tone: 'yellow', w: 1.544 }], T3: [] },
-    capOverride: { T2: '9.1' },
-    patientsShown: 5,
-    currentPatient: 5,
+    time: `${WK.clock(127)} · ${Y}PATIENT 6</span>`,
+    heading: `Forty-one minutes of quiet, then another ${Y}yellow</span> patient arrives.`,
+    subtitle: `With the intern on board and the Yellows decaying, Team 1's capacity climbs to ${rAt('T1', 127, 5)}.<br>Team 2 sits at ${rAt('T2', 127, 5)} with two patients. Team 3 is still empty, over two hours in.<br>${recLine(6)}`,
+    ...arrive(6),
     cutoffMinute: 127,
-    teamOverrides: { T1: { strength: 42.5, providers: [['Attending', 20], ['Senior Resident', 15.2], ['PGY-1 Intern', 5.0], ['Rotator', 2.3]] } },
   },
   {
-    time: '12:02 · <span style="color:#b8a000">PATIENT 6</span>',
+    time: `${WK.clock(127)} · ${Y}PATIENT 6</span>`,
     heading: 'Historical routing sends to Team 2 again, <span style="color:var(--red)">a fourth disagreement.</span>',
     subtitle: 'Team 2 now carries three patients. Team 3 stays idle for the <strong>6th consecutive patient</strong>.',
-    highlights: ['T2'],
-    disagree: true,
-    chips: { T1: [{ tone: 'yellow', w: 1.133 }, { tone: 'yellow', w: 1.289 }], T2: [{ tone: 'red', w: 2.289 }, { tone: 'yellow', w: 1.533 }, { tone: 'yellow', w: 1.989 }], T3: [] },
-    patientsShown: 6,
-    currentPatient: 6,
+    ...place(6),
     cutoffMinute: 128,
-    teamOverrides: { T1: { strength: 42.5, providers: [['Attending', 20], ['Senior Resident', 15.2], ['PGY-1 Intern', 5.0], ['Rotator', 2.3]] } },
   },
   {
-    time: '12:06 · <span style="color:#b8a000">PATIENT 7</span>',
-    heading: 'Four minutes later, another <span style="color:#b8a000">yellow</span> patient arrives.',
-    subtitle: 'Team 2 now carries three patients, dropping its capacity to 6.2.<br>Team 1 sits at 18.0 with its enhanced strength. Team 3 is still empty, 131 minutes in.<br><span style="color:#2e7d32">Formula recommends Team 3.</span>',
-    highlights: ['T3'],
-    chips: { T1: [{ tone: 'yellow', w: 1.1 }, { tone: 'yellow', w: 1.256 }], T2: [{ tone: 'red', w: 2.22 }, { tone: 'yellow', w: 1.5 }, { tone: 'yellow', w: 1.956 }], T3: [] },
-    capOverride: { T2: '6.2' },
-    patientsShown: 6,
-    currentPatient: 6,
+    time: `${WK.clock(131)} · ${Y}PATIENT 7</span>`,
+    heading: `Four minutes later, another ${Y}yellow</span> patient arrives.`,
+    subtitle: `Team 2 now carries three patients, dropping its capacity to ${rAt('T2', 131, 6)}.<br>Team 1 sits at ${rAt('T1', 131, 6)} with its enhanced strength. Team 3 is still empty, 131 minutes in.<br>${recLine(7)}`,
+    ...arrive(7),
     cutoffMinute: 131,
-    teamOverrides: { T1: { strength: 42.5, providers: [['Attending', 20], ['Senior Resident', 15.2], ['PGY-1 Intern', 5.0], ['Rotator', 2.3]] } },
   },
   {
-    time: '12:06 · <span style="color:#b8a000">PATIENT 7</span>',
+    time: `${WK.clock(131)} · ${Y}PATIENT 7</span>`,
     heading: 'Team 3 gets its first patient. <span style="color:#2e7d32">Both agree.</span>',
-    subtitle: 'One of the most experienced residents in the ER finally gets put to work...<br><strong>132 minutes into the window.</strong>',
-    highlights: ['T3'],
-    chips: { T1: [{ tone: 'yellow', w: 1.089 }, { tone: 'yellow', w: 1.244 }], T2: [{ tone: 'red', w: 2.197 }, { tone: 'yellow', w: 1.489 }, { tone: 'yellow', w: 1.944 }], T3: [{ tone: 'yellow', w: 2.0 }] },
-    patientsShown: 7,
-    currentPatient: 7,
+    subtitle: `One of the most experienced residents in the ER finally gets put to work...<br><strong>${WK.ARRIVALS[6].t} minutes into the window.</strong>`,
+    ...place(7),
     cutoffMinute: 132,
-    teamOverrides: { T1: { strength: 42.5, providers: [['Attending', 20], ['Senior Resident', 15.2], ['PGY-1 Intern', 5.0], ['Rotator', 2.3]] } },
   },
   {
-    time: '12:21 · <span style="color:#b8a000">PATIENT 8</span>',
-    heading: 'Fifteen minutes later, the final <span style="color:#b8a000">yellow</span> patient arrives.',
-    subtitle: 'All three ratios are finite for the first time — T1 at 21.0, T3 at 19.1, T2 at 7.0.<br><span style="color:#2e7d32">Formula recommends Team 1.</span>',
-    highlights: ['T1'],
-    chips: { T1: [{ tone: 'yellow', w: 0.933 }, { tone: 'yellow', w: 1.089 }], T2: [{ tone: 'red', w: 1.877 }, { tone: 'yellow', w: 1.333 }, { tone: 'yellow', w: 1.789 }], T3: [{ tone: 'yellow', w: 1.844 }] },
-    capOverride: { T2: '7.0', T3: '19.1' },
-    patientsShown: 7,
-    currentPatient: 7,
+    time: `${WK.clock(146)} · ${Y}PATIENT 8</span>`,
+    heading: `Fifteen minutes later, the final ${Y}yellow</span> patient arrives.`,
+    subtitle: `All three ratios are finite for the first time: T1 at ${rAt('T1', 146, 7)}, T3 at ${rAt('T3', 146, 7)}, T2 at ${rAt('T2', 146, 7)}.<br>${recLine(8)}`,
+    ...arrive(8),
     cutoffMinute: 146,
-    teamOverrides: { T1: { strength: 42.5, providers: [['Attending', 20], ['Senior Resident', 15.2], ['PGY-1 Intern', 5.0], ['Rotator', 2.3]] } },
   },
   {
-    time: '12:21 · <span style="color:#b8a000">PATIENT 8</span>',
+    time: `${WK.clock(146)} · ${Y}PATIENT 8</span>`,
     heading: 'The final patient goes to Team 1. <span style="color:#2e7d32">Both agree.</span>',
-    subtitle: '146 minutes, 8 patients, 4 disagreements.<br>T1 saw 4, T2 saw 3, T3 saw 1.',
-    highlights: ['T1'],
-    chips: { T1: [{ tone: 'yellow', w: 0.922 }, { tone: 'yellow', w: 1.078 }, { tone: 'yellow', w: 2.0 }], T2: [{ tone: 'red', w: 1.854 }, { tone: 'yellow', w: 1.322 }, { tone: 'yellow', w: 1.778 }], T3: [{ tone: 'yellow', w: 1.833 }] },
-    patientsShown: 8,
-    currentPatient: 8,
+    subtitle: `${WK.WINDOW} minutes, ${WK.ARRIVALS.length} patients, ${DISAGREEMENTS} disagreements.<br>T1 saw ${HIST_COUNTS.T1}, T2 saw ${HIST_COUNTS.T2}, T3 saw ${HIST_COUNTS.T3}.`,
+    ...place(8),
     cutoffMinute: 147,
-    teamOverrides: { T1: { strength: 42.5, providers: [['Attending', 20], ['Senior Resident', 15.2], ['PGY-1 Intern', 5.0], ['Rotator', 2.3]] } },
   },
 ];
 
@@ -1589,14 +1489,10 @@ function stepStart955(phase = 0) {
   };
 
   const row = (tid) => {
-    const base = S955_TEAMS[tid];
-    const ov = ph.teamOverrides && ph.teamOverrides[tid];
-    const t = ov ? { ...base, ...ov } : base;
-    const chips = ph.chips[tid] || [];
+    const t = phaseTeam(ph, tid);
+    const chips = phaseChips(ph, tid);
     const load = chips.reduce((s, c) => s + c.w, 0);
-    const computed = load === 0 ? '∞' : (t.strength / load).toFixed(1);
-    const override = ph.capOverride && ph.capOverride[tid];
-    const capacity = override || computed;
+    const capacity = WK.formatRatio(WK.ratio(t.strength, load));
     const isWinner = ph.highlights.includes(tid);
     const disagreeCls = isWinner && ph.disagree ? ' dyn-disagree' : '';
     const staffingCls = isWinner && ph.staffing ? ' dyn-staffing' : '';
@@ -1647,12 +1543,12 @@ function stepStart955(phase = 0) {
             </div>
             ${renderChart({
               patientsShown: 8,            // emit dots for every patient in this walkthrough window (through P8)
-              currentPatient: null,        // no dot emphasis — all walkthrough dots same size
+              currentPatient: null,        // no dot emphasis: all walkthrough dots same size
               width: 560,
               height: 340,
               xStart: -5,
               hideLegend: true,
-              strokeOnly: true,            // no area fills — introduced later when we talk AUC
+              strokeOnly: true,            // no area fills: introduced later when we talk AUC
               fullDomain: true,            // draw paths edge-to-edge; visibility via stroke-dashoffset
             })}
             <div class="chart-legend" style="display:flex;gap:14px;justify-content:center;margin-top:4px;font-size:11px;color:var(--muted);flex-wrap:wrap">
@@ -1670,7 +1566,7 @@ function stepStart955(phase = 0) {
   `;
 }
 
-// Partial update for slide 10 phase transitions — keeps DOM intact so
+// Partial update for slide 10 phase transitions: keeps DOM intact so
 // elements can animate in rather than the whole page re-rendering.
 // ---- Walkthrough chart stroke-dashoffset setup ------------------------
 // Given a chart-wrap and a target cutoffMinute (what minute the data lines
@@ -1716,7 +1612,7 @@ function setupWalkthroughChart(chartWrap, phase, opts = {}) {
 
   // Compute the target d-string for each team based on the current phase's
   // routed-patient count. For phase K the line should only reflect patients
-  // actually routed so far — otherwise a Yellow/Red "jump" appears at the
+  // actually routed so far: otherwise a Yellow/Red "jump" appears at the
   // pen tip before the corresponding routing decision has been announced.
   const computePathD = (patientsShown) => {
     const { pts: allPts } = curvesThrough(patientsShown, 'actual');
@@ -1749,7 +1645,7 @@ function setupWalkthroughChart(chartWrap, phase, opts = {}) {
   //   completes.
 
   if (!prev) {
-    // Initial render — just set new paths, no animation.
+    // Initial render: just set new paths, no animation.
     paths.forEach(path => {
       const tid = path.getAttribute('data-team');
       const d = newPathFor(tid);
@@ -1780,7 +1676,7 @@ function setupWalkthroughChart(chartWrap, phase, opts = {}) {
 
       // If a patient is being un-routed to THIS team and the jump sits
       // at or after the new cutoff, the retraction would otherwise stop
-      // with the jump still visible on the old path — and swapping to the
+      // with the jump still visible on the old path: and swapping to the
       // new (jump-less) path would snap the line down. Extend retraction
       // one minute past the jump so the pen visibly "erases" it, then
       // silently swap paths in the matching pre-jump region and settle
@@ -1846,7 +1742,7 @@ function setupWalkthroughChart(chartWrap, phase, opts = {}) {
     // Forward path ----------------------------------------------------
     // Swap d to the NEW path first so the pen draws over it for the whole
     // animation. We anchor the starting dashoffset at the equivalent of
-    // the previous cutoff on the new path — but if a new patient was
+    // the previous cutoff on the new path: but if a new patient was
     // added at or near prev.cutoffMinute, the arc-length at that x on the
     // new path is AFTER the jump (the point at x=prevCutoff is post-jump).
     // To ensure the animation sweeps across the jump, rewind the anchor
@@ -1912,7 +1808,7 @@ function setupWalkthroughChart(chartWrap, phase, opts = {}) {
       return;
     }
     if (now && !was) {
-      // Fade IN — wait until the line has drawn past this dot's x.
+      // Fade IN: wait until the line has drawn past this dot's x.
       // Start from 0, then delay-in based on how far along the reveal is.
       el.style.transition = 'none';
       el.style.opacity = '0';
@@ -2027,7 +1923,7 @@ function updateStart955(prevPhase, newPhase) {
     const prevSub = prev.subtitle || '';
     const nextSub = next.subtitle;
     if (prevSub === nextSub) {
-      // No change — make sure DOM matches the canonical text.
+      // No change: make sure DOM matches the canonical text.
       if (subEl.innerHTML !== nextSub) subEl.innerHTML = nextSub;
     } else if (nextSub.startsWith(prevSub) && prevSub.length > 0) {
       // Additive: keep the shared prefix on screen, fade in only the suffix.
@@ -2054,7 +1950,7 @@ function updateStart955(prevPhase, newPhase) {
         subEl.innerHTML = nextSub;
       }
     } else {
-      // No shared prefix — fall back to a full fade swap.
+      // No shared prefix: fall back to a full fade swap.
       fadeSwapHTML(subEl, nextSub);
     }
   }
@@ -2062,11 +1958,7 @@ function updateStart955(prevPhase, newPhase) {
   // --- Team outlines / numbers / chips --- //
   const cards = slide.querySelectorAll('.s955-card');
   const teamIds = ['T1', 'T2', 'T3'];
-  const effTeam = (phase, tid) => {
-    const base = S955_TEAMS[tid];
-    const ov = phase && phase.teamOverrides && phase.teamOverrides[tid];
-    return ov ? { ...base, ...ov } : base;
-  };
+  const effTeam = (phase, tid) => phaseTeam(phase, tid);
   teamIds.forEach((tid, idx) => {
     const card = cards[idx];
     if (!card) return;
@@ -2115,11 +2007,9 @@ function updateStart955(prevPhase, newPhase) {
     }
 
     // load + capacity numbers
-    const chips = next.chips[tid] || [];
+    const chips = phaseChips(next, tid);
     const load = chips.reduce((s, c) => s + c.w, 0);
-    const computed = load === 0 ? '∞' : (nextT.strength / load).toFixed(1);
-    const override = next.capOverride && next.capOverride[tid];
-    const capacity = override || computed;
+    const capacity = WK.formatRatio(WK.ratio(nextT.strength, load));
     const loadEl = card.querySelector('.dv-den');
     const capEl = card.querySelector('.dv-cap');
     const newLoad = load.toFixed(1);
@@ -2224,110 +2114,7 @@ function updateStart955(prevPhase, newPhase) {
   return true;
 }
 
-function stepTeams() {
-  const card = (key, t, roster, strength, note) => `
-    <div class="team-card ${key.toLowerCase()}">
-      <div class="team-name">${t}</div>
-      <div style="font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.4">${roster}</div>
-      <div class="team-stat-row"><span>Strength</span><span>${strength}</span></div>
-      <div class="team-stat-row"><span>Patients</span><span>0</span></div>
-      <div class="team-stat-row"><span>Load</span><span>0.00</span></div>
-      ${note ? `<div style="font-size:12px;color:#b45309;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border)">${note}</div>` : ''}
-    </div>`;
-  return `
-    <h1 class="hero-title serif">Meet the teams.</h1>
-    <p class="lede">Representative A-side staffing at the start of the window. Each team has an attending plus two other providers. Strength is the sum of provider weights.</p>
-    <div class="teams-grid">
-      ${card('t1', 'Team 1', 'Attending + Senior Resident', 37.5, 'An intern joins at noon, raising strength to 42.5.')}
-      ${card('t2', 'Team 2', 'Attending + PA + Junior Resident', 42.2, null)}
-      ${card('t3', 'Team 3', 'Attending + Senior Resident + Rotator', 37.6, null)}
-    </div>
-  `;
-}
-
-function stepRules() {
-  return `
-    <h1 class="hero-title serif">The rules, briefly.</h1>
-    <p class="lede">The only concepts you need. Everything after this is application.</p>
-    <div class="rules-grid">
-      <div class="rule">
-        <h3>Acuity is weighted 4 : 2 : 1</h3>
-        <p><strong style="color:var(--red)">Red</strong> (ESI-1) = 4 &nbsp;·&nbsp; <strong style="color:#8a6400">Yellow</strong> (ESI-2) = 2 &nbsp;·&nbsp; <strong style="color:var(--purple)">Purple</strong> (ESI-3) = 1. One Red contributes as much load as four Purples.</p>
-      </div>
-      <div class="rule">
-        <h3>Attention decays linearly</h3>
-        <p>A patient's load drops to zero over 180 minutes (Red, Yellow) or 90 minutes (Purple). Older patients weigh less on the team.</p>
-      </div>
-      <div class="rule">
-        <h3>Highest ratio wins</h3>
-        <p><strong>Capacity Ratio = Team Strength ÷ Acuity-Weighted Load.</strong> The team with the most unused capacity gets the next patient.</p>
-      </div>
-    </div>
-  `;
-}
-
-function stepPatient(idx) {
-  const p = PATIENTS[idx];
-  const acuityClass = p.acuity.toLowerCase();
-  const recTeam = p.formula;
-  const ratioCard = (team) => {
-    const isRec = team === recTeam;
-    const isActual = team === p.actual;
-    const val = p.ratios[team];
-    let sub = '';
-    if (isRec && isActual) sub = 'formula & actual';
-    else if (isRec) sub = 'formula pick';
-    else if (isActual) sub = 'actual pick';
-    return `<div class="ratio ${isRec ? 'rec' : ''}">
-      <div class="label">${team}</div>
-      <div class="value">${val}</div>
-      <div class="sub">${sub || '&nbsp;'}</div>
-    </div>`;
-  };
-  const decision = p.verdict === 'AGREE'
-    ? `Both sent to ${p.actual}.`
-    : `Formula recommended ${p.formula}. Charge nurse sent to ${p.actual}.`;
-  return `
-    <div class="patient-header">
-      <div class="pnum">${p.n}</div>
-      <div>
-        <div class="ptime">Patient ${p.n} · ${p.time} · T+${p.t}m</div>
-        <div style="margin-top:4px"><span class="acuity-pill ${acuityClass}"><span class="dot-sm"></span>${p.acuity} (+${DECAY[p.acuity].w} load)</span></div>
-      </div>
-      <div class="verdict ${p.verdict === 'AGREE' ? 'agree' : 'disagree'}">${p.verdict}</div>
-    </div>
-    ${p.interlude ? `<div class="interlude">⏰ Noon staffing change: a PGY-1 intern joins Team 1. Strength rises from 37.5 to 42.5.</div>` : ''}
-    <div class="chart-wrap">${renderChart({ patientsShown: p.n, currentPatient: p.n, strategy: 'actual', strokeOnly: true })}</div>
-    <div class="ratios">${ratioCard('T1')}${ratioCard('T2')}${ratioCard('T3')}</div>
-    <div class="narrative">${p.narrative}<div class="decision">${decision}</div></div>
-  `;
-}
-
-function stepAUC() {
-  return `
-    <h1 class="hero-title serif">Step 12 — The AUC perspective</h1>
-    <p class="lede">Six-panel isolated view (Figure 2.3). Actual vs formula routing, side by side. Placeholder — wire up isolated team charts here.</p>
-    <div class="placeholder">Six-panel small-multiple chart goes here.<br/>Top row: T1/T2/T3 under actual routing.<br/>Bottom row: same teams under formula routing.</div>
-  `;
-}
-
-function stepNumbers() {
-  return `
-    <h1 class="hero-title serif">Step 13 — The numbers, side by side</h1>
-    <p class="lede">Load-minutes, patient counts, peak spread, min/avg capacity ratio.</p>
-    <div class="placeholder">Metric comparison dashboard goes here.<br/>Load-minutes: actual 488/371/55 &nbsp;vs&nbsp; formula 250/302/362. Both total 914.</div>
-  `;
-}
-
-function stepScale() {
-  return `
-    <h1 class="hero-title serif">Step 14 — What this means at scale</h1>
-    <p class="lede">This exact analysis ran on every one of the 1,541 patient arrivals across 121 days.</p>
-    <div class="placeholder">Compact preview of Figure 6.1 (cumulative imbalance) goes here.</div>
-  `;
-}
-
-// Little doctor SVG — stylized head + shoulders. Variants encode role.
+// Little doctor SVG: stylized head + shoulders. Variants encode role.
 function doc(role) {
   // role: attending, senior, junior, pa, intern, rotator
   const V = {
@@ -2359,6 +2146,11 @@ function doc(role) {
     <text x="${W/2 + 7}" y="${headCY + headR + 12}" text-anchor="middle" font-size="6" font-weight="700" fill="white" font-family="Inter, sans-serif">${V.badge}</text>
   </svg>`;
 }
+
+// Intro example teams (CCTWalk.INTRO_TEAMS) in the figures' role names.
+const SHORT_ROLE = { attending: 'Attending', senior_resident: 'PGY4', junior_resident: 'PGY2', pa: 'PA', intern: 'Intern', rotator: 'Rotator' };
+const introRows = tid => WK.INTRO_TEAMS[tid].map(r => [SHORT_ROLE[r], WK.WEIGHTS[r]]);
+const introStrength = tid => WK.strengthOf(WK.INTRO_TEAMS[tid]);
 
 function rrTeam(cls, name, roles) {
   return `<div class="rr-team ${cls}">
@@ -2415,11 +2207,11 @@ function slideProblem1() {
       <h1 class="slide-title" style="margin:0 0 16px">All teams are not equal.</h1>
       <p class="slide-sub">Some teams have more providers and/or more experience than others.</p>
       <div class="group-card"><div class="teams-row">
-        ${tcard('Team 1', ['Attending', 'PGY4', 'PGY2', 'PA'], 't1')}
+        ${tcard('Team 1', introRows('T1').map(r => r[0]), 't1')}
         <div class="neq">≠</div>
-        ${tcard('Team 2', ['Attending', 'PA', 'Intern'], 't2')}
+        ${tcard('Team 2', introRows('T2').map(r => r[0]), 't2')}
         <div class="neq">≠</div>
-        ${tcard('Team 3', ['Attending', 'Rotator'], 't3')}
+        ${tcard('Team 3', introRows('T3').map(r => r[0]), 't3')}
       </div></div>
     </div>
   `;
@@ -2469,13 +2261,13 @@ function slideFormula() {
 
 function slideStrength() {
   const rows = [
-    ['Attending', '20'],
-    ['Senior Resident (PGY 3-4)', '15.2'],
-    ['PA', '11.6'],
-    ['Junior Resident (PGY-2)', '10.9'],
-    ['Intern (PGY-1)', '6.7'],
-    ['Rotator', '2.3'],
-  ].map(([t,w]) => `<tr><td>${t}</td><td>${w}</td></tr>`).join('');
+    ['Attending', 'attending'],
+    ['Senior Resident (PGY 3-4)', 'senior_resident'],
+    ['PA', 'pa'],
+    ['Junior Resident (PGY-2)', 'junior_resident'],
+    ['Intern (PGY-1)', 'intern'],
+    ['Rotator', 'rotator'],
+  ].map(([t, r]) => `<tr><td>${t}</td><td>${WK.WEIGHTS[r]}</td></tr>`).join('');
   return `
     <div class="slide">
       <div class="problem-eyebrow" style="color:var(--agree)">Strength</div>
@@ -2488,16 +2280,16 @@ function slideStrength() {
         </table>
       </div>
       <div class="group-card strength-teams" style="padding:16px 24px"><div class="teams-row" style="gap:14px">
-        ${tsCard('Team 1', [['Attending',20],['PGY4',15.2],['PGY2',10.9],['PA',11.6]], 't1')}
-        ${tsCard('Team 2', [['Attending',20],['PA',11.6],['Intern',6.7]], 't2')}
-        ${tsCard('Team 3', [['Attending',20],['Rotator',2.3]], 't3')}
+        ${tsCard('Team 1', introRows('T1'), 't1')}
+        ${tsCard('Team 2', introRows('T2'), 't2')}
+        ${tsCard('Team 3', introRows('T3'), 't3')}
       </div></div>
     </div>
   `;
 }
 
 function tsCard(label, roles, cls) {
-  const total = roles.reduce((s,[,w]) => s+w, 0).toFixed(1);
+  const total = (Math.round(roles.reduce((s,[,w]) => s+w, 0) * 1e9) / 1e9).toFixed(1);
   const items = roles.map(([r,w]) => `<li><span class="role">${r}</span><span class="dots"></span><span class="w">${w}</span></li>`).join('');
   return `
     <div class="team-list-card ${cls}">
@@ -2510,9 +2302,9 @@ function tsCard(label, roles, cls) {
 function slideLoad() {
   const colorMap = { red: '#c0392b', yellow: '#b8a000', purple: '#7b1fa2' };
   const rows = [
-    ['red',    'Red (ESI-1)',    '4.0', 'Cardiac arrest, intubation, anaphylaxis'],
-    ['yellow', 'Yellow (ESI-2)', '2.0', 'Chest pain, stroke alert, sepsis'],
-    ['purple', 'Purple (ESI-3)', '1.0', 'Complex but stable, requires closer monitoring'],
+    ['red',    'Red',    DECAY.Red.w.toFixed(1),    'Cardiac arrest, intubation, anaphylaxis'],
+    ['yellow', 'Yellow', DECAY.Yellow.w.toFixed(1), 'Chest pain, stroke alert, sepsis'],
+    ['purple', 'Purple', DECAY.Purple.w.toFixed(1), 'Complex but stable, requires closer monitoring'],
   ].map(([tone,tier,w,ex]) => `<tr><td style="color:${colorMap[tone]};font-weight:600">${tier}</td><td>${w}</td><td>${ex}</td></tr>`).join('');
   const pcard = (title, items, tone, weight) => `
     <div class="patient-card p-${tone}" style="border-color:${colorMap[tone]}">
@@ -2527,14 +2319,14 @@ function slideLoad() {
       <p class="slide-sub" style="margin:0 0 10px; font-size:15px">A team's load is the sum of its patients' acuity weights.</p>
       <div class="group-card" style="padding:14px 24px; margin: 8px 0 12px">
         <table class="weights-table" style="max-width:620px">
-          <thead><tr><th>Acuity Tier</th><th>Initial Weight</th><th>Clinical Examples</th></tr></thead>
+          <thead><tr><th>Acuity</th><th>Initial Weight</th><th>Clinical Examples</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
       <div class="group-card strength-teams" style="padding:16px 24px"><div class="patients-row" style="gap:14px">
-        ${pcard('Red', ['Labs', 'Rapid Transfusion', 'A-line', 'Central Line', 'Pressors', 'Intubation', 'CTA', 'MICU Consult', 'Admit ICU'], 'red', '4.0')}
-        ${pcard('Yellow', ['Labs', 'Antibiotics', 'HFNC', 'CXR', 'Admit Floors'], 'yellow', '2.0')}
-        ${pcard('Purple', ['Sedation', 'End Tidal-CO2', 'Discharge'], 'purple', '1.0')}
+        ${pcard('Red', ['Labs', 'Rapid Transfusion', 'A-line', 'Central Line', 'Pressors', 'Intubation', 'CTA', 'MICU Consult', 'Admit ICU'], 'red', DECAY.Red.w.toFixed(1))}
+        ${pcard('Yellow', ['Labs', 'Antibiotics', 'HFNC', 'CXR', 'Admit Floors'], 'yellow', DECAY.Yellow.w.toFixed(1))}
+        ${pcard('Purple', ['Sedation', 'End Tidal-CO2', 'Discharge'], 'purple', DECAY.Purple.w.toFixed(1))}
       </div></div>
     </div>
   `;
@@ -2575,6 +2367,18 @@ function slideCapacity() {
       </div>
     </div>`;
 
+  // A team that has just taken these patients: strength, load and ratio from the model.
+  const divideRow = (tid, cls, acuities, baseDelay) => {
+    const strength = introStrength(tid);
+    const load = acuities.reduce((sum, a) => sum + DECAY[a].w, 0);
+    return row({
+      team: 'Team ' + tid.slice(1), teamCls: cls,
+      providers: introRows(tid),
+      patients: acuities.map(a => [a.toLowerCase(), DECAY[a].w]),
+      strength: strength.toFixed(1), load: load.toFixed(1), capacity: WK.formatRatio(WK.ratio(strength, load)), baseDelay,
+    });
+  };
+
   return `
     <div class="slide">
       <div class="problem-eyebrow" style="color:#1a3a7b">Capacity</div>
@@ -2585,18 +2389,8 @@ function slideCapacity() {
         <span style="color:#c0392b;font-weight:600">Load</span> of patients
       </p>
       <div class="dv-stack">
-        ${row({
-          team: 'Team 1', teamCls: 't1',
-          providers: [['Attending', 20], ['PGY4', 15.2], ['PGY2', 10.9], ['PA', 11.6]],
-          patients: [['red', 4.0], ['purple', 1.0]],
-          strength: '57.7', load: '5.0', capacity: '11.5', baseDelay: 0,
-        })}
-        ${row({
-          team: 'Team 2', teamCls: 't2',
-          providers: [['Attending', 20], ['PA', 11.6], ['Intern', 6.7]],
-          patients: [['yellow', 2.0], ['yellow', 2.0]],
-          strength: '38.3', load: '4.0', capacity: '9.6', baseDelay: 2.5,
-        })}
+        ${divideRow('T1', 't1', ['Red', 'Purple'], 0)}
+        ${divideRow('T2', 't2', ['Yellow', 'Yellow'], 2.5)}
       </div>
     </div>
   `;
@@ -2621,13 +2415,13 @@ function slideDynamicCapacity() {
           </div>
           <div class="dv-bar"></div>
           <div class="dv-den-wrap">
-            <span class="dv-load dv-den dyn-load">—</span>
+            <span class="dv-load dv-den dyn-load">&nbsp;</span>
             <div class="dv-mini-patients dyn-patients"></div>
           </div>
         </div>
         <span class="dv-eq">=</span>
         <div class="dv-cap-wrap">
-          <span class="dv-cap dyn-cap">—</span>
+          <span class="dv-cap dyn-cap">&nbsp;</span>
           <div class="dv-cap-lbl">Capacity</div>
         </div>
       </div>
@@ -2642,9 +2436,9 @@ function slideDynamicCapacity() {
       </p>
       <div class="dyn-caption"></div>
       <div class="dv-stack" style="gap:10px">
-        ${row({ id:'T1', label:'Team 1', cls:'t1', providers:[['Attending',20],['PGY4',15.2],['PGY2',10.9],['PA',11.6]], strength:'57.7' })}
-        ${row({ id:'T2', label:'Team 2', cls:'t2', providers:[['Attending',20],['PA',11.6],['Intern',6.7]], strength:'38.3' })}
-        ${row({ id:'T3', label:'Team 3', cls:'t3', providers:[['Attending',20],['Senior Resident',15.2],['Rotator',2.3]], strength:'37.5' })}
+        ${row({ id:'T1', label:'Team 1', cls:'t1', providers:introRows('T1'), strength:introStrength('T1').toFixed(1) })}
+        ${row({ id:'T2', label:'Team 2', cls:'t2', providers:introRows('T2'), strength:introStrength('T2').toFixed(1) })}
+        ${row({ id:'T3', label:'Team 3', cls:'t3', providers:introRows('T3'), strength:introStrength('T3').toFixed(1) })}
       </div>
     </div>
   `;
@@ -2654,30 +2448,31 @@ function startDynamicCapacity() {
   const container = document.querySelector('.dyn-slide');
   if (!container) return () => {};
 
-  // Compressed decay times (real seconds)
-  const DECAY = { red: 6, yellow: 6, purple: 3 };
+  // Compressed decay times (real seconds): one second stands for 30 minutes.
+  const DECAY = { red: WK.ACUITY.Red.minutes / 30, yellow: WK.ACUITY.Yellow.minutes / 30, purple: WK.ACUITY.Purple.minutes / 30 };
+  const W8 = { red: WK.ACUITY.Red.w, yellow: WK.ACUITY.Yellow.w, purple: WK.ACUITY.Purple.w };
   const P_SCALE = 20; // px per weight unit
 
   const teams = [
-    { id: 'T1', strength: 57.7, patients: [
-      { acuity: 'red',    weight: 4.0, arrivedAt: 0 },
-      { acuity: 'purple', weight: 1.0, arrivedAt: 0 },
+    { id: 'T1', strength: introStrength('T1'), patients: [
+      { acuity: 'red',    weight: W8.red,    arrivedAt: 0 },
+      { acuity: 'purple', weight: W8.purple, arrivedAt: 0 },
     ]},
-    { id: 'T2', strength: 38.3, patients: [
-      { acuity: 'yellow', weight: 2.0, arrivedAt: 0 },
-      { acuity: 'yellow', weight: 2.0, arrivedAt: 0 },
+    { id: 'T2', strength: introStrength('T2'), patients: [
+      { acuity: 'yellow', weight: W8.yellow, arrivedAt: 0 },
+      { acuity: 'yellow', weight: W8.yellow, arrivedAt: 0 },
     ]},
-    { id: 'T3', strength: 37.5, patients: [
-      { acuity: 'yellow', weight: 2.0, arrivedAt: 0 },
+    { id: 'T3', strength: introStrength('T3'), patients: [
+      { acuity: 'yellow', weight: W8.yellow, arrivedAt: 0 },
     ]},
   ];
 
   // Scheduled arrivals (simulation seconds)
   const arrivals = [
-    { at: 2.0, acuity: 'yellow', weight: 2.0 },
-    { at: 4.5, acuity: 'red',    weight: 4.0 },
-    { at: 6.2, acuity: 'yellow', weight: 2.0 },
-    { at: 7.4, acuity: 'purple', weight: 1.0 },
+    { at: 2.0, acuity: 'yellow', weight: W8.yellow },
+    { at: 4.5, acuity: 'red',    weight: W8.red },
+    { at: 6.2, acuity: 'yellow', weight: W8.yellow },
+    { at: 7.4, acuity: 'purple', weight: W8.purple },
   ];
 
   const ACUITY_COLORS = { red: '#c0392b', yellow: '#b8a000', purple: '#7b1fa2' };
@@ -2748,7 +2543,7 @@ function startDynamicCapacity() {
     for (const team of teams) {
       const l = teamLoad(team, simTime);
       const lRounded = Math.round(l * 10) / 10;
-      const capFromShown = lRounded === 0 ? Infinity : team.strength / lRounded;
+      const capFromShown = l === 0 ? Infinity : team.strength / l;
       const row = container.querySelector(`[data-team="${team.id}"]`);
       if (!row) continue;
       const loadEl = row.querySelector('.dyn-load');
@@ -2807,7 +2602,7 @@ function startDynamicCapacity() {
       simTime = arrivals[processed].at;
       return true;
     }
-    // Simulation done — release the handler so default advance fires
+    // Simulation done: release the handler so default advance fires
     slideNextHandler = null;
     return false;
   };
@@ -2835,50 +2630,44 @@ function stepIntro(phase) {
   return slideIntro();
 }
 
+// Load-minutes from 09:55 to the last arrival (the area under the load line).
 function teamAUC(team, strategy) {
-  const key = `${team}|${strategy}`;
-  teamAUC._cache = teamAUC._cache || {};
-  if (teamAUC._cache[key] != null) return teamAUC._cache[key];
-  const { pts } = curvesThrough(PATIENTS.length, strategy);
-  const inRange = pts.filter(p => p.m >= 0 && p.m <= 146);
-  let auc = 0;
-  for (let i = 0; i < inRange.length - 1; i++) {
-    auc += (inRange[i][team] + inRange[i+1][team]) / 2;
-  }
-  teamAUC._cache[key] = Math.round(auc);
-  return teamAUC._cache[key];
+  return Math.round(WK.loadMinutes(team, strategy === 'actual' ? 'actual' : 'formula'));
 }
 
 function loadMinDefinition() {
   const total = teamAUC('T1', 'actual') + teamAUC('T2', 'actual') + teamAUC('T3', 'actual');
-  return `<strong>Load-minutes</strong> measure a team's total workload over the window &mdash; the area under its load curve.<br>
+  return `<strong>Load-minutes</strong> measure a team's total workload over the window: the area under its load curve.<br>
     One unit of acuity-weighted load sustained for one minute.<br>
     Same <strong>${total} load-minutes</strong>, only redistributed.`;
 }
 
+const HIST_PEAK = WK.worstPeak('actual');
+const FORMULA_PEAK = WK.worstPeak('formula');
+const FORMULA_COUNTS = WK.counts('formula');
 const FORMULA_COMPARE_HEADINGS = {
   0: 'What the formula would have done.',
-  1: 'Formula caps every team at <span style="color:#c0392b">4.3</span>.',
+  1: `The worst peak drops from <span style="color:#c0392b">${HIST_PEAK.load.toFixed(1)}</span> to <span style="color:#2e7d32">${FORMULA_PEAK.load.toFixed(1)}</span>.`,
   2: '<span style="color:var(--t1)">Team 1\'s workload:</span> Historical vs. Formula.',
   3: '<span style="color:var(--t2)">Team 2\'s workload:</span> Historical vs. Formula.',
   4: '<span style="color:var(--t3)">Team 3\'s workload:</span> Historical vs. Formula.',
 };
 const FORMULA_COMPARE_SUBS = {
-  0: `Same 8 patients, same 146 minutes, routed by <span style="color:#2e7d32">capacity formula</span> from the very first patient.<br>
+  0: `Same ${WK.ARRIVALS.length} patients, same ${WK.WINDOW} minutes, routed by <span style="color:#2e7d32">capacity formula</span> from the very first patient.<br>
       <span style="display:inline-flex; align-items:center; gap:48px; margin-top:4px">
         <span><strong>Historical</strong>
-          <span style="color:var(--t1)">&nbsp;●&nbsp;4</span>
-          <span style="color:var(--t2)">&nbsp;●&nbsp;3</span>
-          <span style="color:var(--t3)">&nbsp;●&nbsp;1</span>
+          <span style="color:var(--t1)">&nbsp;●&nbsp;${HIST_COUNTS.T1}</span>
+          <span style="color:var(--t2)">&nbsp;●&nbsp;${HIST_COUNTS.T2}</span>
+          <span style="color:var(--t3)">&nbsp;●&nbsp;${HIST_COUNTS.T3}</span>
         </span>
         <span><strong>Formula</strong>
-          <span style="color:var(--t1)">&nbsp;●&nbsp;3</span>
-          <span style="color:var(--t2)">&nbsp;●&nbsp;3</span>
-          <span style="color:var(--t3)">&nbsp;●&nbsp;2</span>
+          <span style="color:var(--t1)">&nbsp;●&nbsp;${FORMULA_COUNTS.T1}</span>
+          <span style="color:var(--t2)">&nbsp;●&nbsp;${FORMULA_COUNTS.T2}</span>
+          <span style="color:var(--t3)">&nbsp;●&nbsp;${FORMULA_COUNTS.T3}</span>
         </span>
       </span>`,
-  1: `Historical routing lets Team 2's load spike to <strong style="color:#c0392b">5.9</strong> at noon.<br>
-      Formula routing holds every team below the same ceiling for the full 146-minute window.`,
+  1: `Historical routing lets ${teamName(HIST_PEAK.team)}'s load spike to <strong style="color:#c0392b">${HIST_PEAK.load.toFixed(1)}</strong> at ${WK.clock(HIST_PEAK.t)}.<br>
+      Formula routing keeps every team at or below ${FORMULA_PEAK.load.toFixed(1)} for the full ${WK.WINDOW}-minute window.`,
   2: loadMinDefinition(),
   3: loadMinDefinition(),
   4: loadMinDefinition(),
@@ -2898,7 +2687,7 @@ function stepFormulaCompare(phase = 0) {
   const chartTitle = (color, label) =>
     `<div class="chart-title" style="font-size:13px;font-weight:600;text-align:center;margin-bottom:6px;color:${color}">${label}</div>`;
 
-  const threshold = 4.3;
+  const threshold = FORMULA_PEAK.load;
   const slideClasses = ['compare-slide'];
   if (phase === 1) slideClasses.push('slide-shades');
   if (FORMULA_COMPARE_FOCUS[phase]) slideClasses.push('focus-' + FORMULA_COMPARE_FOCUS[phase]);
@@ -2949,7 +2738,7 @@ function updateFormulaCompare(prevPhase, nextPhase) {
   const focus = FORMULA_COMPARE_FOCUS[nextPhase];
   if (focus) {
     // The intro animation leaves inline opacity on dots/labels which would
-    // outrank the focus-T{N} CSS rule — strip it so CSS can dim them.
+    // outrank the focus-T{N} CSS rule: strip it so CSS can dim them.
     slide.querySelectorAll('.patient-dot, .patient-dot-label').forEach(el => {
       el.style.removeProperty('opacity');
     });
@@ -3014,12 +2803,22 @@ function animateFormulaReveal(wrap, durationMs = 4500) {
   return () => timeouts.forEach(clearTimeout);
 }
 
+// Header title for each phase of the walkthrough, from the phase itself.
+const S955_TITLES = S955_PHASES.map(ph => {
+  if (ph.staffing) return `${WK.clock(WK.NOON)}: intern joins Team 1`;
+  if (!ph.kind) return `${WK.clock(0)}: all teams empty`;
+  return `${WK.clock(WK.ARRIVALS[ph.n - 1].t)}: patient ${ph.n} ${ph.kind === 'place' ? 'placed' : 'arrives'}`;
+});
+
 const STEPS = [
-  { section: 'Intro',       title: 'What\'s wrong with round robin?', render: stepIntro, phases: 8 },
+  { section: 'Intro',       title: 'What\'s wrong with round robin?', render: stepIntro, phases: 8,
+    phaseTitles: ['What\'s wrong with round robin?', 'All teams are not equal', 'All patients are not equal', 'One formula', 'Strength', 'Load', 'Divide', 'Decide'] },
   { section: 'Walkthrough', title: 'A real-life example', render: stepNYUBK },
-  { section: 'Walkthrough', title: 'T+0: all teams empty', render: stepStart955, phases: 18, update: updateStart955 },
-  { section: 'Comparison',  title: 'Formula comparison', render: stepFormulaCompare, phases: 5, update: updateFormulaCompare },
+  { section: 'Walkthrough', title: 'The morning', render: stepStart955, phases: 18, update: updateStart955, phaseTitles: S955_TITLES },
+  { section: 'Comparison',  title: 'Formula comparison', render: stepFormulaCompare, phases: 5, update: updateFormulaCompare,
+    phaseTitles: ['What the formula would have done', 'The worst peak', 'Team 1 workload', 'Team 2 workload', 'Team 3 workload'] },
 ];
+const stepTitle = (s, p) => (s.phaseTitles && s.phaseTitles[p]) || s.title;
 
 // ============================================================
 // ROUTING / STATE
@@ -3063,7 +2862,7 @@ function render() {
       if (phase === 0) {
         cleanupActiveSlide = animateFormulaReveal(formulaWrap);
       } else {
-        // Cold-start on phase >= 1 — skip animation, just reveal the formula chart.
+        // Cold-start on phase >= 1: skip animation, just reveal the formula chart.
         const svg = formulaWrap && formulaWrap.querySelector('svg.chart');
         if (svg) {
           svg.querySelectorAll('.noon-marker, .noon-label').forEach(el => el.style.opacity = '1');
@@ -3081,7 +2880,7 @@ function render() {
   const globalSlide = slideBefore + phase + 1;
 
   counter.textContent = `Slide ${globalSlide} of ${totalSlides}`;
-  stepTitleEl.textContent = `Slide ${globalSlide} · ${step.title}`;
+  stepTitleEl.textContent = `Slide ${globalSlide} · ${stepTitle(step, phase)}`;
   prevBtn.disabled = current === 0 && phase === 0;
   nextBtn.disabled = current === STEPS.length - 1 && phase === phases - 1;
 
@@ -3110,7 +2909,7 @@ function render() {
     for (let p = 0; p < ph; p++) {
       const isCurrentDot = stepIdx === current && p === phase;
       const isDoneDot = stepIdx < current || (stepIdx === current && p < phase);
-      phaseDots.push(`<div class="dot ${isDoneDot ? 'done' : ''} ${isCurrentDot ? 'current' : ''}" data-step="${stepIdx}" data-phase="${p}" title="${s.title}${ph > 1 ? ` (${p + 1}/${ph})` : ''}"></div>`);
+      phaseDots.push(`<div class="dot ${isDoneDot ? 'done' : ''} ${isCurrentDot ? 'current' : ''}" data-step="${stepIdx}" data-phase="${p}" title="${stepTitle(s, p)}"></div>`);
     }
   });
 
@@ -3171,7 +2970,7 @@ document.addEventListener('keydown', e => {
   else if (e.key === 'ArrowLeft') retreat();
 });
 
-// dark-mode preference — query-param wins (set by parent app), then localStorage.
+// dark-mode preference: query-param wins (set by parent app), then localStorage.
 const urlParams = new URLSearchParams(window.location.search);
 const queryDark = urlParams.get('dark');
 const storedDark = localStorage.getItem('walkthrough-dark');

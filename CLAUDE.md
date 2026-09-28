@@ -175,8 +175,14 @@ Carbon rebuild (branch `carbon-rebuild`, 2026-09-28): a new interface on the unc
   admin, attestation. Simulations still run on the pre-Carbon `components/Dashboard.tsx` (research only).
 - `src/App.tsx`: routes `?lab` to the lab, everything else to `CarbonApp`. `?tour` opens the tour.
 - `src/components/`: pre-Carbon components, now used only by the lab.
-- `archive/`: files moved out of the build (`MethodologyDeepDive`, old `HelpSection`, the old walkthrough and
+- `archive/`: files moved out of the build (`MethodologyDeepDive`, old `HelpSection`,
   `EvidenceWalkthrough`). Never imported or shipped.
+- `public/walkthrough-v4.html`: the slide walkthrough, opened from How it works ("Walk through a real
+  morning", `src/app/WalkthroughFrame.tsx`; `?walkthrough` opens it directly). Every number on it comes
+  from `public/walkthrough-model.js` (one weights table, the December 29 rosters and arrivals, the
+  engine's ranking). `src/walkthrough/walkthroughModel.test.ts` fails if that file drifts from
+  `constants.ts` or the engine, or if a slide goes back to typed-in numbers or em dashes. If the weights
+  change, update the model file and review the slide text the test pins.
 - `src/utils/scheduleParser.ts`: layout-sensitive parser for departmental schedule workbooks
 - `src/utils/delphiResponses.ts`: the survey missing-value policy (see "Delphi survey: missing values")
 - `src/components/benchmarkResults.ts`: numbers for the lab benchmark page, generated from
@@ -313,8 +319,8 @@ scoring never reads the survey.
 - None known in the Carbon interface. The old `HelpSection.tsx`, which quoted "+55%" and "+249%"
   (cross-benchmark stitches, never quote them), is archived; `src/app/Help.tsx` was written from scratch
   and quotes no figures.
-- The pre-Carbon walkthrough (`public/walkthrough-v4.html`) is archived; How it works is text only and
-  the app makes no Google Fonts request.
+- The walkthrough (`public/walkthrough-v4.html`) still loads Google Fonts (EB Garamond, Inter), by
+  Julian's choice (2026-09-28). The rest of the app makes no Google Fonts request.
 - Pre-Carbon lab screens still show some em dashes (simulation setup, lab Dashboard, lab TeamCard).
 
 ## Key Design Decisions

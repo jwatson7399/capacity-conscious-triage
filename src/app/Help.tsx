@@ -1,9 +1,10 @@
 // © 2026 New York University. All rights reserved.
 //
 // Help, written from scratch for the Carbon build. It quotes no benchmark figures.
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { CAPACITY_WEIGHTS, DECEASED_BUFFER_MS, FLOAT_MODIFIER_MULTIPLIERS } from '../constants';
 import { ACUITIES, ACUITY_NAME, ROLE_LONG, ROLE_ORDER, baseWeight, countMinutes } from '../ui/model';
+import WalkthroughFrame from './WalkthroughFrame';
 
 function Page({ title, onBack, children }: { title: string; onBack: () => void; children: React.ReactNode }) {
   useEffect(() => {
@@ -77,13 +78,19 @@ export function Help({ onBack }: { onBack: () => void }) {
   );
 }
 
-export function HowItWorks({ onBack }: { onBack: () => void }) {
+export function HowItWorks({ onBack, startWalk = false }: { onBack: () => void; startWalk?: boolean }) {
+  const [walk, setWalk] = useState(startWalk);
   return (
     <Page title="How it works" onBack={onBack}>
       <p>Round-robin gives each team the next patient in turn. It does not look at who is on each team or how sick their current patients are.</p>
       <p>This board does. For each team it adds up provider strength (an attending counts more than an intern) and divides by patient load (a Red counts more than a Purple, and recent patients count more than ones placed hours ago). The team with the most room for its staffing is suggested next.</p>
       <p>Patient load fades over time. A Red counts for {countMinutes('tier_one')} minutes, a Yellow for {countMinutes('tier_two')} and a Purple for {countMinutes('tier_three')}, shrinking steadily until the patient no longer counts. That keeps the number close to how busy the team is now, not how busy it was at the start of the shift.</p>
       <p>The suggestion is advice. The charge nurse places every patient, and can send a patient elsewhere with a reason whenever the board does not match what is happening at the bedside.</p>
+      <div style={{ margin: '24px 0 8px' }}>
+        <button className="btn primary lg full" onClick={() => setWalk(true)}>Walk through a real morning ›</button>
+        <p style={{ fontSize: 13, marginTop: 8, textAlign: 'center' }}>Eight real arrivals on one morning, step by step, then what the formula would have done.</p>
+      </div>
+      {walk && <WalkthroughFrame onClose={() => setWalk(false)} />}
     </Page>
   );
 }
