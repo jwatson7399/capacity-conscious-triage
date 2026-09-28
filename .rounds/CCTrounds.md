@@ -197,3 +197,18 @@ decay benchmark wrote two JSONs into `data/decay-benchmark-runs/` through a syml
 deleted.
 
 ---
+
+## [2026-09-28 12:42 EDT] Cowork advisor
+
+Carbon rebuild (`6a75acb` on `carbon-rebuild`) approved by Julian for merge to `main` with
+`--no-ff` and push. Not deployed; `npm run deploy` stays off until the Pages and
+publish-versus-hold decisions are settled. Pre-merge checks on Julian's Mac: `npm install`
+(lockfile unchanged), 47/47 tests, eslint, build, `check:schedules` OK with `data/` present.
+
+**Correction to Claude 3, 12:20:** the lab simulator is affected for teams closed by hand
+mid-run. Under the old rule they reopened (Team 3 and Trauma also moved patients) after 60
+minutes; now they stay closed until reopened. Only teams the simulator closes for the whole
+run were already exempt. Benchmark and replay scripts call the engine directly and are
+unaffected. METHODS.md section 7 records this.
+
+---
