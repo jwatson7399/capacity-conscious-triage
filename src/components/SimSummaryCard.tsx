@@ -45,7 +45,7 @@ export default function SimSummaryCard({ simulation: sim }: Props) {
     return [
       {
         label: 'B2B High-Acuity',
-        hint: '2 red/yellow to one team within 30 min',
+        hint: 'Red or Yellow onto a team that got one within 30 min',
         live: countBackToBackHA(liveEntries),
         shadow: countBackToBackHA(shadowEntries),
         higherBetter: false,
@@ -53,7 +53,7 @@ export default function SimSummaryCard({ simulation: sim }: Props) {
       },
       {
         label: 'Slams',
-        hint: '2+ patients to one team within 1 hr',
+        hint: 'patient onto a team that got one within 1 hr',
         live: countSlams(liveEntries),
         shadow: countSlams(shadowEntries),
         higherBetter: false,
@@ -61,7 +61,7 @@ export default function SimSummaryCard({ simulation: sim }: Props) {
       },
       {
         label: 'Red-Zone Arrivals',
-        hint: 'team below p5 of historical capacity at assignment',
+        hint: 'receiving team below 8.5 just before assignment',
         live: liveStats.redZoneEvents,
         shadow: shadowStats.redZoneEvents,
         higherBetter: false,
@@ -69,7 +69,7 @@ export default function SimSummaryCard({ simulation: sim }: Props) {
       },
       {
         label: 'Min Capacity',
-        hint: 'lowest ratio at any assignment',
+        hint: 'lowest receiving-team ratio at assignment',
         live: liveStats.minRatio,
         shadow: shadowStats.minRatio,
         higherBetter: true,
@@ -77,7 +77,7 @@ export default function SimSummaryCard({ simulation: sim }: Props) {
       },
       {
         label: 'Avg Capacity',
-        hint: 'mean ratio across assignments',
+        hint: 'mean receiving-team ratio at assignment',
         live: liveStats.avgRatio,
         shadow: shadowStats.avgRatio,
         higherBetter: true,
@@ -93,7 +93,7 @@ export default function SimSummaryCard({ simulation: sim }: Props) {
       },
       {
         label: 'Acuity Spread',
-        hint: 'max − min weighted load per team',
+        hint: 'max − min arrivals weighted 4:2:1',
         live: acuitySpread(liveStats, eligible),
         shadow: acuitySpread(shadowStats, eligible),
         higherBetter: false,
@@ -107,24 +107,12 @@ export default function SimSummaryCard({ simulation: sim }: Props) {
   const liveCountStr = eligible.map(t => liveStats.teamCounts[t] ?? 0).join(' | ');
   const shadowCountStr = eligible.map(t => shadowStats.teamCounts[t] ?? 0).join(' | ');
 
-  // Per-metric tally — no composite score, no weights.
-  let liveWins = 0;
-  let shadowWins = 0;
-  for (const row of rows) {
-    const w = metricWinner(row);
-    if (w === 'live') liveWins++;
-    else if (w === 'shadow') shadowWins++;
-  }
-  const ties = rows.length - liveWins - shadowWins;
-  const leader = liveWins > shadowWins ? liveMode : shadowWins > liveWins ? shadowMode : null;
-  const leaderWins = Math.max(liveWins, shadowWins);
-
   return (
     <div className="mx-4 mb-4 glass-card rounded-xl overflow-hidden">
       <div className="bg-gradient-to-r from-cyan-500/20 via-blue-500/20 to-violet-500/20 px-4 py-3 border-b border-white/10">
-        <h3 className="text-sm font-bold text-white">Shift Complete — Performance Summary</h3>
+        <h3 className="text-sm font-bold text-white">Shift complete: each measure on its own</h3>
         <p className="text-[10px] text-slate-400 mt-0.5">
-          Same seed ({sim.seed}), same {sim.timeline.length} patients — only assignment logic differs
+          Same seed ({sim.seed}), same {sim.timeline.length} patients; only the assignment method differs. The better value on each measure is highlighted; the measures are not combined into a score or a winner.
         </p>
       </div>
 
@@ -143,7 +131,7 @@ export default function SimSummaryCard({ simulation: sim }: Props) {
           <span className="text-left font-mono text-xs whitespace-nowrap text-slate-300">{shadowCountStr}</span>
         </div>
 
-        {/* Individual metrics — each compared on its own; no composite */}
+        {/* Individual metrics, each compared on its own: no composite, no win tally (Decision 18) */}
         {rows.map(row => {
           const w = metricWinner(row);
           return (
@@ -161,20 +149,6 @@ export default function SimSummaryCard({ simulation: sim }: Props) {
             </div>
           );
         })}
-
-        {/* Metric tally — counts wins, doesn't weight them */}
-        <div className="mt-3 text-center py-2 rounded-lg bg-white/5">
-          {!leader ? (
-            <span className="text-xs text-slate-400">
-              Even split — {liveWins} metric{liveWins !== 1 ? 's' : ''} each{ties > 0 ? `, ${ties} tied` : ''}
-            </span>
-          ) : (
-            <span className="text-xs text-slate-300">
-              <span className="font-semibold text-emerald-400">{leader}</span> leads on {leaderWins} of {rows.length} metrics
-              {ties > 0 ? ` (${ties} tied)` : ''}
-            </span>
-          )}
-        </div>
 
         {/* Per-team breakdown */}
         <div className="mt-3">
