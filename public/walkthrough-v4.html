@@ -1072,6 +1072,20 @@
     .compare-slide .chart-legend { font-size: 9px !important; gap: 6px !important; }
   }
 
+  /* Dark mode: the cards and navy capacity numbers were built for light mode only. */
+  body.dark .formula-card, body.dark .group-card {
+    background: linear-gradient(180deg, #1e293b 0%, #172033 100%);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.2);
+  }
+  body.dark .dv-cap, body.dark .dv-cap-lbl, body.dark .f-capacity,
+  body.dark .formula-mini .fm-capacity,
+  body.dark .cap-row .cap-score .cap-num, body.dark .cap-row .cap-score .cap-label { color: #9db8f2; }
+  /* Inline styles get rewritten during phase animations, so match by slide, not by style text. */
+  body.dark .problem-eyebrow[style*="#1a3a7b"],
+  body.dark .s955-slide .problem-eyebrow, body.dark .compare-slide .problem-eyebrow { color: #9db8f2 !important; }
+  body.dark .slide-title { color: var(--ink) !important; }
+  body.dark .interlude { background: #3a2f10; }
+
 </style>
 </head>
 <body>
@@ -1327,8 +1341,8 @@ const HIST_COUNTS = WK.counts('actual');
 // shows ("at"), how many patients have been placed, and where the chart pen stops.
 // Strengths, loads, ratios and suggestions in the text come from the model.
 const Y = '<span style="color:#b8a000">';
-const arrive = n => ({ highlights: [HIST[n - 1].suggested], patientsShown: n - 1, currentPatient: n > 1 ? n - 1 : null, at: WK.ARRIVALS[n - 1].t });
-const place = n => ({ highlights: [HIST[n - 1].actual], disagree: HIST[n - 1].suggested !== HIST[n - 1].actual, patientsShown: n, currentPatient: n, at: WK.ARRIVALS[n - 1].t });
+const arrive = n => ({ kind: 'arrive', n, highlights: [HIST[n - 1].suggested], patientsShown: n - 1, currentPatient: n > 1 ? n - 1 : null, at: WK.ARRIVALS[n - 1].t });
+const place = n => ({ kind: 'place', n, highlights: [HIST[n - 1].actual], disagree: HIST[n - 1].suggested !== HIST[n - 1].actual, patientsShown: n, currentPatient: n, at: WK.ARRIVALS[n - 1].t });
 const S955_PHASES = [
   {
     time: '09:54 AM',
@@ -2789,12 +2803,22 @@ function animateFormulaReveal(wrap, durationMs = 4500) {
   return () => timeouts.forEach(clearTimeout);
 }
 
+// Header title for each phase of the walkthrough, from the phase itself.
+const S955_TITLES = S955_PHASES.map(ph => {
+  if (ph.staffing) return `${WK.clock(WK.NOON)}: intern joins Team 1`;
+  if (!ph.kind) return `${WK.clock(0)}: all teams empty`;
+  return `${WK.clock(WK.ARRIVALS[ph.n - 1].t)}: patient ${ph.n} ${ph.kind === 'place' ? 'placed' : 'arrives'}`;
+});
+
 const STEPS = [
-  { section: 'Intro',       title: 'What\'s wrong with round robin?', render: stepIntro, phases: 8 },
+  { section: 'Intro',       title: 'What\'s wrong with round robin?', render: stepIntro, phases: 8,
+    phaseTitles: ['What\'s wrong with round robin?', 'All teams are not equal', 'All patients are not equal', 'One formula', 'Strength', 'Load', 'Divide', 'Decide'] },
   { section: 'Walkthrough', title: 'A real-life example', render: stepNYUBK },
-  { section: 'Walkthrough', title: 'T+0: all teams empty', render: stepStart955, phases: 18, update: updateStart955 },
-  { section: 'Comparison',  title: 'Formula comparison', render: stepFormulaCompare, phases: 5, update: updateFormulaCompare },
+  { section: 'Walkthrough', title: 'The morning', render: stepStart955, phases: 18, update: updateStart955, phaseTitles: S955_TITLES },
+  { section: 'Comparison',  title: 'Formula comparison', render: stepFormulaCompare, phases: 5, update: updateFormulaCompare,
+    phaseTitles: ['What the formula would have done', 'The worst peak', 'Team 1 workload', 'Team 2 workload', 'Team 3 workload'] },
 ];
+const stepTitle = (s, p) => (s.phaseTitles && s.phaseTitles[p]) || s.title;
 
 // ============================================================
 // ROUTING / STATE
@@ -2856,7 +2880,7 @@ function render() {
   const globalSlide = slideBefore + phase + 1;
 
   counter.textContent = `Slide ${globalSlide} of ${totalSlides}`;
-  stepTitleEl.textContent = `Slide ${globalSlide} · ${step.title}`;
+  stepTitleEl.textContent = `Slide ${globalSlide} · ${stepTitle(step, phase)}`;
   prevBtn.disabled = current === 0 && phase === 0;
   nextBtn.disabled = current === STEPS.length - 1 && phase === phases - 1;
 
@@ -2885,7 +2909,7 @@ function render() {
     for (let p = 0; p < ph; p++) {
       const isCurrentDot = stepIdx === current && p === phase;
       const isDoneDot = stepIdx < current || (stepIdx === current && p < phase);
-      phaseDots.push(`<div class="dot ${isDoneDot ? 'done' : ''} ${isCurrentDot ? 'current' : ''}" data-step="${stepIdx}" data-phase="${p}" title="${s.title}${ph > 1 ? ` (${p + 1}/${ph})` : ''}"></div>`);
+      phaseDots.push(`<div class="dot ${isDoneDot ? 'done' : ''} ${isCurrentDot ? 'current' : ''}" data-step="${stepIdx}" data-phase="${p}" title="${stepTitle(s, p)}"></div>`);
     }
   });
 
