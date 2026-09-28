@@ -51,15 +51,25 @@ export function statsFromEntries(entries: ShadowEntry[]): ModeStats {
 }
 
 // --- Individual comparison metrics ---
-// The simulation UI compares these directly, one row per metric — there is no
-// composite score (per the methods paper, a weighted composite hides the
-// safety-vs-equity tradeoff). Definitions mirror scripts/historical-replay.ts
-// so in-app numbers match the published benchmarks.
+// The simulation panels compare these one metric at a time; they show no composite
+// score (a weighted composite hides the safety versus equity trade-off).
+// countBackToBackHA and countSlams use the same definitions as the local copies in
+// scripts/historical-replay.ts, scripts/real-schedule-benchmark.ts and
+// scripts/decay-schedule-benchmark.ts.
+//
+// Assumptions shared by these helpers (June audit, 2026-09-28):
+// - `entries` are in arrival order. The window checks compare each arrival with
+//   earlier ones only; unsorted input gives wrong counts.
+// - Windows are inclusive: arrivals exactly 30 min (B2B) or 60 min (slam) apart count.
+// - B2B and slams count every entry, including any on Trauma; spreads use only the
+//   `eligibleTeams` the caller passes (normally open A-side teams).
+// - acuitySpread measures load with the model's ACUITY_WEIGHTS (4:2:1) at full arrival
+//   weight, with no decay, whatever routing weights produced the entries.
 
 const B2B_WINDOW_MS = 30 * 60 * 1000;
 const SLAM_WINDOW_MS = 60 * 60 * 1000;
 
-/** Back-to-back high-acuity: a red/yellow arrival landing on a team that received another red/yellow within the prior 30 min. */
+/** Back-to-back high acuity: a Red or Yellow arrival on a team that received another Red or Yellow within the prior 30 min (inclusive). */
 export function countBackToBackHA(entries: ShadowEntry[]): number {
   let count = 0;
   const lastHA: Record<number, number> = {}; // teamId → arrivalTime
@@ -73,7 +83,7 @@ export function countBackToBackHA(entries: ShadowEntry[]): number {
   return count;
 }
 
-/** Slams: an arrival landing on a team that already received a patient within the prior hour. */
+/** Slams: an arrival on a team that already received a patient within the prior 60 min (inclusive). Counted once per arrival. */
 export function countSlams(entries: ShadowEntry[]): number {
   let count = 0;
   const teamTimes: Record<number, number[]> = {};
@@ -86,14 +96,14 @@ export function countSlams(entries: ShadowEntry[]): number {
   return count;
 }
 
-/** Count spread: max − min patient count across eligible teams. */
+/** Count spread: max minus min patient count across the eligible teams. */
 export function countSpread(stats: ModeStats, eligibleTeams: TeamId[]): number {
   if (eligibleTeams.length === 0) return 0;
   const counts = eligibleTeams.map(t => stats.teamCounts[t] ?? 0);
   return Math.max(...counts) - Math.min(...counts);
 }
 
-/** Acuity spread: max − min of acuity-weighted (4:2:1) load across eligible teams. */
+/** Acuity spread: max minus min of acuity-weighted arrivals (ACUITY_WEIGHTS, 4:2:1, no decay) across the eligible teams. */
 export function acuitySpread(stats: ModeStats, eligibleTeams: TeamId[]): number {
   if (eligibleTeams.length === 0) return 0;
   const loads = eligibleTeams.map(t => {
@@ -104,9 +114,25 @@ export function acuitySpread(stats: ModeStats, eligibleTeams: TeamId[]): number 
   return Math.max(...loads) - Math.min(...loads);
 }
 
-// --- Legacy composite (benchmark scripts only) ---
-// computeFairness/computeFairnessDetailed reproduce the composite reported in
-// earlier benchmark runs. The app UI no longer displays it.
+// --- Composite fairness score (benchmark scripts only; the app does not show it) ---
+//
+// Two versions (June audit and reconciliation, 2026-09-28; METHODS.md section 9):
+//
+// - v1, `computeFairnessDetailedV1` / `computeFairnessV1`: the original composite. Its
+//   acuity-balance part weights arrivals 5:3:1 whatever the model uses. Every composite
+//   figure recorded before 2026-09-28 was computed this way; use v1 to reproduce them.
+// - v2, `computeFairnessDetailed` / `computeFairness`: acuity balance measured on the
+//   model's weights. By default that is ACUITY_WEIGHTS (4:2:1), one fixed measurement
+//   scale for every condition, so runs with experimental routing weights are still
+//   compared on the same yardstick. A caller that wants each condition measured on its
+//   own routing weights passes `acuityWeights` explicitly; that answers a different
+//   question and must be labeled as such.
+//
+// Only the acuity-balance part (15% of the composite) differs between versions.
+
+export type FairnessVersion = 'v1' | 'v2';
+export const FAIRNESS_VERSION: FairnessVersion = 'v2';
+export const FAIRNESS_V1_ACUITY_WEIGHTS: Readonly<Record<AcuityTier, number>> = { tier_one: 5, tier_two: 3, tier_three: 1 };
 
 export interface FairnessBreakdown {
   composite: number;           // 0-100 weighted score
@@ -117,11 +143,30 @@ export interface FairnessBreakdown {
   stressEquity: number;        // 0-1
 }
 
-/** Compute fairness score with full sub-score breakdown */
+/** Composite v2 with its sub-scores. Acuity balance on `acuityWeights` (default ACUITY_WEIGHTS). */
 export function computeFairnessDetailed(
   stats: ModeStats,
   permanentlyClosedTeams: number[],
   teamCapacities?: Record<number, number>,
+  acuityWeights: Readonly<Record<AcuityTier, number>> = ACUITY_WEIGHTS,
+): FairnessBreakdown {
+  return compositeWithAcuityScale(stats, permanentlyClosedTeams, teamCapacities, acuityWeights);
+}
+
+/** Composite v1 (legacy, 5:3:1 acuity balance) with its sub-scores. Reproduces pre-2026-09-28 figures. */
+export function computeFairnessDetailedV1(
+  stats: ModeStats,
+  permanentlyClosedTeams: number[],
+  teamCapacities?: Record<number, number>,
+): FairnessBreakdown {
+  return compositeWithAcuityScale(stats, permanentlyClosedTeams, teamCapacities, FAIRNESS_V1_ACUITY_WEIGHTS);
+}
+
+function compositeWithAcuityScale(
+  stats: ModeStats,
+  permanentlyClosedTeams: number[],
+  teamCapacities: Record<number, number> | undefined,
+  acuityWeightMap: Readonly<Record<AcuityTier, number>>,
 ): FairnessBreakdown {
   const eligible = ([1, 2, 3, 4] as TeamId[]).filter(
     t => t !== TRAUMA_TEAM_ID && !permanentlyClosedTeams.includes(t)
@@ -154,8 +199,7 @@ export function computeFairnessDetailed(
     }
   }
 
-  // Acuity Balance (15%): 1 - (stdDev of acuity-weighted load / mean)
-  const acuityWeightMap: Record<AcuityTier, number> = { tier_one: 5, tier_two: 3, tier_three: 1 };
+  // Acuity Balance (15%): 1 - (stdDev of acuity-weighted load / mean), on the version's scale
   const teamLoads = eligible.map(t => {
     const al = stats.teamAcuityLoad[t];
     if (!al) return 0;
@@ -200,11 +244,21 @@ export function computeFairnessDetailed(
   return { composite, capacityBalance, acuityBalance, overwhelmAvoidance, minRatioScore, stressEquity };
 }
 
-/** Compute a fairness score (0-100) from mode stats */
+/** Composite v2 score (0-100). */
 export function computeFairness(
   stats: ModeStats,
   permanentlyClosedTeams: number[],
   teamCapacities?: Record<number, number>,
+  acuityWeights?: Readonly<Record<AcuityTier, number>>,
 ): number {
-  return computeFairnessDetailed(stats, permanentlyClosedTeams, teamCapacities).composite;
+  return computeFairnessDetailed(stats, permanentlyClosedTeams, teamCapacities, acuityWeights).composite;
+}
+
+/** Composite v1 score (0-100), legacy 5:3:1 acuity balance. */
+export function computeFairnessV1(
+  stats: ModeStats,
+  permanentlyClosedTeams: number[],
+  teamCapacities?: Record<number, number>,
+): number {
+  return computeFairnessDetailedV1(stats, permanentlyClosedTeams, teamCapacities).composite;
 }
