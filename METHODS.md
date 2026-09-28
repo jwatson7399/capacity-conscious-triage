@@ -447,6 +447,99 @@ Wrapping the reducer instead of editing it for interface needs keeps every bench
 
 ---
 
+## 8. Retrospective: the June 10 to 11, 2026 Work (Recorded 2026-09-28)
+
+### Objective
+Record what the June 10 and 11 commits on GitHub `main` changed, since none of it reached the Mac, the Roundtable, this file, CLAUDE.md or the Dossier at the time. Written after the fact from the commits and the independent audit (`ER Triage App/AUDIT_june-fixes.md`, Roundtable 2026-09-28, Decision 16). This section does not restate June's claims as findings; the corrections follow each item.
+
+### What June changed
+- History: 21 commits on GitHub `main`, ending at `025fe05`, common ancestor with the Mac's `main` `efd0fb4`. `9b08b8f` is a single-parent squash whose tree matches `d896353`; the later merge also brought the development commits into ancestry. PR #3 (branch `review-fix-and-improve-triage-app`) held the engine, simulator, survey and fairness changes; PR #4 and follow-ups (`ui-review-fixes`) held UI work on the pre-Carbon interface and a new benchmark page.
+- Engine: `getCurrentLoad` excluded deceased patients from team load. No other engine change; routing, ratios and the scripts' event counts were untouched.
+- Simulator reducer: TICK scored arrivals with the providers after same-tick status changes; skip-ahead drained pending status changes before the jump.
+- Survey: `useSurveyWeights` averaged only values greater than 0 for each role.
+- Fairness: the composite's acuity-balance part was switched from 5:3:1 to `ACUITY_WEIGHTS` in place; individual metric helpers (B2B, slams, count spread, acuity spread) were added; `OVERWHELM_THRESHOLD` was renamed `RED_ZONE_THRESHOLD` (8.5) with matching field renames.
+- Benchmark: `scripts/benchmark.ts` rewritten to report ten metrics per run, plus a per-seed tally across four "primary" metrics; a new "Formula vs Round-Robin" page headlined "81%" of 1,000 shifts; the Real Week Backtest links were removed.
+- UI (pre-Carbon interface): header wrapping and button sizing, TeamCard badge padding and capacity words, patient ID nowrap, bottom clearance, decay label brackets, setup label and preset comments, mini controls after 160 px of scroll, sandbox seed and tour changes, walkthrough dark-mode fixes, a favicon, 55 screenshots at the repository root and a UI review plan.
+- Records: a June METHODS section numbered 5 and a CLAUDE.md rewrite, both superseded by the Carbon versions.
+
+### Corrections from the audit
+- The survey fix discarded genuine zero ratings (the scale is 0 to 20) and left the admin panel and survey results on the old code, which read blanks as 0.
+- The skip-ahead fix applied every status change before expiring earlier ones, so back-to-back changes for one provider left the provider active; skip-ahead also used formula routing in round-robin mode.
+- Changing the composite's weights in place changes every composite figure; June's comment that the retained function "reproduces" earlier composites was wrong. Historical composites used 5:3:1 for acuity balance while the model used 4:2:1 (see section 9).
+- The 81% headline depends on counting wins across four chosen metrics; across all ten it is 59%. Neither is a clinical success rate.
+- Page claims not supported by a synthetic routing comparison: "safer care"; a p5 boundary meaning provider strength is "nearly exhausted"; minimum capacity as the lowest ratio any team reached (it is the receiving team just before placement); a narrower spread meaning one team no longer carries twice another's burden; "round-robin wins exactly one thing" (it also has lower raw acuity spread). B2B and slam differences (about +0.14 and +0.26 events per formula shift, p < 0.001) are small but statistically significant, not equivalent. The stress spreads use steady-state staffing.
+- June's METHODS said the head-to-head preceded any NYU inputs; the script uses the Delphi-derived provider weights.
+- Capacity words on team cards conflicted with the number-only board (Roundtable 2026-09-27, Decision 2).
+
+### What was taken, adapted or left
+See section 9. In short: the deceased-load rule was accepted by Julian (Decision 17); TICK, the null-recommendation assign path, the rename, the metric helpers, the favicon and most lab UI fixes were taken; survey, skip-ahead, composite and benchmark page were redone; the capacity words, tour and sandbox edits, walkthrough fixes and June's deployment instructions were left out. The June METHODS text itself stays in git history (`025fe05:METHODS.md`).
+
+---
+
+## 9. June Reconciliation: Merging GitHub `main` Into the Carbon Line
+
+### Objective
+Bring the June work (section 8) into the Carbon line without force, rebase or squash, taking each change on its merits per the audit, and show which numbers move. Roundtable 2026-09-28, Decisions 16 to 19; `ER Triage App/HANDOFF_june-reconciliation.md`.
+
+### Methodology / data
+- Backup: local `main` (`8f1a6ab`) pushed to a new remote branch `carbon-main`. `gh-pages` recorded at `610b6f5` before and after.
+- Branch `reconcile-june` from `8f1a6ab`; `git merge --no-ff origin/main` (`025fe05`) resolved file by file into merge commit `b7e50bb`. Carbon won for Carbon files and settled behaviors; June's edits to archived files stayed out of the archive; June's survey averaging, skip-ahead drain and in-place composite weights were not taken as written.
+- Topic commits after the merge:
+
+| Commit | Change |
+|---|---|
+| `e468438` | Deceased patients add no load; `src/ui/model.ts`, TeamDetail and Help follow the engine (Decision 17) |
+| `4b3c549` | Lab reducer: chronological skip-ahead that keeps round-robin mode; TICK same-tick test |
+| `10e9739` | Survey missing-value policy (`src/utils/delphiResponses.ts`): blank is a non-response, 0 is valid, off-scale is missing |
+| `d2287d4` | Composite versioned: v1 (5:3:1, reproduces old figures) and v2 (model weights, default in scripts) |
+| `6c841b3` | Rename finished; JSON fields `overwhelms` and `overwhelmAvoidance` kept |
+| `a4da317` | Lab simulation panels: no win tally, accurate hints, mini controls by real visibility |
+| `602dd94` | Ten-metric benchmark with model version and definitions; report page rebuilt (Decision 18) |
+| `bf9eea7` | Real Week Backtest kept in the lab, labeled dated (Decision 19) |
+| `cd4e296` | Favicon linked in Carbon's `index.html` |
+| `754b45a` | June screenshots and plan moved to `docs/reviews/2026-06-11/` |
+
+- Composite policy: v2 measures acuity balance on `ACUITY_WEIGHTS` (4:2:1) by default, one fixed scale for every condition including runs with experimental routing weights. A caller may pass its own weights; that answers a different question and must be labeled.
+- Survey policy: missingness is decided on the raw cell before numeric conversion. A row of all zeros is now a response; a row of blanks is not. Survey means, quartiles and n may change; scoring does not (frozen `constants.ts` weights).
+- Reruns in scratch copies of `f0f5bd4` (pre-Carbon), `8f1a6ab` (Carbon) and `754b45a` (branch), each with its own copy of `data/provider-schedules/`; nothing written into the repository's `data/`. Historical replay with `--json` and no other flags (current configuration), `scripts/benchmark.ts`, `scripts/real-schedule-benchmark.ts`. Run on Julian's Mac (America/New_York), and the replay again under `TZ=UTC`.
+
+### Results
+| Check | Result |
+|---|---|
+| Replay, synthetic benchmark, real-schedule benchmark: pre-Carbon vs Carbon | Byte-identical |
+| Replay JSON: Carbon vs branch | Differs only in `acuityBalance`, `composite` and `fairness`, both cohorts; every routing, ratio, event, Gini, spread and load-minutes field identical |
+| Replay JSON: branch with the scripts' composite set to v1 vs Carbon | Byte-identical (console differs only in renamed labels) |
+| Carbon's old `benchmark.ts` run on the branch engine vs Carbon | Only the fairness rows and composite win counts differ |
+| `benchmark.ts` ten-metric rows: branch vs GitHub `main` | Identical (60 rows) |
+| Real-schedule benchmark: Carbon vs branch | Only fairness-derived lines differ; red-zone, ratio and other rows identical |
+| Carbon replay under `TZ=UTC` vs `historical-replay-results-current-2026-09-27.json` (section 6) | Byte-identical |
+| Tests, lint, build, `check:schedules` with `data/` present | 70 of 70 (47 existing, 23 new), clean, pass, OK |
+
+Composite, three-team cohort (actual / formula / round-robin means; formula wins over actual):
+
+| Run | v1 (5:3:1) | v2 (4:2:1) |
+|---|---|---|
+| Mac, America/New_York (1,541 encounters) | 84.3 / 90.2 / 90.6; 96 of 121 days | 84.5 / 90.3 / 90.9; 97 of 121 days |
+| `TZ=UTC` (1,540 encounters, matches section 6) | 84.1 / 90.2 / 90.6; 98 of 121 days | 84.2 / 90.3 / 90.9; 99 of 121 days |
+
+In the two-team cohort the formula minus round-robin composite goes from +0.0 to -0.0 (p 0.87 to 0.91 on the Mac; 0.94 to 0.86 under UTC), which flips the replay's printed "usability implication" line. That line compares composites only and should not be read as a finding.
+
+Synthetic benchmark, all 1,000 shifts (formula vs round-robin, per shift): red-zone placements 0.65 vs 1.34; lowest receiving ratio 17.6 vs 13.0; mean receiving ratio 97 vs 150 (p = 0.06); back-to-back Red or Yellow 1.78 vs 1.63; slams 7.73 vs 7.47; count spread 2.6 vs 0.7; acuity spread 5.8 vs 4.6; patients per unit of strength spread 0.053 vs 0.075; acuity per unit of strength spread 0.099 vs 0.200; spread of team mean ratios 115 vs 284 (p = 0.04, d = 0.07). All other p < 0.001.
+
+### Cohort-count finding
+The difference between 1,541 / 417 (the audit and every Mac run) and 1,540 / 418 (section 6) is the machine's time zone, not the data or the code version. `excelDateToMs` in `scripts/historical-replay.ts` anchors Excel serials at `new Date(1899, 11, 30)` in local time. Under America/New_York the 1899 offset is local mean time (UTC-4:56:02), so every census arrival is read about 4 minutes early before March 8, 2026 and about 56 minutes late after the switch to daylight time. Under UTC there is no skew. A check of the census under America/New_York (with an approximate Team 4 filter) found 418 arrivals read at a different hour than the workbook shows and 24 crossing the 9 AM or midnight cohort boundary, in both directions, netting to one in the replay's cohorts; under UTC, none. Section 6 ran in a Linux copy under UTC and matches the workbook clock; the audit's controlled replay and all Mac replays are skewed. `scripts/decay-schedule-benchmark.ts` and `scripts/extract-worked-example.ts` use the same conversion. Not fixed here: a fix changes replay results and needs its own measured pass. The record is not changed.
+
+### Design rationale
+A merge commit keeps both lines of history, which the legal record requires, and lets GitHub accept a later push of `main` without force. Versioning the composite rather than overwriting it keeps every earlier figure reproducible while making the corrected one the default. The rerun design isolates each change: identical outputs everywhere except the composite show the reconciliation did not touch routing.
+
+### Implementation / congruency notes
+- Not in this reconciliation: the shared simulation and replay status-ordering repair (open item; could change benchmark results). The lab reducer's TICK still applies a tick's status changes before expiring earlier ones; skip-ahead is chronological.
+- Deceased rule: existing benchmarks generate no deaths, so the unit tests (load off at once, buffer ranks the team last for 30 minutes then no residual load, all teams buffered, closed team, reassignment) are the only check. The 30 minutes is a judgment, not a measured value.
+- Pre-Carbon lab screens still carry some em dashes in visible text (simulation setup, Dashboard, TeamCard); `SimSummaryCard` and the rebuilt report have none.
+- Not merged to `main` and not deployed; `reconcile-june` pushed as a working branch only.
+
+---
+
 # Historical Methodology Record
 
 _The sections below document earlier methodology work preserved from a prior version of this document._
