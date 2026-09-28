@@ -151,6 +151,14 @@ export default function Board({ mode, dark, onToggleDark, onHome, onHelp, onHow,
         <span className="sp" />
         <span className={`live${paused ? ' paused' : ''}`} title={paused ? 'Paused' : 'Live'}><i /><span className="live-word">{paused ? 'Paused' : 'Live'}</span></span>
         <span className="clock num">{clock(state.now)}</span>
+        <button className="pill themesw" role="switch" aria-checked={dark} aria-label="Dark mode" title={dark ? 'Switch to light mode' : 'Switch to dark mode'} onClick={onToggleDark}>
+          <span className={dark ? '' : 'on'} aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
+          </span>
+          <span className={dark ? 'on' : ''} aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" /></svg>
+          </span>
+        </button>
         <button className="pill actbtn" onClick={() => setShowLog(true)} aria-label={`Shift activity, ${actCount} events`} data-tour="activity">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10" /></svg>
           <span className="num">{actCount || ''}</span>
@@ -190,7 +198,6 @@ export default function Board({ mode, dark, onToggleDark, onHome, onHelp, onHow,
         <Sheet label="Menu" onClose={() => setMenu(false)}>
           <SheetHeader title="Menu" onClose={() => setMenu(false)} />
           <div className="opts">
-            <button className="opt" onClick={onToggleDark}><b>{dark ? 'Light mode' : 'Dark mode'}</b></button>
             <button className="opt" onClick={() => { setMenu(false); onHelp(); }}><b>Help</b></button>
             <button className="opt" onClick={() => { setMenu(false); onHow(); }}><b>How it works</b></button>
             <button className="opt" onClick={() => { setMenu(false); onHome(); }}>

@@ -288,6 +288,12 @@
 /* ---------- header controls ---------- */
 .cct .actbtn { display: inline-flex; align-items: center; gap: 6px; }
 .cct .actbtn svg, .cct .menubtn svg { width: 16px; height: 16px; }
+/* Light/dark switch in the board header: the current mode's icon sits on the filled knob. */
+.cct .themesw { padding: 2px; gap: 0; }
+.cct .themesw > span { display: grid; place-items: center; width: 28px; height: 26px; border-radius: 999px; color: var(--tx3); }
+.cct .themesw > span.on { background: var(--tx); color: var(--card); }
+.cct .themesw svg { width: 15px; height: 15px; }
+.cct .themesw:focus-visible { outline: 2px solid var(--sig); outline-offset: 2px; }
 .cct .uchip {
   position: fixed; bottom: calc(var(--keys-h, 200px) + max(12px, env(safe-area-inset-bottom)) + 10px); left: 50%; transform: translateX(-50%); z-index: 35; display: inline-flex; align-items: center; gap: 7px;
   box-shadow: 0 4px 14px rgba(0,0,0,.12); min-height: 36px;
