@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { CURRENT_ROUND } from '../constants';
+import { isSurveyResponse, parseRating, type SheetRow } from '../utils/delphiResponses';
 
 const ACTIVE_ROUND_KEY = 'delphi-active-round';
 
@@ -46,7 +47,8 @@ const SHEET_COL: Record<string, string> = {
 
 const SHEETS_API = import.meta.env.VITE_DELPHI_SHEETS_URL || '';
 
-type ResponseEntry = { timestamp: string; responses: Record<string, number>; round: 1 | 2 };
+// A null rating is a non-response for that role (src/utils/delphiResponses.ts).
+type ResponseEntry = { timestamp: string; responses: Record<string, number | null>; round: 1 | 2 };
 
 function parseRound(val: unknown): 1 | 2 {
   const n = Number(val);
@@ -57,25 +59,14 @@ async function fetchSheetResponses(): Promise<ResponseEntry[] | null> {
   if (!SHEETS_API) return null;
   try {
     const res = await fetch(SHEETS_API);
-    const rows: Record<string, string | number>[] = await res.json();
+    const rows: SheetRow[] = await res.json();
+    const columns = ROLE_KEYS.map(k => SHEET_COL[k]);
     return rows
-      .filter(row => {
-        if (row['Type'] === 'attestation') return false;
-        return ROLE_KEYS.some(k => {
-          const v = row[SHEET_COL[k]];
-          return v !== '' && v != null && Number(v) !== 0;
-        });
-      })
+      .filter(row => isSurveyResponse(row, columns))
       .map(row => ({
         timestamp: String(row['Timestamp'] ?? ''),
         round: parseRound(row['Round']),
-        responses: {
-          senior_resident: Number(row['Senior Resident'] ?? 0),
-          junior_resident: Number(row['Junior Resident'] ?? 0),
-          intern: Number(row['Intern'] ?? 0),
-          pa: Number(row['PA'] ?? 0),
-          rotator: Number(row['Rotator'] ?? 0),
-        },
+        responses: Object.fromEntries(ROLE_KEYS.map(k => [k, parseRating(row[SHEET_COL[k]])])),
       }));
   } catch {
     return null;
@@ -138,7 +129,7 @@ function percentile(sorted: number[], p: number): number {
 function computeStats(responses: ResponseEntry[]): Record<string, { mean: number; p25: number; p75: number; n: number }> {
   const out: Record<string, { mean: number; p25: number; p75: number; n: number }> = {};
   for (const key of ROLE_KEYS) {
-    const vals = responses.map(r => r.responses[key] ?? 0).filter(v => !Number.isNaN(v));
+    const vals = responses.map(r => parseRating(r.responses[key])).filter((v): v is number => v !== null);
     const sorted = [...vals].sort((a, b) => a - b);
     out[key] = {
       mean: mean(vals),
