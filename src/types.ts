@@ -169,7 +169,7 @@ export type ShiftAction =
   | { type: 'TICK' }
   | { type: 'ASSIGN_PATIENT'; tier: AcuityTier; teamId: TeamId; source: 'critical' | 'floor'; overrideReason?: string; recommendedTeamId?: TeamId }
   | { type: 'SET_PROVIDER_STATUS'; providerId: string; status: ProviderStatus }
-  | { type: 'UPGRADE_PATIENT'; patientId: string }
+  | { type: 'UPGRADE_PATIENT'; patientId: string; toTier?: AcuityTier }
   | { type: 'REASSIGN_PATIENT'; patientId: string; toTeamId: TeamId; reason: string }
   | { type: 'SWAP_PROVIDER'; outProviderId: string; incoming: Omit<Provider, 'id' | 'status' | 'statusExpiresAt'> }
   | { type: 'CLOSE_TEAM'; teamId: TeamId }

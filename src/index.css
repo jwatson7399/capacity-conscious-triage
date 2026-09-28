@@ -1,6 +1,26 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap');
 @import "tailwindcss";
+@import "./ui/carbon.css";
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* Carbon tokens as Tailwind v4 theme values. The values live as CSS variables on .cct
+   (src/ui/carbon.css) and switch with dark mode, so these utilities follow the theme. */
+@theme inline {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-num: 'IBM Plex Sans', system-ui, sans-serif;
+  --color-cct-bg: var(--bg);
+  --color-cct-card: var(--card);
+  --color-cct-ink: var(--tx);
+  --color-cct-ink-2: var(--tx2);
+  --color-cct-ink-3: var(--tx3);
+  --color-cct-line: var(--line);
+  --color-cct-line-2: var(--line2);
+  --color-cct-chip: var(--chip);
+  --color-cct-accent: var(--sig);
+  --color-cct-on-accent: var(--on-sig);
+  --color-cct-red: var(--red-fill);
+  --color-cct-yellow: var(--yellow-fill);
+  --color-cct-purple: var(--purple-fill);
+}
 
 body {
   margin: 0;
@@ -10,7 +30,8 @@ body {
 }
 
 .patient-id {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'IBM Plex Sans', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
   letter-spacing: 0.05em;
 }
 

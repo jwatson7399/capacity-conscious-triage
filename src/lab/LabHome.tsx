@@ -1,24 +1,18 @@
+// © 2026 New York University. All rights reserved.
+//
+// Research tools, reached only through the hidden ?lab route (Roundtable 2026-09-28,
+// Decision 5). This was the old RoleSelection splash; the role picker, tour, sandbox and
+// schedule demo moved to the Carbon Home, demo and tour. What stays here: the simulation
+// lab, the benchmark reports, the Delphi survey and admin panel, and the attestation.
 import { useState, useEffect } from 'react';
-import { useShift } from '../context/ShiftContext';
-import type { Role, Provider } from '../types';
-import { parseWeeklySchedule, getProvidersForShift } from '../utils/scheduleParser';
-import { randomSeed, getDefaultOverrides } from '../engine/simulation';
-import { uid } from '../uid';
-import SimulationSetup from './SimulationSetup';
-import BenchmarkReport from './BenchmarkReport';
-import RealScheduleBenchmarkReport from './RealScheduleBenchmarkReport';
-import DelphiSurvey from './DelphiSurvey';
-import DelphiAdminPanel from './DelphiAdminPanel';
+import SimulationSetup from '../components/SimulationSetup';
+import BenchmarkReport from '../components/BenchmarkReport';
+import RealScheduleBenchmarkReport from '../components/RealScheduleBenchmarkReport';
+import DelphiSurvey from '../components/DelphiSurvey';
+import DelphiAdminPanel from '../components/DelphiAdminPanel';
 import { CURRENT_ROUND } from '../constants';
-import EvidenceWalkthrough from './EvidenceWalkthrough';
 
-const roles: { role: Role; label: string; desc: string }[] = [
-  { role: 'charge_nurse', label: 'Charge / Triage Nurse', desc: 'Set up shift, manage providers, assign patients' },
-  { role: 'attending', label: 'Attending', desc: 'View team status, manage patient acuity' },
-];
-
-export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode }: { onStartTour?: () => void; darkMode: boolean; onToggleDarkMode: () => void }) {
-  const { dispatch } = useShift();
+export default function LabHome({ darkMode, onToggleDarkMode }: { darkMode: boolean; onToggleDarkMode: () => void }) {
   const [activeRound, setActiveRound] = useState<1 | 2>(() => {
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('delphi-active-round') : null;
     if (raw === '1') return 1;
@@ -48,119 +42,23 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
   const [attestationSubmitted, setAttestationSubmitted] = useState(false);
   const [attestationId, setAttestationId] = useState('');
   const [attestationLoading, setAttestationLoading] = useState(false);
-  const [showEvidence, setShowEvidence] = useState(false);
-  const [scheduleLoading, setScheduleLoading] = useState(false);
-  const [scheduleError, setScheduleError] = useState<string | null>(null);
 
   if (showSimSetup) return <SimulationSetup onCancel={() => setShowSimSetup(false)} />;
   if (showBenchmark) return <BenchmarkReport onBack={() => setShowBenchmark(false)} />;
   if (showRealBenchmark) return <RealScheduleBenchmarkReport onBack={() => setShowRealBenchmark(false)} />;
   if (showDelphi) return <DelphiSurvey onCancel={() => setShowDelphi(false)} startOnResults={showDelphi === 'results'} />;
-  if (showEvidence) return <EvidenceWalkthrough onBack={() => setShowEvidence(false)} darkMode={darkMode} />;
 
   return (
     <div className="dashboard-bg flex flex-col items-center justify-center p-6">
       <div className="mb-6 text-center">
-        <h1 className="text-center leading-none text-slate-900 dark:text-white text-5xl sm:text-6xl" style={{ fontFamily: "'EB Garamond', serif", fontWeight: 500, letterSpacing: "0.01em" }}>
-          <span className="block">Capacity</span>
-          <span className="block">Conscious</span>
-          <span className="block">Triage</span>
+        <h1 className="text-center leading-none text-slate-900 dark:text-white text-5xl sm:text-6xl" style={{ fontWeight: 500, letterSpacing: "-0.02em" }}>
+          <span className="block">CCT Lab</span>
         </h1>
       </div>
-      <div className="w-full max-w-sm space-y-4">
-        {roles.map(r => (
-          <button
-            key={r.role}
-            onClick={() => dispatch({ type: 'SET_ROLE', role: r.role })}
-            className="w-full min-h-[64px] glass-card rounded-xl px-5 py-4 text-center active:bg-white/90 transition-colors"
-            aria-label={`Select role: ${r.label}`}
-          >
-            <div className="font-semibold text-gray-900 dark:text-gray-100 text-lg">{r.label}</div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">{r.desc}</div>
-          </button>
-        ))}
-      </div>
-      <div className="w-full max-w-sm mt-8 pt-6 border-t border-slate-300 dark:border-white/10 space-y-3">
-        {onStartTour && (
-          <button
-            onClick={onStartTour}
-            className="w-full min-h-[56px] bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl px-5 py-4 font-semibold text-base active:from-blue-700 active:to-indigo-700 transition-colors"
-          >
-            <div>Tour the App</div>
-            <div className="text-xs font-normal opacity-80 mt-0.5">Learn the dashboard in 10 steps</div>
-          </button>
-        )}
-        <button
-          onClick={() => setShowEvidence(true)}
-          className="w-full min-h-[56px] bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl px-5 py-4 font-semibold text-base active:from-emerald-700 active:to-teal-700 transition-colors"
-        >
-          <div>How It Works</div>
-          <div className="text-xs font-normal opacity-80 mt-0.5">How the formula routes 8 patients</div>
-        </button>
-        <div className="bg-slate-200 dark:bg-white/10 rounded-xl border border-slate-300 dark:border-white/10 overflow-hidden">
-          <div className="text-center text-base font-semibold text-slate-800 dark:text-white py-2">Demo</div>
-          <div className="flex border-t border-slate-300 dark:border-white/10">
-            <button
-              onClick={() => dispatch({ type: 'LOAD_DEMO' })}
-              className="flex-1 min-h-[48px] px-4 py-3 font-semibold text-sm text-slate-800 dark:text-white active:bg-slate-300 dark:active:bg-white/20 transition-colors"
-            >
-              <div>Sandbox</div>
-              <div className="text-[11px] font-normal text-slate-500 dark:text-slate-400 mt-0.5">Fake providers & patients,<br />Explore the UI</div>
-            </button>
-            <div className="w-px bg-slate-300 dark:bg-white/10" />
-            <button
-              disabled={scheduleLoading}
-              onClick={async () => {
-                setScheduleError(null);
-                setScheduleLoading(true);
-                try {
-                  // Synthetic schedule: real layout and shift structure, pseudonymous
-                  // provider names. Real schedules live in data/provider-schedules/ and
-                  // must never be placed under public/ — see scripts/check-no-real-schedules.ts.
-                  const resp = await fetch(`${import.meta.env.BASE_URL}schedules/demo-week-schedule.xlsx`);
-                  if (!resp.ok) throw new Error('Failed to fetch schedule');
-                  const buf = await resp.arrayBuffer();
-                  const parsed = parseWeeklySchedule(buf);
-                  if (parsed.days.length === 0) throw new Error('No days found in schedule');
-                  const dayIdx = Math.floor(Math.random() * parsed.days.length);
-                  const day = parsed.days[dayIdx];
-                  const currentHour = 7;
-                  const { providers: schedProviders, floatAttendings } = getProvidersForShift(day, currentHour);
-                  const providers: Provider[] = schedProviders.map(sp => ({
-                    id: uid(),
-                    name: sp.name.replace(/\w\S*/g, w => w[0].toUpperCase() + w.slice(1).toLowerCase()),
-                    type: sp.type,
-                    status: 'active' as const,
-                    statusExpiresAt: null,
-                    teamId: sp.teamId,
-                  }));
-                  if (providers.length === 0) throw new Error('No providers active at current hour');
-                  const overrides = getDefaultOverrides();
-                  overrides.arrivalRatePerHour = 2;
-                  dispatch({
-                    type: 'LOAD_SCHEDULE_DEMO',
-                    providers,
-                    floatAttendings,
-                    scheduleData: { days: parsed.days, selectedDayIdx: dayIdx, currentHour },
-                    seed: randomSeed(),
-                    shiftDurationMs: 24 * 60 * 60 * 1000,
-                    overrides,
-                  });
-                } catch (e) {
-                  setScheduleError(e instanceof Error ? e.message : 'Failed to load schedule');
-                } finally {
-                  setScheduleLoading(false);
-                }
-              }}
-              className="flex-1 min-h-[48px] px-4 py-3 font-semibold text-sm text-slate-800 dark:text-white active:bg-slate-300 dark:active:bg-white/20 transition-colors disabled:opacity-50"
-            >
-              <div>{scheduleLoading ? 'Loading...' : 'Real Schedule'}</div>
-              <div className="text-[11px] font-normal text-slate-500 dark:text-slate-400 mt-0.5">Actual NYU BK schedule</div>
-              <div className="text-[11px] font-normal text-slate-500 dark:text-slate-400">Simulated patients</div>
-            </button>
-          </div>
-        </div>
-        {scheduleError && <div className="text-xs text-red-500 text-center">{scheduleError}</div>}
+      <p className="text-center text-sm text-slate-500 dark:text-slate-400 mb-6 max-w-sm">
+        Research tools. Not part of the shift board. <a className="underline" href={import.meta.env.BASE_URL}>Back to the app</a>
+      </p>
+      <div className="w-full max-w-sm space-y-3">
         <button
           onClick={() => setShowSimSetup(true)}
           className="w-full min-h-[48px] bg-slate-200 dark:bg-white/10 text-slate-700 dark:text-slate-300 rounded-xl px-5 py-3 font-semibold text-sm active:bg-slate-300 dark:active:bg-white/20 border border-slate-300 dark:border-white/10"
@@ -325,7 +223,6 @@ export default function RoleSelection({ onStartTour, darkMode, onToggleDarkMode 
             aria-label="Toggle dark mode"
           >
             <span className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform flex items-center justify-center text-sm ${darkMode ? 'translate-x-5' : ''}`}>
-              {darkMode ? '🌙' : '☀️'}
             </span>
           </button>
         </div>

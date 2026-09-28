@@ -6,7 +6,8 @@ time-decaying patient load. Advisory only (never auto-assigns), no PHI, no EMR i
 Vite, Tailwind CSS v4, React 19.
 
 Copyright holder is **New York University** (NYU TOV ref WAT01-01). Notice lives in `LICENSE`,
-`src/main.tsx`, and the footer of `RoleSelection.tsx`. Keep it on anything new that users see or print.
+`src/main.tsx`, and the footers of the Carbon screens (`src/app/`: Home, Board, SetupScreen, TeamDetail,
+Help and the menu). Keep it on anything new that users see or print.
 
 **Source of truth for formula values is the code** (`src/constants.ts`, `src/engine/recommendation.ts`).
 If this file and the code disagree, the code wins and this file should be fixed.
@@ -65,8 +66,8 @@ Vite copies `public/` verbatim into `dist/`, and `dist/` is what gets published.
 - **Real schedules live in `data/provider-schedules/`, never under `public/`.** This includes
   `demo-schedule.xlsx`, which despite its name contains 120 real provider names.
 - The only workbook allowed under `public/` is `public/schedules/demo-week-schedule.xlsx`, a synthetic
-  file with real layout and shift structure but pseudonymous names. The "Real Schedule" demo button in
-  `RoleSelection.tsx` fetches it.
+  file with real layout and shift structure but pseudonymous names. The demo's "Sample scheduled shift"
+  button and the setup screen's "Use sample scheduled shift" (`src/ui/samples.ts`) fetch it.
 - To regenerate it from a real schedule:
 
 ```bash
@@ -88,7 +89,8 @@ types, teams and shift windows) and that no real name survives.
   Packet*`, the Informatics thread PDFs) and must not be committed. Stage files by name.
 - The unauthenticated Delphi Apps Script endpoint and the hardcoded fallback weights in
   `constants.ts` were left in place by Julian's explicit decision (weights are NYU-specific). Do not
-  "fix" them without asking.
+  "fix" them without asking. Since 2026-09-28 the app scores with the `constants.ts` weights only
+  (frozen for the study); the survey and endpoint remain for research under `?lab`.
 - No em dashes in any document or user-facing text.
 
 ## Delphi Survey: Google Sheets Backend
@@ -144,27 +146,44 @@ If the env var is unset, the survey falls back to localStorage-only mode.
 
 ## Architecture
 
+Carbon rebuild (branch `carbon-rebuild`, 2026-09-28): a new interface on the unchanged engine.
+
 - `src/types.ts`: all TypeScript types (`Provider`, `Patient`, `Buffer`, `TeamScore`, `Recommendation`, `ShiftState`, `ShiftAction`)
 - `src/constants.ts`: tuning parameters (see below)
 - `src/engine/recommendation.ts`: pure-function scoring engine
 - `src/engine/simulation.ts`, `src/engine/fairness.ts`: simulator and fairness metrics used by benchmarks
-- `src/context/ShiftContext.tsx`: `useReducer`-based state management
-- `src/hooks/useSurveyWeights.ts`: polls the Delphi sheet for live provider weights
+- `src/context/ShiftContext.tsx`: the core `useReducer` shift reducer and `ShiftProvider`. The provider
+  scores with frozen `CAPACITY_WEIGHTS` (no Delphi polling) and exposes the activity list. Shift rules
+  changed 2026-09-28 (Roundtable, Carbon Rebuild Audit, Decisions 12 to 14; scoring untouched):
+  closed teams stay closed until reopened (no 60-minute auto-transfer or auto-reopen; sign-out keeps
+  the team closed); `REASSIGN_PATIENT` keeps the patient's timer; `UPGRADE_PATIENT` takes an optional
+  `toTier` (any higher color, default Red) and restarts at that color's full weight.
+- `src/context/session.ts`: session layer around the core reducer. Records the shift activity events
+  (`src/activity.ts`, JSON-safe, append-only; undo is its own event) and adds interface-only actions:
+  `HYDRATE` (load a sample shift), `REMOVE_PROVIDER`, `REOPEN_TEAM`, `DEMO_ARRIVALS`, `UNDO_ASSIGN`.
+  Undo is bound to the assignment's event id and ends at any later action on that patient or a new sample.
+- `src/ui/model.ts`: display helpers (infinity rule, gauge scale, timers). `src/ui/samples.ts`: demo and
+  tour sample shifts (made-up names) and the synthetic schedule loader. `src/ui/carbon.css`: Carbon tokens
+  and styles (dark default); Tailwind v4 theme values in `src/index.css` point at them.
+- `src/app/`: the Carbon interface. `CarbonApp` (screens), `Home`, `SetupScreen`, `Board` (`Gauge`,
+  `Ledger`, `Assign`, `ActivityDrawer`), `TeamDetail`, `Demo`, `Tour`, `Help`/`HowItWorks`, `Sheet`.
+  The live shift's `ShiftProvider` stays mounted, so Home never wipes a shift; demo and tour mount their
+  own providers and cannot reach it.
+- `src/lab/`: hidden `?lab` route (lazy-loaded): simulation lab, benchmark reports, Delphi survey and
+  admin, attestation. Simulations still run on the pre-Carbon `components/Dashboard.tsx` (research only).
+- `src/App.tsx`: routes `?lab` to the lab, everything else to `CarbonApp`. `?tour` opens the tour.
+- `src/components/`: pre-Carbon components, now used only by the lab.
+- `archive/`: files moved out of the build (`MethodologyDeepDive`, old `HelpSection`, the old walkthrough and
+  `EvidenceWalkthrough`). Never imported or shipped.
 - `src/utils/scheduleParser.ts`: layout-sensitive parser for departmental schedule workbooks
-- `src/App.tsx`: root: role selection -> shift setup (charge nurse) -> dashboard; 1s TICK interval
-- `src/components/`: `Dashboard`, `TeamCard` (battery capacity gauge), `AssignPatient`, `OverrideModal`,
-  `HelpSection`, `ShiftSetup`, `RoleSelection` (splash, demos, survey entry, copyright footer),
-  `GuidedTour`, `EvidenceWalkthrough` (iframes `public/walkthrough-v4.html`), `MethodologyDeepDive`,
-  `BenchmarkReport`, `RealScheduleBenchmarkReport`, `DelphiSurvey`, `DelphiAdminPanel`,
-  `ScheduleImport`, simulation components, `PatientBadge`, `ProviderStatusToggle`, `Toast`
 - `scripts/`: Node-only benchmark, replay, de-identification and guard scripts (read from `data/`)
 
 ## Scoring Formula
 
 ```
 Capacity Ratio = Team Capacity / Patient Load
-Team Capacity  = sum(provider weight x status multiplier x float modifier)
-Patient Load   = sum(decayed acuity weight)
+Team Capacity  = sum(provider weight x status multiplier)
+Patient Load   = sum(decayed acuity weight x patient float modifier)
 ```
 
 Teams are ranked on their **current** ratio. The incoming patient's acuity does not change the pick, so
@@ -172,16 +191,19 @@ the recommended team is known before the patient's tier is chosen. `getRecommend
 `incomingTier` argument ("post-assign" mode: capacity / (load + incoming weight)) that nothing in the
 app or simulator passes; it was tested and rejected in April (see Roundtable, Session September 27,
 2026). Do not turn it on without Julian. Highest ratio among eligible teams is recommended. Team 4 (Trauma) and closed teams are excluded from
-auto-recommendations. Tiebreakers: highest ratio, then least recent assignment, then lowest team ID.
-(The not-buffered-first tiebreaker still exists in code but is inert because buffers are zero.)
+auto-recommendations; a closed team stays out until someone reopens it. Tiebreakers: highest ratio, then least recent assignment, then lowest team ID.
+(The not-buffered-first rule is actually the first sort key, not a tiebreaker. Ordinary buffers are
+zero, so it only acts during the 30-minute deceased buffer, which ranks that team last unless every
+eligible team is buffered.)
 
 ### Provider weights
 
-Fetched live from the Delphi sheet (`useSurveyWeights`, polled every 5 min). Fallbacks in
-`constants.ts` are the Delphi Round 1 means (n=19). Round 2 collection is in progress
-(`CURRENT_ROUND = 2`; the admin panel sets the active round).
+Frozen for the whole study at the `constants.ts` values, the Delphi Round 1 means (n=19)
+(Roundtable 2026-09-28, Decision 7). The app no longer reads the Delphi sheet for scoring;
+`useSurveyWeights` is unused. Round 2 collection is in progress (`CURRENT_ROUND = 2`); any switch to
+Round 2 values needs a benchmark rerun first.
 
-| Provider                     | Fallback weight |
+| Provider                     | Weight |
 |------------------------------|-----------------|
 | Attending                    | 20 (fixed reference) |
 | Senior Resident (PGY 3-4)    | 15.2 |
@@ -190,6 +212,9 @@ Fetched live from the Delphi sheet (`useSurveyWeights`, polled every 5 min). Fal
 | Intern (PGY-1)               | 6.6 |
 | Rotator                      | 2.4 |
 
+Provider statuses are hidden in the Carbon interface (Decision 6): nothing on screen sets one, so every
+provider scores as active. The code and multipliers below remain in the model.
+
 | Status          | Multiplier | Auto-expires |
 |-----------------|------------|--------------|
 | Active          | 1.0        | no |
@@ -197,7 +222,7 @@ Fetched live from the Delphi sheet (`useSurveyWeights`, polled every 5 min). Fal
 | In Procedure    | 0.25       | 30 min |
 | Off Floor       | 0.0        | 15 min |
 
-Float modifiers: none 1.0, float supervising 0.65, float primary 0.0.
+Float modifiers (applied to the patient's load, per `getCurrentLoad`): none 1.0, float supervising 0.65, float primary 0.0.
 
 ### Acuity weights and decay (4:2:1, D6 linear)
 
@@ -212,7 +237,12 @@ Float modifiers: none 1.0, float supervising 0.65, float primary 0.0.
 Removed. `BUFFER_DURATIONS_MS` is all zeros per the Methods paper: a new assignment raises the team's
 load and lowers its ratio, which provides the protection buffers used to add.
 
-### Capacity terms (displayed on cards)
+### Capacity terms (pre-Carbon cards; lab only)
+
+The Carbon board shows the number only, no tier words or capacity colors. Display rule for large ratios
+(Decision 3): 100 or more shows as infinity unless two or more A-side teams are at 100 or more, then
+those show whole numbers; zero load is always infinity (`src/ui/model.ts`).
+
 
 | Ratio   | Label       |
 |---------|-------------|
@@ -229,16 +259,23 @@ color and battery fill are anchored to per-arrival percentiles of the 4:2:1 hist
 
 ## Known inaccuracies still in the app
 
-- `src/components/HelpSection.tsx` (around line 51) quotes "+55%" and "+249%". These are cross-benchmark
-  stitches and must not be quoted anywhere. Same-run figures put the minimum-ratio gain versus actual
-  practice at roughly +77% to +118% ("the worst-case floor roughly doubles"). Fix pending Julian's
-  wording.
+- None known in the Carbon interface. The old `HelpSection.tsx`, which quoted "+55%" and "+249%"
+  (cross-benchmark stitches, never quote them), is archived; `src/app/Help.tsx` was written from scratch
+  and quotes no figures.
+- The pre-Carbon walkthrough (`public/walkthrough-v4.html`) is archived; How it works is text only and
+  the app makes no Google Fonts request.
 
 ## Key Design Decisions
 
 - **All state is client-side** (`useReducer` + React context). No backend yet.
 - **Team 4 (Trauma)** is visible but excluded from auto-recommendations; assignment only via manual override.
-- **Demo mode** randomizes provider names, team compositions, statuses, and simulates patient arrivals through the recommendation engine.
+- **One role, one shared device.** No role picker. Phone portrait and tablet landscape are both first-class.
+- **Demo** is one sample shift with a permanent "Demo · Sample data" badge and a clock toolbar (pause, 1x,
+  60x, 240x, optional arrivals placed through the engine, reset, sample scheduled shift).
+- **Tour** is six steps on its own sample shift with the clock held still.
+- **Shift activity** is in memory only and is lost on reload or End shift. The trial still needs a
+  durable override record (open item).
+- **Override reasons:** Continuity / bounce-back; Team or attending request; Other (note required).
 - **Patient nomenclature**: `C-###` = critical/new arrival, `F-###` = floor upgrade, time display = minutes until next decay, `w:N` = current decayed weight.
 
 ## Agent rounds

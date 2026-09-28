@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useShift } from '../context/ShiftContext';
 import type { TeamId, TeamScore, ProviderType } from '../types';
-import { ACUITY_DECAY, PROVIDER_TYPE_LABELS, TRAUMA_TEAM_ID, TEAM_CLOSE_TRANSFER_MS, TEAM_CLOSE_TRANSFER_TARGETS, getCapacityColor, capacityFillPercent } from '../constants';
+import { ACUITY_DECAY, PROVIDER_TYPE_LABELS, TRAUMA_TEAM_ID, TEAM_CLOSE_TRANSFER_TARGETS, getCapacityColor, capacityFillPercent } from '../constants';
 import { getActiveBuffers } from '../engine/recommendation';
 import ProviderStatusToggle from './ProviderStatusToggle';
 import PatientBadge from './PatientBadge';
@@ -19,7 +19,7 @@ interface Props {
 
 const PROVIDER_TYPES: ProviderType[] = ['attending', 'senior_resident', 'junior_resident', 'intern', 'pa', 'rotator'];
 
-export default function TeamCard({ teamId, score, recommendationRank, isClosed, closedAt, allCandidatesBuffered, forceCollapsePatients, forceHideStabilized }: Props) {
+export default function TeamCard({ teamId, score, recommendationRank, isClosed, allCandidatesBuffered, forceCollapsePatients, forceHideStabilized }: Props) {
   const { state, dispatch } = useShift();
   const { providers, patients, buffers, now, currentRole } = state;
   const isTrauma = teamId === TRAUMA_TEAM_ID;
@@ -230,18 +230,9 @@ export default function TeamCard({ teamId, score, recommendationRank, isClosed, 
               {isTrauma && (
                 <div className="text-xs text-red-600 dark:text-red-400 mt-0.5">Excluded from assignment recommendations</div>
               )}
-              {isClosed && closedAt && transferTarget && (() => {
-                const transferAt = closedAt + TEAM_CLOSE_TRANSFER_MS;
-                const remainingMs = Math.max(0, transferAt - now);
-                const mins = Math.floor(remainingMs / 60000);
-                const secs = Math.floor((remainingMs % 60000) / 1000);
-                return (
-                  <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                    Auto-transfer to Team {transferTarget} in{' '}
-                    <span className="font-mono">{String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}</span>
-                  </div>
-                );
-              })()}
+              {isClosed && (
+                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">Closed until reopened</div>
+              )}
             </div>
           </div>
         );
@@ -389,6 +380,16 @@ export default function TeamCard({ teamId, score, recommendationRank, isClosed, 
             className="w-full py-2 rounded-lg bg-gray-200 text-gray-700 text-sm font-medium min-h-[44px]"
           >
             Close Team
+          </button>
+        </div>
+      )}
+      {canManage && isClosed && (
+        <div className="px-4 pb-3">
+          <button
+            onClick={() => dispatch({ type: 'REOPEN_TEAM', teamId })}
+            className="w-full py-2 rounded-lg bg-gray-200 text-gray-700 text-sm font-medium min-h-[44px]"
+          >
+            Reopen Team
           </button>
         </div>
       )}
