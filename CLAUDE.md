@@ -1,5 +1,11 @@
 # Capacity Conscious Triage (er-triage-app)
 
+**Read `AGENTS.md` first.** It is the shared rule file for every agent (any vendor): log a START
+entry in `AGENT_LOG.md` (main repo folder) before changing anything and a DONE entry when finished;
+update the Roundtable and METHODS as you go; draft Legal Dossier items for Julian's go.
+
+@AGENTS.md
+
 A mobile-first React + TypeScript app that recommends which ED team should take the next patient. It
 replaces round-robin assignment with a capacity ratio: team provider strength divided by acuity-weighted,
 time-decaying patient load. Advisory only (never auto-assigns), no PHI, no EMR integration. Built with

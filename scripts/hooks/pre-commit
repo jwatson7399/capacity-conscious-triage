@@ -1,0 +1,31 @@
+#!/bin/sh
+# CCT pre-commit: every commit needs a recent entry in the shared agent log.
+# The log lives in the main repo folder (not a worktree) and is kept out of git.
+# Julian can override: CCT_SKIP_LOG=1 git commit ...   Agents must not.
+
+[ "$CCT_SKIP_LOG" = "1" ] && exit 0
+
+MAIN="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+LOG="$MAIN/AGENT_LOG.md"
+
+if [ ! -f "$LOG" ]; then
+  echo "Commit blocked: $LOG does not exist. Read AGENTS.md, then add a START entry." >&2
+  exit 1
+fi
+
+# Updated within the last 180 minutes?
+if [ -z "$(find "$LOG" -mmin -180 2>/dev/null)" ]; then
+  echo "Commit blocked: AGENT_LOG.md has no entry in the last 3 hours." >&2
+  echo "Add a START or DONE entry to $LOG (see AGENTS.md section 1), then commit again." >&2
+  exit 1
+fi
+
+# Never commit private material, whatever the .gitignore says.
+BAD="$(git diff --cached --name-only | grep -E '^(ER Triage App/|CCT Legal Dossier|AGENT_LOG\.md|Counsel Memo|IP Policy Excerpts|Outside Counsel Briefing|[Ii]nformatics [Oo]utlook thread|data/provider-schedules/)')"
+if [ -n "$BAD" ]; then
+  echo "Commit blocked: these files must never be committed:" >&2
+  echo "$BAD" >&2
+  exit 1
+fi
+
+exit 0
