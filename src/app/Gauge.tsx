@@ -35,6 +35,8 @@ export default function Gauge({ rec, closedTeams, deceased, armed, onOpen }: {
         <span className="sp" />
         {s2 && <span className="then">Next-ranked: {teamName(s2.teamId)}, <span className="num">{displayRatio(s2, scores)}</span></span>}
       </div>
+      <div className="gtitle">Capacity</div>
+      <div className="gdirection gtop"><span aria-hidden="true">↑</span> Less busy</div>
       <div className="gwrap">
         <div className="axis" aria-hidden="true">
           {GAUGE_TICKS.map(([r, l]) => <span key={l} className="num" style={{ bottom: `${gaugeLevel(r, 1)}%` }}>{l}</span>)}
@@ -81,7 +83,7 @@ export default function Gauge({ rec, closedTeams, deceased, armed, onOpen }: {
           })}
         </div>
       </div>
-      <div className="gfoot sc"><span>↓ More busy</span><span>Less busy ↑</span></div>
+      <div className="gdirection gfoot"><span aria-hidden="true">↓</span> More busy</div>
     </div>
   );
 }
