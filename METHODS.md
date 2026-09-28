@@ -540,6 +540,62 @@ A merge commit keeps both lines of history, which the legal record requires, and
 
 ---
 
+## 10. Time-Zone-Independent Census Times in the Replay and Benchmark Scripts
+
+### Objective
+Make every script that reads the census workbook give the same result on any machine, equal to the workbook's wall-clock reading, and find out which recorded results came from skewed runs. Roundtable 2026-09-28, Decision 20 finding; `ER Triage App/HANDOFF_timezone-fix.md`.
+
+### The defect, stated correctly
+The scripts converted Excel serials with `new Date(1899, 11, 30)` and read dates, hours and shift anchors with local-time methods. In the time zone database New York is already on EST (UTC-5) in 1899. On a New York machine, arrivals before 2026-03-08 were therefore read correctly, and arrivals from 2026-03-08 onward (daylight time, UTC-4) were read **exactly one hour late**. Separately, `historical-replay.ts` parsed `YYYY-MM-DD` strings (which JavaScript reads as UTC midnight) and took the local day of week, so every weekday label was one day early (December 1, 2025, a Monday, was labeled Sunday).
+
+**Correction to section 9:** section 9 and the 2026-09-28 rounds post described the skew as "about 4 minutes early before 2026-03-08 and about 56 minutes late after it" (local mean time). That was wrong; the minute-level figures came from a rounding artifact in the check script. The cohort counts and conclusions in section 9 stand.
+
+### Methodology / data
+- Fix, option (b) of the handoff: one shared module, `scripts/lib/census-time.ts`. The Excel epoch is `Date.UTC(1899, 11, 30)`; every census date, hour, day of week, shift anchor and printed example time uses UTC getters. The workbook's clock time is used as the ED's wall-clock time with no zone conversion. No `TZ` setting is needed or read. Run-date stamps stay in local time.
+- Scripts changed: tracked `historical-replay.ts`, `decay-schedule-benchmark.ts`, `extract-worked-example.ts`; untracked `buffer-duration-benchmark.ts`, `comprehensive-benchmark.ts`, `dispo-stats.ts` (same change, working tree only). Searched all of `scripts/`: `real-schedule-benchmark.ts` and `acuity-by-capacity.ts` read no census times. `src/utils/scheduleParser.ts` already uses UTC. `src/engine`, `src/constants.ts` and the app are unchanged.
+- The replay no longer prints a usability recommendation from the two-team combined score; it prints the two means and the difference.
+- Runs: scratch copies of `0ac3878` (baseline) and the branch, each with its own read-only copy of `data/provider-schedules/`, every affected script under `TZ=UTC` and `TZ=America/New_York`. Nothing written into the repository's `data/`.
+
+### Results
+| Check | Result |
+|---|---|
+| Baseline `0ac3878`, UTC vs New York | Differs in every census script except `extract-worked-example` (its day, 2026-02-09, is before the change): replay 2,885 JSON fields, buffer 3,330, comprehensive 2,202, decay V3 8,643, dispo-stats 39 output lines. Replay cohorts 1,540 / 418 (UTC) vs 1,541 / 417 (New York) |
+| Baseline UTC with composite v1 vs `historical-replay-results-current-2026-09-27.json` (section 6) | Byte-identical |
+| Branch, UTC vs New York | Identical for all six scripts: JSON byte-identical; logs and Markdown differ only in run-date stamps, output paths and timing |
+| Branch vs baseline UTC | Identical for all six scripts; the replay log differs only in the removed recommendation line |
+| Tests | 74 of 74 (70 existing, 4 new: wall-clock date and hour for serials before and after 2026-03-08 and near midnight, including 23:30 on 2026-03-20, which the old code read as 00:30 on 2026-03-21; identical results under UTC, America/New_York and Asia/Kolkata) |
+
+### Which records came from skewed runs
+Fingerprints: encounter totals, per-day arrival counts and weekday labels, which do not depend on weights or decay; plus exact reruns where the code still reproduces the record.
+
+| Record | Reading | Evidence |
+|---|---|---|
+| `data/historical-replay-runs/historical-replay-results-current-2026-09-27.json` and `-current-post-` | UTC | 1,540 / 418; per-day counts and weekdays match UTC |
+| All other `data/historical-replay-runs/historical-replay-results*.json` (12 files, April 2026: `4-2-1`, `5-3-1`, `1-1-1*`, `1-2-3`, `1-2-4*`, `1-3-5`, unsuffixed) | New York | 1,541 / 417; per-day counts and weekday labels match New York. `4-2-1` rerun on `0ac3878` under New York with composite v1 reproduces it exactly |
+| `scripts/buffer-duration-benchmark-results.json` | New York | Reproduced exactly by the New York baseline |
+| `data/decay-benchmark-runs/decay-benchmark-results-v3-20260423-192901.json` | New York | Differs from the New York baseline in 3 fields, from UTC in 8,645 |
+| `scripts/decay-schedule-benchmark-results.json` | New York | 1,541 encounters (older format, not rerun) |
+| `scripts/comprehensive-benchmark-results.json` | Not determined from the JSON | No count fields; code has changed since (neither reading reproduces it). Its Markdown reports 1,541 |
+| `docs/results/`: `HISTORICAL_REPLAY_RESULTS.md`, `HISTORICAL_REPLAY_RESULTS_4-2-1.md` (and the root copy), `WORKED_EXAMPLE.md`, `DECAY_SCHEDULE_BENCHMARK_RESULTS_V2.md` (and the root copy), `_V3.md`, `DECAY_BENCHMARK_RESULTS.md`, `BUFFER_DURATION_BENCHMARK_RESULTS.md`, `COMPREHENSIVE_BENCHMARK_RESULTS.md`, `ACUITY_WEIGHT_BENCHMARK_SUMMARY.md`, `LOAD_MINUTES_RESULTS.md` | New York | 1,541 in the text, or built from a New York JSON (`LOAD_MINUTES_RESULTS.md` from the `4-2-1` file). Dispo statistics: median 260 min (UTC 261), p75 391.3 (UTC 391.5) |
+| `RED_ZONE_EXAMPLES.md`, `RED_ZONE_REFRAME.md`, `ACUITY_WEIGHT_RATIONALE.md` | No replay counts | Not determined or not replay-based |
+
+Each New York-derived result document now carries a dated note at the top pointing here; no values were changed. The day-of-week tables in `HISTORICAL_REPLAY_RESULTS*.md` are labeled one day early.
+
+### Filed figures (Methods and Rationale PDF and TOV IDF answers, filed 2026-06-08)
+- Encounter counts: both documents use 1,541 (and the paper 417 overnight), the New York reading; the wall-clock reading is 1,540 and 418. 121 days is the same under both.
+- Load-minutes: 211 vs 91 per shift (-57%) and the cumulative 25,543 vs 10,965 match the New York reading of the `4-2-1` replay exactly; the wall-clock reading gives 214 vs 91 and 25,846 vs 10,982 (-57.5%).
+- Historical-routing ("Actual") figures that do not depend on weights match the New York reading of the buffer benchmark: Gini count 0.141 (UTC 0.143), Gini acuity 0.144 (UTC 0.146), count spread 2.5 (UTC 2.6), acuity spread 9.9 (UTC 10.0), slams 2.2 (UTC 2.3), B2B 0.65 (same).
+- Ratio figures (average 62.5 vs 97.1, +55%; minimum 14.6 vs 50.9, +249%) and the weight, decay and buffer tables come from runs on the same 1,541-encounter cohort, but today's code does not reproduce their ratio scale, so their wall-clock values were not computed here.
+- No day-of-week result appears in either filed document. The worked example (2025-12-29) is before 2026-03-08 and is unaffected by the time skew.
+- The Dossier is not edited; this answers its open item 20 for Julian.
+
+### Implementation / congruency notes
+- Commits on branch `fix-timezone`: `b45b7ab` (fix; its message repeats the wrong minute-level description, corrected in `0062797`), `f5503af` (recommendation line removed), `0062797` (corrected comments, DST near-midnight test), plus the records commits.
+- Not merged to `main`; not deployed.
+- Corrected tables for the New York-derived records are a separate step if Julian wants them.
+
+---
+
 # Historical Methodology Record
 
 _The sections below document earlier methodology work preserved from a prior version of this document._

@@ -298,12 +298,11 @@ scoring never reads the survey.
 
 ## Landmines
 
-- **Replay time zone.** `scripts/historical-replay.ts`, `scripts/decay-schedule-benchmark.ts` and
-  `scripts/extract-worked-example.ts` convert Excel serials with `new Date(1899, 11, 30)` in local time.
-  On the Mac (America/New_York) that reads census arrivals about 4 minutes early before 2026-03-08 and
-  about 56 minutes late after it, and the replay cohorts become 1,541 / 417. Under `TZ=UTC` they are
-  1,540 / 418 and match the workbook clock and METHODS section 6. Run these scripts with `TZ=UTC` until
-  the conversion is fixed (open item; a fix changes results and needs Julian's go).
+- **Census times are zone-independent** (METHODS.md section 10). Scripts that read the census use
+  `scripts/lib/census-time.ts`: Excel serials become wall-clock time held as UTC milliseconds and are read
+  only with UTC getters, so any machine gives the workbook reading (1,540 / 418). Never use
+  `new Date(y, m, d)`, `getHours()` or `new Date('YYYY-MM-DD').getDay()` on census data. Records made
+  before 2026-09-28 on the Mac (1,541 / 417) read arrivals from 2026-03-08 onward one hour late.
 - The lab reducer's TICK applies a tick's scheduled status changes before expiring earlier ones;
   skip-ahead is chronological. The shared simulation and replay status ordering is an open item.
 - Scripts that write results (historical replay) write into `data/`; for comparison runs use a scratch

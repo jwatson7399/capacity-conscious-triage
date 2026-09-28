@@ -1,5 +1,7 @@
 # Historical Replay Benchmark — Results Summary (4:2:1 Weights)
 
+> **Note added 2026-09-28 (time zone).** The figures in this document come from a run that read the census arrival times in the machine's America/New_York time zone instead of the workbook's wall-clock time: arrivals from 2026-03-08 onward (daylight time) were read one hour late (earlier arrivals were read correctly), giving 1,541 three-team and 417 two-team encounters instead of 1,540 and 418. Day-of-week labels in this run are also one day early (December 1, 2025, a Monday, is labeled Sunday), so any weekday breakdown is shifted by a day. The values below are unchanged. See METHODS.md section 10.
+
 ## What This Is
 
 A three-way comparison using **real patient arrivals** (1,958 A-side encounters, Dec 2025–Mar 2026) and **real provider schedules** (18 weekly schedule files covering 122 days) to evaluate the triage app's formula against historical assignments and round-robin.

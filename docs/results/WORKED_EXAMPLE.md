@@ -1,5 +1,7 @@
 # Worked Example — How the Benchmark Computed Its Numbers
 
+> **Note added 2026-09-28 (time zone).** The figures in this document come from a run that read the census arrival times in the machine's America/New_York time zone instead of the workbook's wall-clock time: arrivals from 2026-03-08 onward (daylight time) were read one hour late (earlier arrivals were read correctly), giving 1,541 three-team and 417 two-team encounters instead of 1,540 and 418. Day-of-week labels in this run are also one day early (December 1, 2025, a Monday, is labeled Sunday), so any weekday breakdown is shifted by a day. The values below are unchanged. See METHODS.md section 10.
+
 > **Note added 2026-09-28.** The fairness (composite) and acuity-balance figures in this document were computed with the composite's original 5:3:1 acuity-balance scale (composite v1), even where the routing used 4:2:1. The values below are left as they were. See METHODS.md section 9 for the versioned composite and the corrected (4:2:1) comparison.
 
 ## What This Document Shows

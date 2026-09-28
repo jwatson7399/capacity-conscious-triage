@@ -33,6 +33,7 @@ import {
 import type { ScoringOverrides } from '../src/engine/recommendation';
 import { TRAUMA_TEAM_ID, RED_ZONE_THRESHOLD, ACUITY_WEIGHTS } from '../src/constants';
 import { uid } from '../src/uid';
+import { atWallHour, dateStrDayOfWeek, excelSerialToWallMs, localDateToWallMs, parseWallClockString, wallDateStr, wallHour } from './lib/census-time';
 
 // ── CLI flags ──────────────────────────────────────────────────────
 
@@ -206,11 +207,8 @@ function parseTeamId(teamStr: string | null | undefined): TeamId | null {
 }
 
 function excelDateToMs(serial: number): number {
-  // Excel date serial → epoch ms
-  // Excel epoch: 1900-01-01, but with the 1900 leap year bug
-  const msPerDay = 86400000;
-  const excelEpoch = new Date(1899, 11, 30).getTime(); // Dec 30, 1899
-  return excelEpoch + serial * msPerDay;
+  // Wall-clock time, independent of the machine time zone (scripts/lib/census-time.ts).
+  return excelSerialToWallMs(serial);
 }
 
 function loadCensusData(): { all: HistoricalArrival[]; excludedCount: number; totalCount: number } {
@@ -265,9 +263,9 @@ function loadCensusData(): { all: HistoricalArrival[]; excludedCount: number; to
     if (typeof rawArrival === 'number') {
       arrivalMs = excelDateToMs(rawArrival);
     } else if (rawArrival instanceof Date) {
-      arrivalMs = rawArrival.getTime();
+      arrivalMs = localDateToWallMs(rawArrival);
     } else if (typeof rawArrival === 'string') {
-      arrivalMs = new Date(rawArrival).getTime();
+      arrivalMs = parseWallClockString(rawArrival);
     } else {
       continue; // skip rows without arrival time
     }
@@ -299,13 +297,12 @@ function loadCensusData(): { all: HistoricalArrival[]; excludedCount: number; to
     const doorToDispoMin = colDoorDispo && typeof row[colDoorDispo] === 'number' ? row[colDoorDispo] : null;
     const edLosMin = colEdLos && typeof row[colEdLos] === 'number' ? row[colEdLos] : null;
 
-    const d = new Date(arrivalMs);
-    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const dateStr = wallDateStr(arrivalMs);
 
     arrivals.push({
       arrivalTime: arrivalMs,
       date: dateStr,
-      hour: d.getHours(),
+      hour: wallHour(arrivalMs),
       esi: validEsi,
       acuity: esiToTier(validEsi),
       actualTeam: teamId as TeamId,
@@ -703,13 +700,11 @@ function replayCohort(
 
     // ── Load-minutes: integrate acuity-weighted load and capacity across the shift window ──
     // Window = [firstArrival, shiftEnd] where shiftEnd is midnight for three-team cohort (9A shift start
-    // + 15h) or 9am for two-team cohort (0A shift start + 9h). Anchored from firstArrival's local date
-    // so timezone matches how `hour` was computed when parsing the census. Per-minute step.
+    // + 15h) or 9am for two-team cohort (0A shift start + 9h). Anchored on firstArrival's wall-clock date,
+    // the same reading used for `hour` when parsing the census (scripts/lib/census-time.ts). Per-minute step.
     const firstArrivalMs = arrivals[0].arrivalTime;
-    const shiftAnchor = new Date(firstArrivalMs);
     const isThreeTeam = eligibleTeams.length === 3;
-    shiftAnchor.setHours(isThreeTeam ? 9 : 0, 0, 0, 0);
-    const shiftStartMs = shiftAnchor.getTime();
+    const shiftStartMs = atWallHour(firstArrivalMs, isThreeTeam ? 9 : 0);
     const shiftEndMs = shiftStartMs + (isThreeTeam ? 15 : 9) * 3_600_000;
     const windowStartMs = Math.min(firstArrivalMs, shiftStartMs);
     const windowEndMs = shiftEndMs;
@@ -720,7 +715,7 @@ function replayCohort(
 
     const STEP_MS = 60_000;
     for (let now = windowStartMs; now < windowEndMs; now += STEP_MS) {
-      const hourOfDay = new Date(now).getHours();
+      const hourOfDay = wallHour(now);
       const { providers: scheduledProviders } = getProvidersForShift(day, hourOfDay);
       const simProviders = toProviders(scheduledProviders);
       for (const team of eligibleTeams) {
@@ -1094,9 +1089,8 @@ for (const date of allDates) {
   const threeTeamArrivals = dayArrivals.filter(a => a.hour >= 9 && a.hour <= 23);
   const twoTeamArrivals = dayArrivals.filter(a => a.hour >= 0 && a.hour < 9);
 
-  const d = new Date(date);
   const dowNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const dayOfWeek = dowNames[d.getDay()];
+  const dayOfWeek = dowNames[dateStrDayOfWeek(date)];
 
   // Three-team cohort (9A–12A midnight): Teams 1, 2, 3
   if (threeTeamArrivals.length > 0) {
@@ -1294,11 +1288,12 @@ printCohortReport(
   [1, 2] as TeamId[],
 );
 
-// Usability implication
+// Two-team hours, combined score: numbers only. No advice is derived from the combined score
+// (METHODS.md sections 9 and 10).
 if (twoTeamDays.length > 0) {
   const fFairness2 = mean(twoTeamDays.map(d => d.formula.fairness));
   const rrFairness2 = mean(twoTeamDays.map(d => d.roundRobin.fairness));
-  console.log(`\n  Usability implication: Formula ${fFairness2 >= rrFairness2 ? '≥' : '<'} Round-Robin in two-team hours → ${fFairness2 >= rrFairness2 ? '"leave tool on all the time"' : 'consider toggling by time of day'}`);
+  console.log(`\n  Two-team hours, combined fairness score (mean): formula ${fmt(fFairness2, 2)}, round-robin ${fmt(rrFairness2, 2)}, difference ${fmt(fFairness2 - rrFairness2, 2)}`);
 }
 
 // ── Day-of-week breakdown (three-team cohort) ──

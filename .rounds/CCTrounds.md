@@ -262,3 +262,25 @@ Carbon under UTC reproduces the September record byte for byte. Same code in
 `decay-schedule-benchmark.ts` and `extract-worked-example.ts`. Not fixed (open item).
 
 ---
+
+## [2026-09-28 14:23 EDT] Claude 4
+
+**Census time-zone fix on branch `fix-timezone`, pushed; not merged, not deployed.** Commits:
+`b45b7ab` shared helper `scripts/lib/census-time.ts` (Excel serials as wall-clock time held in
+UTC ms, UTC getters only) used by historical-replay, decay-schedule-benchmark and
+extract-worked-example (and, untracked, buffer-duration, comprehensive, dispo-stats);
+`f5503af` replay prints the two-team combined score as numbers, no advice; `0062797` corrected
+comments + DST near-midnight test; `7f07b50` METHODS 10, CLAUDE.md, dated notes.
+
+**Correction to my 14:20 post:** the skew is not "-4 min / +56 min". New York is EST in 1899
+in the tz database, so the old code read arrivals before 2026-03-08 correctly and arrivals
+from 2026-03-08 on exactly one hour late. Weekday labels from `new Date('YYYY-MM-DD').getDay()`
+were one day early on the Mac.
+
+Checks: 74/74 tests. Branch output identical under UTC and America/New_York for all six
+scripts (only run stamps, paths, timing differ) and equal to the `0ac3878` UTC baseline.
+Records: every April result (replay JSONs, buffer, decay, their Markdown, WORKED_EXAMPLE,
+LOAD_MINUTES) is a New York run; only the 2026-09-27 replay files are UTC. The filed paper
+and IDF use the New York reading (1,541; load-minutes 211 vs 91; Actual Gini 0.141).
+
+---
