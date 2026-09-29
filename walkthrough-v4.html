@@ -1344,7 +1344,7 @@ function renderChart({ patientsShown, currentPatient, strategy = 'actual', width
 
   // X gridlines every 30 min
   const allXTicks = [-5, 0, 30, 60, 90, 120, 150];
-  const allTimeLabels = { [-5]: '09:50', 0: '09:55', 30: '10:25', 60: '10:55', 90: '11:25', 120: '11:55', 150: '12:25' };
+  const allTimeLabels = Object.fromEntries(allXTicks.map(x => [x, WK.clock(x)]));
   const xTicks = allXTicks.filter(x => x >= xStart && x <= xEnd)
     // Suppress the 09:50 tick whenever the chart starts at -5: at any plot
     // width it ends up crowding the 09:55 label to the point of overlap.
@@ -1506,21 +1506,21 @@ const arrive = n => ({ kind: 'arrive', n, highlights: [HIST[n - 1].suggested], p
 const place = n => ({ kind: 'place', n, highlights: [HIST[n - 1].actual], disagree: HIST[n - 1].suggested !== HIST[n - 1].actual, patientsShown: n, currentPatient: n, at: WK.ARRIVALS[n - 1].t });
 const S955_PHASES = [
   {
-    time: '09:54 AM',
+    time: `${WK.clock(-1)}`,
     heading: 'All three teams start with zero patients.',
     subtitle: 'Infinite capacities all around, no wrong decision.',
     highlights: [], patientsShown: 0, currentPatient: null, at: 0,
     cutoffMinute: -1,
   },
   {
-    time: '09:55 · <span style="color:var(--purple)">PATIENT 1</span>',
+    time: `${WK.clock(0)} · <span style="color:var(--purple)">PATIENT 1</span>`,
     heading: 'A <span style="color:var(--purple)">purple</span> patient arrives.',
     subtitle: '<span style="color:#2e7d32">Formula recommends any of these teams.</span>',
     ...arrive(1), highlights: ['T1', 'T2', 'T3'],
     cutoffMinute: -1,
   },
   {
-    time: '09:55 · <span style="color:var(--purple)">PATIENT 1</span>',
+    time: `${WK.clock(0)} · <span style="color:var(--purple)">PATIENT 1</span>`,
     heading: 'A <span style="color:var(--purple)">purple</span> patient arrives.',
     subtitle: 'Historical routing sends it to Team 1. No disagreements here.<br><span style="color:#2e7d32">Formula recommends any of these teams.</span>',
     ...place(1),
