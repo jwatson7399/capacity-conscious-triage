@@ -1,6 +1,6 @@
 // © 2026 New York University. All rights reserved.
 //
-// How it works: "Walk through a real morning" opens the slide walkthrough
+// How it works: "Walk through the method" opens the slide walkthrough
 // (public/walkthrough-v4.html) full screen. Its numbers come from
 // public/walkthrough-model.js, which src/walkthrough/walkthroughModel.test.ts ties to the
 // engine. The top bar or Escape returns to How it works.
@@ -34,14 +34,14 @@ export default function WalkthroughFrame({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Walk through a real morning"
+    <div role="dialog" aria-modal="true" aria-label="Walk through the method"
       style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
       <header className="appbar" style={{ padding: '6px 12px', maxWidth: 'none', borderBottom: '1px solid var(--line)' }}>
         <button className="btn quiet sm" onClick={onClose}>‹ How it works</button>
         <span className="sp" />
-        <span className="sub">Walk through a real morning</span>
+        <span className="sub">Walk through the method</span>
       </header>
-      <iframe ref={frame} src={src} title="Walk through a real morning"
+      <iframe ref={frame} src={src} title="Walk through the method"
         onLoad={onLoad}
         style={{ flex: 1, width: '100%', border: 0, display: 'block' }} />
     </div>

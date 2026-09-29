@@ -87,8 +87,8 @@ export function HowItWorks({ onBack, startWalk = false }: { onBack: () => void; 
       <p>Patient load fades over time. A Red counts for {countMinutes('tier_one')} minutes, a Yellow for {countMinutes('tier_two')} and a Purple for {countMinutes('tier_three')}, shrinking steadily until the patient no longer counts. That keeps the number close to how busy the team is now, not how busy it was at the start of the shift.</p>
       <p>The suggestion is advice. The charge nurse places every patient, and can send a patient elsewhere with a reason whenever the board does not match what is happening at the bedside.</p>
       <div style={{ margin: '24px 0 8px' }}>
-        <button className="btn primary lg full" onClick={() => setWalk(true)}>Walk through a real morning ›</button>
-        <p style={{ fontSize: 13, marginTop: 8, textAlign: 'center' }}>Eight real arrivals on one morning, step by step, then what the formula would have done.</p>
+        <button className="btn primary lg full" onClick={() => setWalk(true)}>Walk through the method ›</button>
+        <p style={{ fontSize: 13, marginTop: 8, textAlign: 'center' }}>Why round robin falls short, how the formula works, then one real morning replayed step by step.</p>
       </div>
       {walk && <WalkthroughFrame onClose={() => setWalk(false)} />}
     </Page>

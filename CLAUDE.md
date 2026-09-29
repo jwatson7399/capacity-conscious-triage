@@ -184,8 +184,8 @@ Carbon rebuild (branch `carbon-rebuild`, 2026-09-28): a new interface on the unc
 - `src/components/`: pre-Carbon components, now used only by the lab.
 - `archive/`: files moved out of the build (`MethodologyDeepDive`, old `HelpSection`,
   `EvidenceWalkthrough`). Never imported or shipped.
-- `public/walkthrough-v4.html`: the slide walkthrough, opened from How it works ("Walk through a real
-  morning", `src/app/WalkthroughFrame.tsx`; `?walkthrough` opens it directly). Every number on it comes
+- `public/walkthrough-v4.html`: the slide walkthrough, opened from How it works ("Walk through the
+  method", `src/app/WalkthroughFrame.tsx`; `?walkthrough` opens it directly). Every number on it comes
   from `public/walkthrough-model.js` (one weights table, the December 29 rosters and arrivals, the
   engine's ranking). `src/walkthrough/walkthroughModel.test.ts` fails if that file drifts from
   `constants.ts` or the engine, or if a slide goes back to typed-in numbers or em dashes. If the weights
