@@ -1,6 +1,7 @@
 // © 2026 New York University. All rights reserved.
-// Decorative art for the home screen (Roundtable 2026-09-28, Decision 28): the CCT gauge mark and
-// the faint "capacity skyline" behind the title. Both are aria-hidden and carry no data.
+// Decorative art (Roundtable 2026-09-28, Decision 28): the CCT gauge mark, shown top left on every
+// screen header, and the faint "capacity skyline" behind the home title. Both are aria-hidden and
+// carry no data.
 import type { CSSProperties } from 'react';
 
 /** CCT with a small capacity column above each letter, in the board's column shades. */

@@ -9,6 +9,7 @@ import { AssignPanel, OverrideSheet } from './Assign';
 import ActivityDrawer from './ActivityDrawer';
 import TeamDetail from './TeamDetail';
 import Sheet, { Confirm, Copyright, SheetHeader } from './Sheet';
+import { CctMark } from './HomeArt';
 
 export type BoardMode = 'live' | 'demo' | 'tour';
 
@@ -144,9 +145,10 @@ export default function Board({ mode, dark, onToggleDark, onHome, onHelp, onHow,
   return (
     <div className="board-shell">
       <header className="appbar boardbar">
+        <CctMark />
+        <span className="brand-sep" aria-hidden="true" />
         <div className="titleblock">
-          <span className="ttl">A-side</span>
-          {isDemo && <span className="demo-badge">{mode === 'tour' ? 'Tour · Sample data' : 'Demo · Sample data'}</span>}
+          {isDemo && <span className="demo-badge"><span>{mode === 'tour' ? 'Tour' : 'Demo'} ·</span> <span>Sample data</span></span>}
         </div>
         <span className="sp" />
         <span className={`live${paused ? ' paused' : ''}`} title={paused ? 'Paused' : 'Live'}><i /><span className="live-word">{paused ? 'Paused' : 'Live'}</span></span>

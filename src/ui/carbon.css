@@ -303,7 +303,8 @@
 @media (max-width: 520px) {
   .cct .boardbar .ttl { font-size: 20px; }
   .cct .titleblock { flex-direction: column; align-items: flex-start; }
-  .cct .titleblock .demo-badge { font-size: 10px; padding: 2px 6px; }
+  .cct .titleblock .demo-badge { font-size: 10px; padding: 3px 6px; flex-direction: column; align-items: flex-start; gap: 0; line-height: 1.15; }
+  .cct .boardbar .brand-sep { display: none; }
   .cct .live-word { display: none; }
 }
 .cct .uchip .ring { width: 18px; height: 18px; border-radius: 50%; background: conic-gradient(var(--sig) var(--p), var(--line) 0); display: grid; place-items: center; }
@@ -459,7 +460,8 @@
 @media (max-width: 480px) { .cct .home .br-narrow { display: inline; } }
 
 /* CCT gauge mark (HomeArt.tsx): a capacity column in a faint track above each letter */
-.cct .cct-mark { display: flex; gap: 2px; align-items: flex-end; }
+.cct .cct-mark { display: flex; gap: 2px; align-items: flex-end; flex-shrink: 0; }
+.cct .brand-sep { width: 1px; height: 30px; background: var(--line2); flex-shrink: 0; }
 .cct .cct-mark-col { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .cct .cct-mark-track {
   display: flex; flex-direction: column; justify-content: flex-end; width: 8px; height: 21px; border-radius: 2px;

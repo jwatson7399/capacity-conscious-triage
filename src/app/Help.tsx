@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { CAPACITY_WEIGHTS, DECEASED_BUFFER_MS, FLOAT_MODIFIER_MULTIPLIERS } from '../constants';
 import { ACUITIES, ACUITY_NAME, ROLE_LONG, ROLE_ORDER, baseWeight, countMinutes } from '../ui/model';
 import WalkthroughFrame from './WalkthroughFrame';
+import { CctMark } from './HomeArt';
 
 function Page({ title, onBack, children }: { title: string; onBack: () => void; children: React.ReactNode }) {
   useEffect(() => {
@@ -16,6 +17,8 @@ function Page({ title, onBack, children }: { title: string; onBack: () => void; 
   return (
     <div className="overlay-page" style={{ position: 'fixed', inset: 0, zIndex: 80, overflowY: 'auto', background: 'var(--bg)' }} role="dialog" aria-modal="true" aria-label={title}>
       <header className="appbar">
+        <CctMark />
+        <span className="brand-sep" aria-hidden="true" />
         <button className="btn quiet" onClick={onBack} autoFocus>‹ Back</button>
         <span className="ttl" style={{ fontSize: 20 }}>{title}</span>
       </header>
@@ -78,19 +81,19 @@ export function Help({ onBack }: { onBack: () => void }) {
   );
 }
 
-export function HowItWorks({ onBack, startWalk = false }: { onBack: () => void; startWalk?: boolean }) {
+export function HowItWorks({ onBack, onHome, startWalk = false }: { onBack: () => void; onHome?: () => void; startWalk?: boolean }) {
   const [walk, setWalk] = useState(startWalk);
   return (
     <Page title="How it works" onBack={onBack}>
       <p>Round-robin gives each team the next patient in turn. It does not look at who is on each team or how sick their current patients are.</p>
-      <p>This board does. For each team it adds up provider strength (an attending counts more than an intern) and divides by patient load (a Red counts more than a Purple, and recent patients count more than ones placed hours ago). The team with the most room for its staffing is suggested next.</p>
+      <p>This board does. For each team it adds up <b>provider strength</b> (a senior resident counts more than an intern) and divides by <b>patient load</b> (a Red counts more than a Purple, and recent patients count more than ones placed hours ago). That ratio is the team's <b>capacity</b>: its real room for one more patient. The highest capacity is suggested next.</p>
       <p>Patient load fades over time. A Red counts for {countMinutes('tier_one')} minutes, a Yellow for {countMinutes('tier_two')} and a Purple for {countMinutes('tier_three')}, shrinking steadily until the patient no longer counts. That keeps the number close to how busy the team is now, not how busy it was at the start of the shift.</p>
       <p>The suggestion is advice. The charge nurse places every patient, and can send a patient elsewhere with a reason whenever the board does not match what is happening at the bedside.</p>
       <div style={{ margin: '24px 0 8px' }}>
         <button className="btn primary lg full" onClick={() => setWalk(true)}>Walk through the method ›</button>
         <p style={{ fontSize: 13, marginTop: 8, textAlign: 'center' }}>Why round robin falls short, how the formula works, then one real morning replayed step by step.</p>
       </div>
-      {walk && <WalkthroughFrame onClose={() => setWalk(false)} />}
+      {walk && <WalkthroughFrame onClose={() => setWalk(false)} onHome={onHome} />}
     </Page>
   );
 }

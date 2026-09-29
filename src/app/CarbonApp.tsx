@@ -65,7 +65,7 @@ function Screens() {
     {screen === 'demo' && <ShiftProvider><Ticker /><Demo {...common} /></ShiftProvider>}
     {screen === 'tour' && <ShiftProvider><Ticker /><Tour {...common} onExit={home} onDemo={() => go('demo')} /></ShiftProvider>}
     {overlay === 'help' && <Help onBack={closeOverlay} />}
-    {overlay === 'how' && <HowItWorks onBack={closeOverlay} startWalk={hasParam('walkthrough')} />}
+    {overlay === 'how' && <HowItWorks onBack={closeOverlay} onHome={() => { closeOverlay(); home(); }} startWalk={hasParam('walkthrough')} />}
   </>;
 }
 

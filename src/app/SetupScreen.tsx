@@ -8,6 +8,7 @@ import { uid } from '../uid';
 import { RoleSelect } from './TeamDetail';
 import { loadDraft, saveDraft, type DraftEntry, type DraftTeam } from './draft';
 import Sheet, { Confirm, SheetHeader } from './Sheet';
+import { CctMark } from './HomeArt';
 
 function Roster({ team, entries, onChange, onAdd, onRemove }: {
   team: DraftTeam;
@@ -157,6 +158,8 @@ export default function SetupScreen({ onHome, onStart }: { onHome: () => void; o
   return (
     <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
       <header className="appbar">
+        <CctMark />
+        <span className="brand-sep" aria-hidden="true" />
         <div><div className="ttl">Start shift</div><div className="sub">Draft saved on this device</div></div>
         <span className="sp" />
         <button className="btn quiet" onClick={onHome}>‹ Home</button>
