@@ -36,7 +36,7 @@
   --scrim: rgba(8, 10, 12, 0.38);
   --danger: hsl(360 57% 38%);
 
-  --f-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --f-ui: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --f-num: 'IBM Plex Sans', system-ui, sans-serif;
 
   min-height: 100vh;
@@ -449,12 +449,38 @@
 }
 
 /* ---------- home ---------- */
-.cct .home { display: flex; flex-direction: column; min-height: 100dvh; }
+.cct .home { display: flex; flex-direction: column; min-height: 100dvh; overflow-x: clip; }
 .cct .home main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
 .cct .home .hero { width: 100%; max-width: 460px; }
-.cct .home h1 { font-size: 48px; line-height: 1.08; font-weight: 500; letter-spacing: -1.4px; margin: 0 0 16px; text-align: center; text-shadow: 0 1px 3px #00000033; }
-.cct .home p.lede { color: var(--tx2); font-size: 15px; margin: 0 0 24px; text-align: center; }
-.cct .home .monogram { font-size: 13px; font-weight: 700; line-height: .95; text-align: center; color: var(--tx); }
+.cct .home h1 { position: relative; font-size: 48px; line-height: 1.08; font-weight: 550; letter-spacing: -1.3px; margin: 0 0 16px; text-align: center; text-shadow: 0 1px 3px #00000033; }
+.cct .home p.lede { position: relative; color: var(--tx2); font-size: 15px; margin: 0 0 24px; text-align: center; }
+.cct .home .title-art { position: relative; }
+.cct .home .br-narrow { display: none; }
+@media (max-width: 480px) { .cct .home .br-narrow { display: inline; } }
+
+/* CCT gauge mark (HomeArt.tsx): a capacity column in a faint track above each letter */
+.cct .cct-mark { display: flex; gap: 2px; align-items: flex-end; }
+.cct .cct-mark-col { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.cct .cct-mark-track {
+  display: flex; flex-direction: column; justify-content: flex-end; width: 8px; height: 21px; border-radius: 2px;
+  background: color-mix(in srgb, var(--tx) 8%, transparent);
+}
+.cct .cct-mark-track > span { display: block; width: 8px; border-radius: 2px; }
+.cct .cct-mark-letter { width: 10px; text-align: center; font-size: 13px; font-weight: 700; line-height: 13px; color: var(--tx); }
+
+/* Capacity skyline (HomeArt.tsx): faint towers behind the title. Each fill rises slowly and
+   drops quickly on its own loop. Still for reduced motion. */
+.cct .skyline { position: absolute; left: 50%; top: -22px; margin-left: -360px; color: var(--tx); pointer-events: none; }
+.cct .skyline-fill {
+  transform-box: fill-box; transform-origin: 50% 100%;
+  animation-name: cct-skyline; animation-iteration-count: infinite;
+}
+@keyframes cct-skyline {
+  0% { transform: scaleY(.55); animation-timing-function: linear; }
+  82% { transform: scaleY(var(--hi)); animation-timing-function: cubic-bezier(.2, .7, .3, 1); }
+  88%, 100% { transform: scaleY(.55); }
+}
+@media (prefers-reduced-motion: reduce) { .cct .skyline-fill { animation: none; } }
 
 /* ---------- prose (help, how it works) ---------- */
 .cct .prose { max-width: 680px; margin: 0 auto; padding: 8px 16px 40px; font-size: 15px; line-height: 1.6; }

@@ -173,7 +173,8 @@ Carbon rebuild (branch `carbon-rebuild`, 2026-09-28): a new interface on the unc
 - `src/ui/model.ts`: display helpers (infinity rule, gauge scale, timers). `src/ui/samples.ts`: demo and
   tour sample shifts (made-up names) and the synthetic schedule loader. `src/ui/carbon.css`: Carbon tokens
   and styles (light default since 2026-09-28, dark optional); Tailwind v4 theme values in `src/index.css` point at them.
-- `src/app/`: the Carbon interface. `CarbonApp` (screens), `Home`, `SetupScreen`, `Board` (`Gauge`,
+- `src/app/`: the Carbon interface. `CarbonApp` (screens), `Home` (with `HomeArt`: the CCT gauge mark and
+  the animated capacity skyline, decorative only), `SetupScreen`, `Board` (`Gauge`,
   `Ledger`, `Assign`, `ActivityDrawer`), `TeamDetail`, `Demo`, `Tour`, `Help`/`HowItWorks`, `Sheet`.
   The live shift's `ShiftProvider` stays mounted, so Home never wipes a shift; demo and tour mount their
   own providers and cannot reach it.

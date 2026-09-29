@@ -5,7 +5,7 @@
 /* Carbon tokens as Tailwind v4 theme values. The values live as CSS variables on .cct
    (src/ui/carbon.css) and switch with dark mode, so these utilities follow the theme. */
 @theme inline {
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif;
   --font-num: 'IBM Plex Sans', system-ui, sans-serif;
   --color-cct-bg: var(--bg);
   --color-cct-card: var(--card);
@@ -26,7 +26,7 @@ body {
   margin: 0;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 .patient-id {

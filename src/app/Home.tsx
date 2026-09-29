@@ -2,6 +2,7 @@
 import { useShift } from '../context/ShiftContext';
 import { clock } from '../ui/model';
 import { draftCount } from './draft';
+import { CapacitySkyline, CctMark } from './HomeArt';
 
 export default function Home({ dark, onToggleDark, onStart, onResume, onDemo, onTour, onHow }: {
   dark: boolean;
@@ -20,14 +21,17 @@ export default function Home({ dark, onToggleDark, onStart, onResume, onDemo, on
   return (
     <div className="home">
       <header className="appbar">
-        <div className="monogram" aria-hidden="true">C<br />C<br />T</div>
+        <CctMark />
         <span className="sp" />
         <span className="clock num">{clock(state.now)}</span>
       </header>
       <main>
         <section className="hero">
-          <h1>Capacity<br />Conscious<br />Triage</h1>
-          <p className="lede">Choose the best team for the next patient,<br />every time.</p>
+          <div className="title-art">
+            <CapacitySkyline />
+            <h1>Capacity<br />Conscious<br />Triage</h1>
+            <p className="lede">Choose the best team for the next patient,<br />every time.</p>
+          </div>
           {running
             ? <button className="btn primary lg full" onClick={onResume}>Resume shift →</button>
             : <button className="btn primary lg full" onClick={onStart}>Start shift →</button>}
@@ -47,7 +51,7 @@ export default function Home({ dark, onToggleDark, onStart, onResume, onDemo, on
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <button className="pill" onClick={onToggleDark} aria-pressed={dark}>{dark ? 'Dark mode on' : 'Light mode on'}</button>
         </div>
-        <div className="foot">© 2026 New York University · Advisory only. You make every assignment.</div>
+        <div className="foot">© 2026 New York University · Advisory only.<br className="br-narrow" /> You make every assignment.</div>
       </footer>
     </div>
   );
