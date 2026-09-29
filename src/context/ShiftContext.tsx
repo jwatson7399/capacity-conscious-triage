@@ -285,6 +285,12 @@ export function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState
       return { ...state, providers };
     }
 
+    case 'CORRECT_COLOR': {
+      const p = state.patients.find(x => x.id === action.patientId);
+      if (!p || p.acuity === action.toTier) return state;
+      return { ...state, patients: state.patients.map(x => x.id === action.patientId ? { ...x, acuity: action.toTier } : x) };
+    }
+
     case 'UPGRADE_PATIENT': {
       // Upgrade to any higher color (Decision 14): the patient restarts at the new
       // color's full weight and count time. Default target is Red.
@@ -393,7 +399,9 @@ export function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState
 
     case 'SIGNOUT_PATIENTS': {
       const patients = state.patients.map(p =>
-        p.assignedTeamId === action.fromTeamId ? { ...p, assignedTeamId: action.toTeamId } : p
+        p.assignedTeamId === action.fromTeamId
+          ? { ...p, assignedTeamId: action.toTeamId, signouts: [...(p.signouts ?? []), { fromTeamId: action.fromTeamId, toTeamId: action.toTeamId, at: now }] }
+          : p
       );
       // A closed team stays closed after sign-out; only Reopen brings it back (Decision 12).
       return { ...state, patients };

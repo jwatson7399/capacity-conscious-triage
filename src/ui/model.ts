@@ -120,9 +120,15 @@ export const GAUGE_TICKS: [number, string][] = [
 
 // ---------- time ----------
 
+/** 12-hour time, e.g. "2:57 PM". */
 export function clock(ms: number): string {
   const d = new Date(ms);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return hourMinute(d.getHours(), d.getMinutes());
+}
+
+/** 12-hour label for an hour and minute of the day, e.g. hourMinute(14, 5) is "2:05 PM". */
+export function hourMinute(h: number, m = 0): string {
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
 }
 
 export function duration(mins: number): string {

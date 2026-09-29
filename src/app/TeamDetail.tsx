@@ -11,7 +11,7 @@ import {
 import Sheet, { Confirm, SheetHeader } from './Sheet';
 
 type Dialog =
-  | { kind: 'upgrade' | 'downgrade' | 'deceased' | 'reassign' | 'float'; patient: Patient }
+  | { kind: 'upgrade' | 'downgrade' | 'deceased' | 'reassign' | 'float' | 'correct'; patient: Patient }
   | { kind: 'provider'; provider: Provider | null }
   | { kind: 'remove'; provider: Provider }
   | { kind: 'signout' }
@@ -23,6 +23,28 @@ const DECEASED_MIN = Math.round(DECEASED_BUFFER_MS / 60000);
 /** Colors above the current one (Red is highest). */
 function higherTiers(t: AcuityTier): AcuityTier[] {
   return ACUITIES.slice(0, ACUITIES.indexOf(t));
+}
+
+/** Fix a wrongly entered color. The patient keeps its placed time, so its weight is read at the same age. */
+function CorrectColorSheet({ p, now, onCancel, onPick }: { p: Patient; now: number; onCancel: () => void; onPick: (t: AcuityTier) => void }) {
+  return (
+    <Sheet label={`Correct color for ${p.id}`} onClose={onCancel}>
+      <SheetHeader title={`Correct color · ${p.id}`} onClose={onCancel}
+        sub={`Entered as ${ACUITY_NAME[p.acuity]}. Use this when the color was wrong; the placed time (${clock(p.upgradedAt ?? p.assignedAt)}) stays, unlike an upgrade.`} />
+      <div className="opts">
+        {ACUITIES.filter(t => t !== p.acuity).map(t => {
+          const c = contribution({ ...p, acuity: t }, now);
+          return (
+            <button key={t} data-acuity={ACUITY_CLASS[t]} className="opt" onClick={() => onPick(t)}>
+              <span className={`gl ${ACUITY_CLASS[t]}`} aria-hidden="true">{ACUITY_NAME[t][0]}</span>
+              <span><b>{ACUITY_NAME[t]}</b><small className="num">would add {c.toFixed(2)} load now</small></span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="sheet-actions"><button className="btn" onClick={onCancel}>Cancel</button></div>
+    </Sheet>
+  );
 }
 
 function UpgradeSheet({ p, onCancel, onPick }: { p: Patient; onCancel: () => void; onPick: (t: AcuityTier) => void }) {
@@ -112,49 +134,63 @@ function PatientCard({ p, now, onAction }: { p: Patient; now: number; onAction: 
         </span>
       </div>
       <div className="meta num">Placed {clock(p.assignedAt)}, {ago(p.assignedAt, now)}{p.upgradedAt ? ` · upgraded ${clock(p.upgradedAt)}` : ''}</div>
+      {p.signouts?.map((o, i) => <div key={i} className="meta signed num">Signed out from {teamName(o.fromTeamId)} at {clock(o.at)}</div>)}
       <div className="contrib"><span className="num">{c.toFixed(2)}</span><small className="muted">load contribution{fm !== 'none' ? ` (${FLOAT_MODIFIER_LABELS[fm]}, ${Math.round(FLOAT_MODIFIER_MULTIPLIERS[fm] * 100)}%)` : ''}</small></div>
       <div className="track"><i style={{ width: `${Math.min(100, c / baseWeight('tier_one') * 100)}%`, background: `var(--${cls}-fill)` }} /></div>
       <small className="muted">{p.deceased ? 'Not counted (deceased)' : primary ? 'Not counted (float primary)' : running ? `${duration(left)} until no longer counted` : 'No longer counted'}</small>
       <div className="acts">
         <button className="btn sm" disabled={p.acuity === 'tier_one'} onClick={() => onAction('upgrade', p)}>Upgrade{p.acuity === 'tier_one' ? '' : '…'}</button>
+        <button className="btn sm" onClick={() => onAction('correct', p)}>Correct color</button>
         <button className="btn sm" onClick={() => onAction('downgrade', p)}>Downgrade</button>
         <button className="btn sm" onClick={() => onAction('reassign', p)}>Reassign</button>
         <button className="btn sm" disabled={!!p.deceased} onClick={() => onAction('deceased', p)}>{p.deceased ? 'Deceased' : 'Mark deceased'}</button>
-        <button className="btn sm" onClick={() => onAction('float', p)}>Float: {fm === 'none' ? 'None' : `${FLOAT_MODIFIER_LABELS[fm]}${p.floatAttendingName ? ` · ${p.floatAttendingName}` : ''}`}</button>
+        <button className="btn sm" onClick={() => onAction('float', p)}>{fm === 'none' ? 'Give to float' : `${fm === 'float_primary' ? 'Float' : FLOAT_MODIFIER_LABELS[fm]}${p.floatAttendingName ? ` · ${p.floatAttendingName}` : ''}`}</button>
       </div>
     </article>
   );
 }
 
+/**
+ * Float for a patient already on a team. Only float primary is offered: the float takes the
+ * patient and the team carries none of its load. Float supervising is hidden until attendings
+ * can enter it after triage (Roundtable Decision 37); a patient already set to it still shows it.
+ */
 function FloatSheet({ p, names, onCancel, onPick }: { p: Patient; names: string[]; onCancel: () => void; onPick: (m: FloatModifier, name?: string) => void }) {
   const [typed, setTyped] = useState('');
   const list = names.length ? names : typed.trim() ? [typed.trim()] : [];
   const pct = (m: FloatModifier) => Math.round(FLOAT_MODIFIER_MULTIPLIERS[m] * 100);
   return (
-    <Sheet label={`Float modifier for ${p.id}`} onClose={onCancel}>
-      <SheetHeader title={`Float modifier · ${p.id}`} onClose={onCancel}
-        sub={`Float supervising: this patient counts ${pct('float_supervising')}% toward the team. Float primary: it counts ${pct('float_primary')}%.`} />
+    <Sheet label={`Give ${p.id} to the float`} onClose={onCancel}>
+      <SheetHeader title={`Give to float · ${p.id}`} onClose={onCancel}
+        sub={`The float takes this patient. It stays listed on ${teamName(p.assignedTeamId)} but adds no load there.`} />
       <div className="opts">
-        <button className={`opt${!p.floatModifier ? ' on' : ''}`} onClick={() => onPick('none')}><b>None</b></button>
+        <button className={`opt${!p.floatModifier || p.floatModifier === 'none' ? ' on' : ''}`} onClick={() => onPick('none')}>
+          <span><b>No float</b><small>{teamName(p.assignedTeamId)} keeps the patient</small></span>
+        </button>
+        {p.floatModifier === 'float_supervising' && (
+          <button className="opt on" onClick={onCancel}>
+            <span><b>{FLOAT_MODIFIER_LABELS.float_supervising}</b><small>{p.floatAttendingName ? `Dr. ${p.floatAttendingName} · ` : ''}counts {pct('float_supervising')}% (set earlier)</small></span>
+          </button>
+        )}
         {names.length === 0 && (
           <div>
             <div className="lbl"><label htmlFor="float-name">Float attending</label></div>
             <input id="float-name" value={typed} onChange={e => setTyped(e.target.value)} placeholder="Last name" maxLength={60} />
           </div>
         )}
-        {list.map(n => (['float_supervising', 'float_primary'] as FloatModifier[]).map(m => (
-          <button key={n + m} className={`opt${p.floatModifier === m && p.floatAttendingName === n ? ' on' : ''}`} onClick={() => onPick(m, n)}>
-            <span><b>{FLOAT_MODIFIER_LABELS[m]}</b><small>Dr. {n} · counts {pct(m)}%</small></span>
+        {list.map(n => (
+          <button key={n} className={`opt${p.floatModifier === 'float_primary' && p.floatAttendingName === n ? ' on' : ''}`} onClick={() => onPick('float_primary', n)}>
+            <span><b>Dr. {n}</b><small>Float takes the patient · counts {pct('float_primary')}%</small></span>
           </button>
-        )))}
+        ))}
       </div>
       <div className="sheet-actions"><button className="btn" onClick={onCancel}>Cancel</button></div>
     </Sheet>
   );
 }
 
-export default function TeamDetail({ teamId, onClose, onNote }: { teamId: TeamId; onClose: () => void; onNote: (text: string) => void }) {
-  const { state, dispatch, recommendation: rec } = useShift();
+export default function TeamDetail({ teamId, onClose, onNote, onSignedOut }: { teamId: TeamId; onClose: () => void; onNote: (text: string) => void; onSignedOut?: () => void }) {
+  const { state, dispatch, recommendation: rec, capacityWeights } = useShift();
   const [tab, setTab] = useState<'patients' | 'providers'>('patients');
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const now = state.now;
@@ -203,12 +239,20 @@ export default function TeamDetail({ teamId, onClose, onNote }: { teamId: TeamId
           {providers.length === 0 && <p style={{ marginTop: 14 }}>No providers on this team.</p>}
           {providers.map(p => (
             <div key={p.id} className="prov">
-              <div className="who"><b>{providerLabel(p)}</b><small>{ROLE_LONG[p.type]}</small></div>
+              <div className="who"><b>{providerLabel(p)}</b><small>{ROLE_LONG[p.type]} <span className="str num">Strength {capacityWeights[p.type]}</span></small></div>
               <button className="btn sm" onClick={() => setDialog({ kind: 'provider', provider: p })}>Swap</button>
               <button className="btn sm" onClick={() => setDialog({ kind: 'remove', provider: p })}>Remove</button>
             </div>
           ))}
           <button className="btn full" style={{ marginTop: 14 }} onClick={() => setDialog({ kind: 'provider', provider: null })}>+ Add provider</button>
+          <details className="quiet scale">
+            <summary>Provider strength scale</summary>
+            <p>Team strength is the sum of its providers' strengths. The values are fixed for the study.</p>
+            <table>
+              <thead><tr><th>Provider</th><th>Strength</th></tr></thead>
+              <tbody>{ROLE_ORDER.map(r => <tr key={r}><td>{ROLE_LONG[r]}</td><td className="num">{capacityWeights[r]}</td></tr>)}</tbody>
+            </table>
+          </details>
         </>}
       </div>
 
@@ -225,6 +269,8 @@ export default function TeamDetail({ teamId, onClose, onNote }: { teamId: TeamId
       </section>
       <div className="foot">© 2026 New York University</div>
 
+      {dialog?.kind === 'correct' && <CorrectColorSheet p={dialog.patient} now={now} onCancel={() => setDialog(null)}
+        onPick={t => { dispatch({ type: 'CORRECT_COLOR', patientId: dialog.patient.id, toTier: t }); done(`${dialog.patient.id} corrected to ${ACUITY_NAME[t]}`); }} />}
       {dialog?.kind === 'upgrade' && <UpgradeSheet p={dialog.patient} onCancel={() => setDialog(null)}
         onPick={t => { dispatch({ type: 'UPGRADE_PATIENT', patientId: dialog.patient.id, toTier: t }); done(`${dialog.patient.id} upgraded to ${ACUITY_NAME[t]}`); }} />}
       {dialog?.kind === 'downgrade' && <Confirm title={`Downgrade ${dialog.patient.id}?`}
@@ -237,7 +283,7 @@ export default function TeamDetail({ teamId, onClose, onNote }: { teamId: TeamId
         sub="The patient keeps its timer; this corrects which team it is counted on." from={teamId} closedTeams={state.closedTeams}
         onCancel={() => setDialog(null)} onPick={t => { dispatch({ type: 'REASSIGN_PATIENT', patientId: dialog.patient.id, toTeamId: t, reason: 'Reassigned from team detail' }); done(`${dialog.patient.id} moved to ${teamName(t)}`); }} />}
       {dialog?.kind === 'float' && <FloatSheet p={dialog.patient} names={state.floatAttendings}
-        onCancel={() => setDialog(null)} onPick={(m, n) => { dispatch({ type: 'SET_FLOAT_MODIFIER', patientId: dialog.patient.id, modifier: m, floatName: n }); done(`${dialog.patient.id} float: ${FLOAT_MODIFIER_LABELS[m]}`); }} />}
+        onCancel={() => setDialog(null)} onPick={(m, n) => { dispatch({ type: 'SET_FLOAT_MODIFIER', patientId: dialog.patient.id, modifier: m, floatName: n }); done(m === 'none' ? `${dialog.patient.id} back on ${teamName(teamId)}` : `${dialog.patient.id} given to the float${n ? `, Dr. ${n}` : ''}`); }} />}
       {dialog?.kind === 'provider' && <ProviderForm teamId={teamId} current={dialog.provider} onCancel={() => setDialog(null)}
         onSave={(name, type) => {
           if (dialog.provider) dispatch({ type: 'SWAP_PROVIDER', outProviderId: dialog.provider.id, incoming: { name, type, teamId } });
@@ -250,7 +296,7 @@ export default function TeamDetail({ teamId, onClose, onNote }: { teamId: TeamId
       {dialog?.kind === 'signout' && <TeamPicker title={`Sign out ${teamName(teamId)}`} verb="Sign out to"
         sub={`Moves all ${patients.length} patients. Their load timers keep running.${closed ? ' The team stays closed until someone reopens it.' : ''}`}
         from={teamId} closedTeams={state.closedTeams}
-        onCancel={() => setDialog(null)} onPick={t => { dispatch({ type: 'SIGNOUT_PATIENTS', fromTeamId: teamId, toTeamId: t }); done(`${teamName(teamId)} signed out to ${teamName(t)}`); }} />}
+        onCancel={() => setDialog(null)} onPick={t => { dispatch({ type: 'SIGNOUT_PATIENTS', fromTeamId: teamId, toTeamId: t }); setDialog(null); if (onSignedOut) onSignedOut(); else onNote(`${teamName(teamId)} signed out to ${teamName(t)}`); }} />}
       {dialog?.kind === 'close' && <Confirm title={`Close ${teamName(teamId)}?`}
         body={<p>Takes the team out of recommendations until someone reopens it. Its patients stay on it; move them with sign-out.</p>}
         confirmLabel="Close team" danger

@@ -8,7 +8,7 @@ import {
 } from '../ui/model';
 import Sheet, { SheetHeader } from './Sheet';
 
-export function AssignPanel({ rec, armed, floor, onArm, onFloor, onPlace, onPlaceFloor, onOther }: {
+export function AssignPanel({ rec, armed, floor, onArm, onFloor, onPlace, onPlaceFloor, onFloat, onOther }: {
   rec: Recommendation;
   armed: AcuityTier | null;
   floor: boolean;
@@ -17,6 +17,8 @@ export function AssignPanel({ rec, armed, floor, onArm, onFloor, onPlace, onPlac
   onPlace: () => void;
   /** Floor upgrade: the patient stays on the team they already belong to. */
   onPlaceFloor: (teamId: TeamId) => void;
+  /** The float takes this arrival (no load on any team). */
+  onFloat: () => void;
   onOther: () => void;
 }) {
   const s1 = rec.scores.find(s => s.teamId === rec.first);
@@ -68,10 +70,35 @@ export function AssignPanel({ rec, armed, floor, onArm, onFloor, onPlace, onPlac
             {s1 ? <>Place {ACUITY_NAME[armed]} on {teamName(s1.teamId)}
               <small className="num">{displayRatio(s1, rec.scores)} → {formatRatio(ratioAfter(s1, armed), s1.capacity, high)}</small></> : 'No eligible team'}
           </button>
+          <button className="alt" onClick={onFloat} disabled={!s1} title="The float attending takes this patient; no team load">Float</button>
           <button className="alt" onClick={onOther}>Other team</button>
         </div>
       )}
     </div>
+  );
+}
+
+/** Pick the float attending who takes a new arrival. */
+export function FloatArrivalSheet({ names, onCancel, onPick }: { names: string[]; onCancel: () => void; onPick: (name?: string) => void }) {
+  const [typed, setTyped] = useState('');
+  return (
+    <Sheet label="Give to float" onClose={onCancel}>
+      <SheetHeader title="Give to float" onClose={onCancel}
+        sub="The float attending takes this patient. It is listed on the recommended team for the record but adds no load, so that team stays first for the next patient." />
+      <div className="opts">
+        {names.map(n => <button key={n} className="opt" onClick={() => onPick(n)}><b>Dr. {n}</b></button>)}
+        {names.length === 0 && (
+          <div>
+            <div className="lbl"><label htmlFor="float-arrival-name">Float attending (optional)</label></div>
+            <input id="float-arrival-name" value={typed} onChange={e => setTyped(e.target.value)} placeholder="Last name" maxLength={60} />
+          </div>
+        )}
+      </div>
+      <div className="sheet-actions">
+        <button className="btn" onClick={onCancel}>Cancel</button>
+        {names.length === 0 && <button className="btn primary" onClick={() => onPick(typed.trim() || undefined)}>Give to float</button>}
+      </div>
+    </Sheet>
   );
 }
 

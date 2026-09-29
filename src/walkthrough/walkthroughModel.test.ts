@@ -84,7 +84,7 @@ describe('the story the slides tell', () => {
     expect(W.counts('formula')).toEqual({ T1: 4, T2: 2, T3: 2 });
     const h = W.worstPeak('actual');
     const f = W.worstPeak('formula');
-    expect([h.team, h.load.toFixed(1), W.clock(h.t)]).toEqual(['T2', '5.9', '12:02']);
+    expect([h.team, h.load.toFixed(1), W.clock(h.t)]).toEqual(['T2', '5.9', '12:02 PM']);
     expect(f.load.toFixed(1)).toBe('4.9');
   });
 

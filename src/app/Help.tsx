@@ -48,6 +48,7 @@ export function Help({ onBack }: { onBack: () => void }) {
       </ol>
       <p>To use a different team, tap <b>Other team</b>, pick the team and give a reason: continuity or bounce-back, a team or attending request, or other with a short note. The reason is saved with the assignment.</p>
       <p>Tick <b>Floor upgrade</b> when a patient already on a team gets sicker. Upgrades stay on that team, so there is no recommendation: pick the color, then the patient's team. The patient number starts with F, and the upgrade counts in that team's load at the new color's full weight, which lowers its ratio and steers the next patients elsewhere.</p>
+      <p>Tap <b>Float</b> instead of placing when the float attending takes the patient. It is listed on the recommended team for the record but adds no load, so that team stays first for the next patient.</p>
       <p>After a placement you have 30 seconds to undo it. Undo covers assignments only.</p>
 
       <h2>Team details</h2>
@@ -56,10 +57,12 @@ export function Help({ onBack }: { onBack: () => void }) {
         <li><b>Upgrade</b> to a higher color. The timer restarts at that color's full weight.</li>
         <li><b>Downgrade</b> a patient who no longer belongs on the A-side. It leaves the board.</li>
         <li><b>Reassign</b> a patient entered on the wrong team. The patient keeps its timer; this corrects which team it is counted on.</li>
+        <li><b>Correct color</b> when the color was entered wrongly. Unlike an upgrade, the patient keeps its placed time.</li>
+        <li><b>Undo later.</b> Open Shift activity: any placement, reassignment, sign-out, float change or color correction has an Undo button for the rest of the shift, as long as that patient has not been changed since. If it has, the entry offers to open the patient instead. The original entry stays in the list, marked undone.</li>
         <li><b>Mark deceased.</b> The patient's load comes off the team at once, and the team is ranked last for {Math.round(DECEASED_BUFFER_MS / 60000)} minutes (unless every open team is in the same position), shown as a tag with minutes left. The patient shows as not counted.</li>
-        <li>Set a <b>float</b> attending. Float supervising counts the patient at {pct(FLOAT_MODIFIER_MULTIPLIERS.float_supervising)}; float primary counts it at {pct(FLOAT_MODIFIER_MULTIPLIERS.float_primary)}, so it shows as not counted for this team.</li>
+        <li><b>Give to float.</b> The float attending takes the patient. It stays listed on the team but counts {pct(FLOAT_MODIFIER_MULTIPLIERS.float_primary)}%, so it shows as not counted. To relieve a team that is underwater, give the float one of that team's patients: taking the next new arrival relieves the team with the most room instead.</li>
         <li>Swap, add or remove providers.</li>
-        <li>Close the team or sign out all its patients. A closed team leaves the recommendations and stays closed until someone reopens it. Its patients move only when you sign them out.</li>
+        <li>Close the team or sign out all its patients. A closed team leaves the recommendations and stays closed until someone reopens it. Its patients move only when you sign them out. A sign-out moves each patient with its timer, so its remaining load now counts on the new team. It can be undone for 30 seconds, and each moved patient shows which team it was signed out from and when.</li>
       </ul>
       <p>Patient timers describe the model: how long the patient still adds to team load. They say nothing about clinical status or readiness for discharge.</p>
 

@@ -56,7 +56,7 @@
   --red: hsl(0 69% 78%);
   --yellow: hsl(48 85% 78%);
   --purple: #b8a1e0;
-  --purple-fill: #b8a1e0;
+  --purple-fill: #9a7bcf;
   --on-purple-fill: #111111;
 
   --bg: #0c0c0c;
@@ -157,7 +157,8 @@
 .cct .live { display: inline-flex; align-items: center; gap: 6px; color: var(--tx3); font-size: 11px; font-weight: 500; }
 .cct .live i { width: 6px; height: 6px; border-radius: 50%; background: #4f9a7c; }
 .cct .live.paused i { background: var(--tx3); }
-.cct .clock { font-size: 13px; font-weight: 500; color: var(--tx2); }
+.cct .clock { font-size: 13px; font-weight: 500; color: var(--tx2); white-space: nowrap; }
+.cct .clock small { font-size: 9px; font-weight: 600; margin-left: 2px; letter-spacing: .02em; }
 
 .cct .gcard { padding: 18px 18px 14px; }
 .cct .ghead { display: flex; align-items: baseline; gap: 10px; margin: 0 2px 16px; flex-wrap: wrap; }
@@ -253,7 +254,7 @@
 .cct .seg { display: block; height: 100%; flex: 0 0 0%; transition: flex-basis .4s linear; }
 .cct .seg.red { background: var(--red-fill); } .cct .seg.yellow { background: var(--yellow-fill); } .cct .seg.purple { background: var(--purple-fill); }
 .cct .seg.ghost { background: repeating-linear-gradient(-45deg, var(--pv) 0 3px, transparent 3px 7px); opacity: .85; }
-.cct .row .ros .str { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 600; color: var(--tx2); background: var(--soft); border: 1px solid var(--line2); border-radius: 6px; padding: 0 6px; line-height: 1.5; white-space: nowrap; }
+.cct .str, .cct .row .ros .str { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 600; color: var(--tx2); background: var(--soft); border: 1px solid var(--line2); border-radius: 6px; padding: 0 6px; line-height: 1.5; white-space: nowrap; }
 .cct .smeta { display: flex; justify-content: space-between; margin-top: 6px; font-size: 10px; color: var(--tx3); }
 .cct .legend { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; border-top: 1px solid var(--line); padding: 12px 0; font-size: 10px; color: var(--tx3); }
 .cct .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
@@ -286,7 +287,7 @@
 .cct .key small { display: block; font-size: 10px; font-weight: 500; margin-top: 3px; opacity: .85; }
 .cct .key.on { outline: 2px solid var(--cf); outline-offset: 1px; background: color-mix(in srgb, var(--cf) 18%, var(--card)); }
 .cct .key.dim { opacity: .55; }
-.cct .go { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 10px; }
+.cct .go { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; margin-top: 10px; }
 .cct .go .place {
   border: 1px solid var(--sig); border-radius: 10px; min-height: 52px; background: var(--sig); color: var(--on-sig);
   font-weight: 650; font-size: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
@@ -297,16 +298,14 @@
 .cct .go.fteams .place { background: var(--card); color: var(--tx); border-color: var(--line); font-size: 13px; }
 .cct .go.fteams .place:hover:not(:disabled) { border-color: var(--sig); }
 .cct .go .alt { border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 0 14px; font-size: 13px; color: var(--tx2); min-height: 52px; }
+.cct .go .alt:disabled { color: var(--tx3); opacity: .5; }
 
 /* ---------- header controls ---------- */
 .cct .actbtn { display: inline-flex; align-items: center; gap: 6px; }
-.cct .actbtn svg, .cct .menubtn svg { width: 16px; height: 16px; }
+.cct .actbtn svg, .cct .menubtn svg, .cct .homebtn svg { width: 16px; height: 16px; }
+.cct .homebtn, .cct .themebtn { display: inline-flex; align-items: center; }
+.cct .themebtn svg { width: 16px; height: 16px; }
 /* Light/dark switch in the board header: the current mode's icon sits on the filled knob. */
-.cct .themesw { padding: 2px; gap: 0; }
-.cct .themesw > span { display: grid; place-items: center; width: 28px; height: 26px; border-radius: 999px; color: var(--tx3); }
-.cct .themesw > span.on { background: var(--tx); color: var(--card); }
-.cct .themesw svg { width: 15px; height: 15px; }
-.cct .themesw:focus-visible { outline: 2px solid var(--sig); outline-offset: 2px; }
 .cct .uchip {
   position: fixed; bottom: calc(var(--keys-h, 200px) + max(12px, env(safe-area-inset-bottom)) + 10px); left: 50%; transform: translateX(-50%); z-index: 35; display: inline-flex; align-items: center; gap: 7px;
   box-shadow: 0 4px 14px rgba(0,0,0,.12); min-height: 36px;
@@ -319,6 +318,9 @@
   .cct .titleblock .demo-badge { font-size: 10px; padding: 3px 6px; flex-direction: column; align-items: flex-start; gap: 0; line-height: 1.15; }
   .cct .boardbar .brand-sep { display: none; }
   .cct .live-word { display: none; }
+  .cct .boardbar { gap: 4px; }
+  .cct .boardbar .clock { margin-right: 2px; }
+  .cct .boardbar .homebtn, .cct .boardbar .themebtn, .cct .boardbar .actbtn, .cct .boardbar .menubtn { padding: 0 8px; }
 }
 .cct .uchip .ring { width: 18px; height: 18px; border-radius: 50%; background: conic-gradient(var(--sig) var(--p), var(--line) 0); display: grid; place-items: center; }
 .cct .uchip .ring::after { content: ''; width: 12px; height: 12px; border-radius: 50%; background: var(--card); }
@@ -409,7 +411,7 @@
 .cct .lfil button.on { background: var(--tx); color: var(--card); border-color: var(--tx); }
 .cct .llist { flex: 1; overflow-y: auto; padding: 4px 0 30px; }
 .cct .ev { border-bottom: 1px solid var(--line); }
-.cct .ev > button { display: grid; grid-template-columns: 44px 12px 1fr 14px; gap: 10px; align-items: start; width: 100%; text-align: left; border: 0; background: transparent; padding: 12px 18px; }
+.cct .ev > button { display: grid; grid-template-columns: 58px 12px 1fr 14px; gap: 10px; align-items: start; width: 100%; text-align: left; border: 0; background: transparent; padding: 12px 18px; }
 .cct .ev > button:hover:not(:disabled) { background: var(--bg); }
 .cct .ev > button:disabled { cursor: default; opacity: 1; }
 .cct .ev .tm { font-size: 12px; color: var(--tx3); padding-top: 1px; }
@@ -417,6 +419,9 @@
 .cct .ev .dot.red { background: var(--red-fill); } .cct .ev .dot.yellow { background: var(--yellow-fill); } .cct .ev .dot.purple { background: var(--purple-fill); }
 .cct .ev .dot.hollow { background: transparent; border: 1.5px solid var(--tx3); }
 .cct .ev .t1 { font-size: 13px; font-weight: 600; }
+.cct .ev .evact { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 0 18px 10px; margin-top: -4px; }
+.cct .ev .evact small { font-size: 11px; color: var(--tx3); }
+.cct .ev .evact .btn.sm { min-height: 28px; padding: 0 10px; font-size: 12px; }
 .cct .ev .t2 { font-size: 11px; color: var(--tx3); margin-top: 2px; }
 .cct .ev .t2 .ov { color: var(--sig); font-weight: 600; }
 .cct .ev.undone .t1 { text-decoration: line-through; color: var(--tx3); }
@@ -449,6 +454,11 @@
 .cct .prov .who b { display: block; overflow-wrap: anywhere; }
 .cct .prov .who small { color: var(--tx3); }
 .cct .danger-zone { margin-top: 22px; padding-top: 14px; border-top: 2px solid var(--line); }
+.cct details.scale p { font-size: 12px; color: var(--tx3); margin: 0 0 8px; }
+.cct details.scale table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.cct details.scale th, .cct details.scale td { text-align: left; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.cct details.scale th { font-size: 11px; font-weight: 600; color: var(--tx3); }
+.cct details.scale th:last-child, .cct details.scale td:last-child { text-align: right; }
 .cct details.quiet summary { cursor: pointer; padding: 12px 0; color: var(--tx3); font-weight: 600; min-height: 44px; }
 
 /* ---------- setup ---------- */

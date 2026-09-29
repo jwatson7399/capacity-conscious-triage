@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Provider, ShiftState, TeamScore } from '../types';
 import { initialState, scoringFor, shiftReducer } from './ShiftContext';
-import { emptySession, makeSessionReducer, type SessionState } from './session';
+import { emptySession, makeSessionReducer, undoBlocked, type SessionState } from './session';
 import { formatRatio, highCount, gaugeLevel, contribution, isCounted, minutesLeft, timerRunning } from '../ui/model';
 import { getRecommendation } from '../engine/recommendation';
 import { CAPACITY_WEIGHTS, DECEASED_BUFFER_MS } from '../constants';
@@ -171,6 +171,19 @@ describe('session layer', () => {
     expect(s.shift.patients).toHaveLength(0);
   });
 
+  it('a float arrival is listed on the recommended team with no load and is not an assignment', () => {
+    let s = started();
+    s = reducer(s, { type: 'ASSIGN_TO_FLOAT', tier: 'tier_one', teamId: 1, floatName: 'Moreau' });
+    expect(s.shift.patients[0]).toMatchObject({ id: 'C-001', assignedTeamId: 1, floatModifier: 'float_primary', floatAttendingName: 'Moreau' });
+    const rec = getRecommendation(s.shift.providers, s.shift.patients, s.shift.buffers, s.shift.now, s.shift.closedTeams, scoringFor(s.shift));
+    expect(rec.scores.find(x => x.teamId === 1)!.load).toBe(0);
+    const e = s.activity.at(-1)!;
+    expect(e).toMatchObject({ kind: 'float_arrival', patientId: 'C-001', teamId: 1, floatName: 'Moreau' });
+    expect(s.activity.some(x => x.kind === 'assign')).toBe(false);
+    s = reducer(s, { type: 'UNDO_ASSIGN', eventId: e.id });
+    expect(s.shift.patients).toHaveLength(0);
+  });
+
   it('demo floor upgrades land on their own team, not the recommended one', () => {
     let s = emptySession({ ...initialState });
     s = reducer(s, { type: 'HYDRATE', shift: buildDemoShift() });
@@ -217,6 +230,73 @@ describe('session layer', () => {
     // Forward again replays the same schedule.
     s = reducer(s, { type: 'SIM_SKIP_TO_NEXT' });
     expect(s.shift.now).toBe(t1);
+  });
+
+  it('sign-out moves the load, notes it on each patient, and can be undone', () => {
+    let s = started();
+    s = reducer(s, { type: 'ASSIGN_PATIENT', tier: 'tier_one', teamId: 1, source: 'critical' });
+    s = reducer(s, { type: 'ASSIGN_PATIENT', tier: 'tier_two', teamId: 1, source: 'critical' });
+    s = { ...s, shift: { ...s.shift, now: s.shift.now + 40 * MIN } };
+    const score = (st: SessionState, t: 1 | 2 | 3) => getRecommendation(st.shift.providers, st.shift.patients, st.shift.buffers, st.shift.now, st.shift.closedTeams, scoringFor(st.shift)).scores.find(x => x.teamId === t)!.load;
+    const load1 = score(s, 1);
+    s = reducer(s, { type: 'SIGNOUT_PATIENTS', fromTeamId: 1, toTeamId: 3 });
+    expect(score(s, 1)).toBe(0);
+    expect(score(s, 3)).toBeCloseTo(load1, 10); // same timers, same load, now on Team 3
+    expect(s.shift.patients.every(p => p.signouts?.[0]?.fromTeamId === 1 && p.signouts[0].at === s.shift.now)).toBe(true);
+    const ev = s.activity.at(-1)!;
+    expect(s.undoable).toEqual({ eventId: ev.id });
+    // A patient moved on again after the sign-out stays where it was put.
+    s = reducer(s, { type: 'REASSIGN_PATIENT', patientId: 'C-002', toTeamId: 2, reason: 'x' });
+    s = reducer(s, { type: 'UNDO_ASSIGN', eventId: ev.id });
+    expect(s.undoable).toBeNull();
+    expect(s.shift.patients.find(p => p.id === 'C-001')).toMatchObject({ assignedTeamId: 1, signouts: undefined });
+    expect(s.shift.patients.find(p => p.id === 'C-002')!.assignedTeamId).toBe(2);
+    expect(score(s, 1)).toBeGreaterThan(0);
+    expect(s.activity.at(-1)).toMatchObject({ kind: 'signout_undo', teamId: 1, toTeamId: 3, patientCount: 1 });
+  });
+
+  it('undoes any logged patient action later, while the patient is unchanged since', () => {
+    let s = started();
+    s = reducer(s, { type: 'ASSIGN_PATIENT', tier: 'tier_one', teamId: 1, source: 'critical' });
+    const placed = s.activity.at(-1)!;
+    s = reducer(s, { type: 'ASSIGN_PATIENT', tier: 'tier_two', teamId: 2, source: 'critical' });
+    s = { ...s, shift: { ...s.shift, now: s.shift.now + 5 * MIN } }; // well past the toast
+    // C-001 unchanged since placement: its placement can still be undone.
+    expect(undoBlocked(s, placed.id)).toBeNull();
+    s = reducer(s, { type: 'REASSIGN_PATIENT', patientId: 'C-002', toTeamId: 3, reason: 'x' });
+    const moved = s.activity.at(-1)!;
+    s = reducer(s, { type: 'SET_FLOAT_MODIFIER', patientId: 'C-001', modifier: 'float_primary', floatName: 'Moreau' });
+    const floated = s.activity.at(-1)!;
+    // Placement of C-001 is now blocked (changed since); the float change is not.
+    expect(undoBlocked(s, placed.id)).toBe('changed');
+    s = reducer(s, { type: 'UNDO_EVENT', eventId: floated.id });
+    expect(s.shift.patients.find(p => p.id === 'C-001')!.floatModifier).toBeUndefined();
+    expect(undoBlocked(s, floated.id)).toBe('undone');
+    // With the float change undone, the placement is undoable again.
+    expect(undoBlocked(s, placed.id)).toBeNull();
+    s = reducer(s, { type: 'UNDO_EVENT', eventId: moved.id });
+    expect(s.shift.patients.find(p => p.id === 'C-002')!.assignedTeamId).toBe(2);
+    s = reducer(s, { type: 'UNDO_EVENT', eventId: placed.id });
+    expect(s.shift.patients.map(p => p.id)).toEqual(['C-002']);
+    expect(s.activity.filter(e => e.kind === 'undo').map(e => e.kind === 'undo' && e.undoesEventId)).toEqual([floated.id, moved.id, placed.id]);
+    // A blocked undo changes nothing.
+    expect(reducer(s, { type: 'UNDO_EVENT', eventId: placed.id })).toBe(s);
+  });
+
+  it('correct color keeps the placed time and can be undone', () => {
+    let s = started();
+    s = reducer(s, { type: 'ASSIGN_PATIENT', tier: 'tier_one', teamId: 1, source: 'critical' });
+    s = { ...s, shift: { ...s.shift, now: s.shift.now + 60 * MIN } };
+    const t0 = s.shift.patients[0].assignedAt;
+    s = reducer(s, { type: 'CORRECT_COLOR', patientId: 'C-001', toTier: 'tier_two' });
+    const p = s.shift.patients[0];
+    expect(p).toMatchObject({ acuity: 'tier_two', assignedAt: t0 });
+    expect(p.upgradedAt).toBeUndefined();
+    expect(contribution(p, s.shift.now)).toBeCloseTo(2 * (1 - 60 / 180), 10);
+    const e = s.activity.at(-1)!;
+    expect(e).toMatchObject({ kind: 'correct', patientId: 'C-001', acuity: 'tier_one', toAcuity: 'tier_two', teamId: 1 });
+    s = reducer(s, { type: 'UNDO_EVENT', eventId: e.id });
+    expect(s.shift.patients[0].acuity).toBe('tier_one');
   });
 
   it('reassign keeps the timer and the contribution', () => {

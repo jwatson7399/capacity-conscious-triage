@@ -1,7 +1,11 @@
 // © 2026 New York University. All rights reserved.
 import { useEffect, useRef, useState } from 'react';
+import { useShift } from '../context/ShiftContext';
+import { undoBlocked } from '../context/session';
+import { Confirm } from './Sheet';
 import { trapTab } from './focus';
 import type { ActivityEvent, AssignEvent, RatioValue, TeamSnapshot } from '../activity';
+import type { TeamId } from '../types';
 import { undoneAssignIds } from '../activity';
 import { FLOAT_MODIFIER_LABELS } from '../constants';
 import { A_SIDE, ACUITY_CLASS, ACUITY_NAME, ROLE_LONG, TRAUMA, baseWeight, clock, countMinutes, formatRatio, teamName } from '../ui/model';
@@ -29,7 +33,13 @@ function line(e: ActivityEvent, undone: Set<string>, undoneAt: Map<string, numbe
       t2: (undone.has(e.id) ? `Undone at ${clock(undoneAt.get(e.id)!)}` : 'Stays on its team · not a recommendation') + (e.auto ? ' · demo' : ''),
       dot: ACUITY_CLASS[e.acuity],
     };
-    case 'undo': return { t1: `Undid ${e.patientId}`, t2: 'Assignment reversed', dot: 'hollow' };
+    case 'float_arrival': return {
+      t1: `${e.patientId} · ${ACUITY_NAME[e.acuity]} to the float${e.floatName ? `, Dr. ${e.floatName}` : ''}`,
+      t2: undone.has(e.id) ? `Undone at ${clock(undoneAt.get(e.id)!)}` : `Listed on ${teamName(e.teamId)} · no load`,
+      dot: ACUITY_CLASS[e.acuity],
+    };
+    case 'undo': return { t1: `Undid ${e.patientId}`, t2: 'Earlier entry reversed', dot: 'hollow' };
+    case 'correct': return { t1: `${e.patientId} color corrected to ${ACUITY_NAME[e.toAcuity ?? e.acuity]}`, t2: `${teamName(e.teamId)} · was ${ACUITY_NAME[e.acuity]}; placed time kept`, dot: ACUITY_CLASS[e.toAcuity ?? e.acuity] };
     case 'reassign': return { t1: `${e.patientId} moved ${teamName(e.teamId)} → ${teamName(e.toTeamId!)}`, t2: e.reason ? `Reassigned · ${e.reason}` : 'Reassigned', dot: ACUITY_CLASS[e.acuity] };
     case 'upgrade': return { t1: `${e.patientId} upgraded to ${ACUITY_NAME[e.toAcuity ?? 'tier_one']}`, t2: `${teamName(e.teamId)} · was ${ACUITY_NAME[e.acuity]}`, dot: ACUITY_CLASS[e.toAcuity ?? 'tier_one'] };
     case 'downgrade': return { t1: `${e.patientId} downgraded`, t2: `Removed from ${teamName(e.teamId)} load`, dot: 'hollow' };
@@ -40,6 +50,7 @@ function line(e: ActivityEvent, undone: Set<string>, undoneAt: Map<string, numbe
     case 'provider_swap': return { t1: `${e.replacedName ?? 'Provider'} swapped for ${e.name}`, t2: `${ROLE_LONG[e.providerType]} · ${teamName(e.teamId)}`, dot: '' };
     case 'team_close': return { t1: `${teamName(e.teamId)} closed`, t2: 'Out of recommendations', dot: '' };
     case 'team_reopen': return { t1: `${teamName(e.teamId)} reopened`, t2: 'Back in recommendations', dot: '' };
+    case 'signout_undo': return { t1: `Undid ${teamName(e.teamId)} sign-out`, t2: `${e.patientCount} patient${e.patientCount === 1 ? '' : 's'} back from ${teamName(e.toTeamId!)}`, dot: 'hollow' };
     case 'signout': return { t1: `${teamName(e.teamId)} signed out`, t2: `${e.patientCount} patient${e.patientCount === 1 ? '' : 's'} to ${teamName(e.toTeamId!)}`, dot: '' };
   }
 }
@@ -69,7 +80,24 @@ function AssignDetail({ e, undoneTime }: { e: AssignEvent; undoneTime?: number }
   );
 }
 
-export default function ActivityDrawer({ events, onClose }: { events: ActivityEvent[]; onClose: () => void }) {
+/** What undoing an entry will do, in one sentence. */
+function undoText(e: ActivityEvent, movedCount: number): string {
+  switch (e.kind) {
+    case 'assign': return `${e.patientId} comes off ${teamName(e.chosenTeamId)}.`;
+    case 'floor_upgrade': return `${e.patientId} comes off ${teamName(e.teamId)}.`;
+    case 'float_arrival': return `${e.patientId} comes off the board.`;
+    case 'reassign': return `${e.patientId} moves back to ${teamName(e.teamId)}, keeping its timer.`;
+    case 'correct': return `${e.patientId} goes back to ${ACUITY_NAME[e.acuity]}.`;
+    case 'float': return `${e.patientId} goes back to its previous float setting.`;
+    case 'signout': return `${movedCount} patient${movedCount === 1 ? '' : 's'} move${movedCount === 1 ? 's' : ''} back to ${teamName(e.teamId)}, keeping their timers.`;
+    default: return '';
+  }
+}
+
+export default function ActivityDrawer({ events, onClose, onOpenTeam }: { events: ActivityEvent[]; onClose: () => void; onOpenTeam?: (t: TeamId) => void }) {
+  const { state, dispatch, activity, undoable } = useShift();
+  const session = { shift: state, activity, seq: 0, undoable };
+  const [confirm, setConfirm] = useState<ActivityEvent | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const ref = useRef<HTMLDivElement>(null);
@@ -128,10 +156,22 @@ export default function ActivityDrawer({ events, onClose }: { events: ActivityEv
                 <span className="chev" aria-hidden="true">{expandable ? '▸' : ''}</span>
               </button>
               {expandable && isOpen && <AssignDetail e={e as AssignEvent} undoneTime={undoneAt.get(e.id)} />}
+              {(() => {
+                const why = undoBlocked(session, e.id);
+                if (why === null) return <div className="evact"><button className="btn sm" onClick={() => setConfirm(e)}>Undo</button></div>;
+                if (why === 'changed' && 'patientId' in e && onOpenTeam) {
+                  const p = state.patients.find(x => x.id === e.patientId);
+                  if (p) return <div className="evact"><small>Changed since.</small><button className="btn sm" onClick={() => onOpenTeam(p.assignedTeamId)}>Open {p.id}</button></div>;
+                }
+                return null;
+              })()}
             </div>
           );
         })}
       </div>
+      {confirm && <Confirm title="Undo this entry?" confirmLabel="Undo"
+        body={<p>{undoText(confirm, confirm.kind === 'signout' ? state.patients.filter(p => p.signouts?.some(o => o.fromTeamId === confirm.teamId && o.at === confirm.at) && p.assignedTeamId === confirm.toTeamId).length : 0)} The original entry stays in the log, marked undone.</p>}
+        onCancel={() => setConfirm(null)} onConfirm={() => { dispatch({ type: 'UNDO_EVENT', eventId: confirm.id }); setConfirm(null); }} />}
       <div className="foot" style={{ borderTop: '1px solid var(--line)' }}>Held in memory on this device only. Cleared when the shift ends or the page reloads. © 2026 New York University</div>
     </aside>
   </>;

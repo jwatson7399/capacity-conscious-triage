@@ -29,6 +29,8 @@ export interface Patient {
   deceased?: boolean;
   floatModifier?: FloatModifier;
   floatAttendingName?: string;
+  /** Each time the patient moved in a team sign-out, oldest first. The timer never restarts. */
+  signouts?: { fromTeamId: TeamId; toTeamId: TeamId; at: number }[];
 }
 
 export interface Buffer {
@@ -176,6 +178,8 @@ export type ShiftAction =
   | { type: 'ASSIGN_PATIENT'; tier: AcuityTier; teamId: TeamId; source: 'critical' | 'floor'; overrideReason?: string; recommendedTeamId?: TeamId }
   | { type: 'SET_PROVIDER_STATUS'; providerId: string; status: ProviderStatus }
   | { type: 'UPGRADE_PATIENT'; patientId: string; toTier?: AcuityTier }
+  /** Fix a color entered wrongly. Unlike an upgrade, the patient keeps its placed time. */
+  | { type: 'CORRECT_COLOR'; patientId: string; toTier: AcuityTier }
   | { type: 'REASSIGN_PATIENT'; patientId: string; toTeamId: TeamId; reason: string }
   | { type: 'SWAP_PROVIDER'; outProviderId: string; incoming: Omit<Provider, 'id' | 'status' | 'statusExpiresAt'> }
   | { type: 'CLOSE_TEAM'; teamId: TeamId }

@@ -8,9 +8,9 @@
 //      turn demo arrivals on or off).
 // Nothing here changes how a team is scored or ranked.
 
-import type { AcuityTier, ShiftAction, ShiftState, TeamId, Patient, Recommendation } from '../types';
+import type { AcuityTier, FloatModifier, ShiftAction, ShiftState, TeamId, Patient, Recommendation } from '../types';
 import type { ActivityEvent, NewEvent, OverrideReasonCode, TeamSnapshot } from '../activity';
-import { OVERRIDE_REASONS } from '../activity';
+import { OVERRIDE_REASONS, undoneAssignIds } from '../activity';
 import { getRecommendation, type ScoringOverrides } from '../engine/recommendation';
 import { generateTimeline, randomSeed } from '../engine/simulation';
 import { uid } from '../uid';
@@ -27,7 +27,11 @@ export type SessionOnlyAction =
   | { type: 'DEMO_ARRIVALS'; on: boolean }
   /** A patient on teamId got sicker. Stays on that team; never routed by the recommendation. */
   | { type: 'ADD_FLOOR_UPGRADE'; tier: AcuityTier; teamId: TeamId }
+  /** A new arrival the float takes: listed on teamId (the recommended team) at float primary, so no load. */
+  | { type: 'ASSIGN_TO_FLOAT'; tier: AcuityTier; teamId: TeamId; floatName?: string }
   | { type: 'UNDO_ASSIGN'; eventId: string }
+  /** Reverse one entry in the shift activity log (see undoBlocked). */
+  | { type: 'UNDO_EVENT'; eventId: string }
   /** Demo: go back to the moment of the previous arrival. */
   | { type: 'DEMO_BACK' };
 
@@ -45,7 +49,7 @@ export interface SessionState {
    * by a new sample or shift, and by the undo itself. The 30-second window is kept by the
    * board on the device clock.
    */
-  undoable: { eventId: string; patientId: string } | null;
+  undoable: { eventId: string; patientId?: string } | null;
   /**
    * Demo only, while arrivals are on: the session right after each arrival (the first is
    * the moment arrivals were turned on), so the demo can step back. Cleared by a new
@@ -55,6 +59,54 @@ export interface SessionState {
 }
 
 export const emptySession = (shift: ShiftState): SessionState => ({ shift, activity: [], seq: 0, undoable: null });
+
+/** Logged actions that the activity log can reverse. */
+const UNDOABLE = new Set<ActivityEvent['kind']>(['assign', 'floor_upgrade', 'float_arrival', 'reassign', 'signout', 'float', 'correct']);
+
+/** Patients a sign-out moved that are still where it left them. */
+function signoutMoved(shift: ShiftState, ev: ActivityEvent): Patient[] {
+  if (ev.kind !== 'signout') return [];
+  return shift.patients.filter(p => {
+    const last = p.signouts?.at(-1);
+    return p.assignedTeamId === ev.toTeamId && !!last && last.fromTeamId === ev.teamId && last.at === ev.at;
+  });
+}
+
+/** The float setting a patient had before a float change. */
+function previousFloat(activity: ActivityEvent[], ev: ActivityEvent): { modifier: FloatModifier; name: string | null } {
+  const undone = undoneAssignIds(activity);
+  const idx = activity.indexOf(ev);
+  const pid = 'patientId' in ev ? ev.patientId : '';
+  for (let i = idx - 1; i >= 0; i--) {
+    const e = activity[i];
+    if (undone.has(e.id) || !('patientId' in e) || e.patientId !== pid) continue;
+    if (e.kind === 'float') return { modifier: e.modifier, name: e.floatName };
+    if (e.kind === 'float_arrival') return { modifier: 'float_primary', name: e.floatName };
+  }
+  return { modifier: 'none', name: null };
+}
+
+/**
+ * Why a logged action cannot be undone now, or null when it can. An action is undoable while
+ * its patient is still exactly as that action left it: no later change that was not itself undone.
+ */
+export function undoBlocked(s: SessionState, eventId: string): 'kind' | 'undone' | 'gone' | 'changed' | null {
+  const idx = s.activity.findIndex(e => e.id === eventId);
+  const ev = s.activity[idx];
+  if (!ev || !UNDOABLE.has(ev.kind)) return 'kind';
+  const undone = undoneAssignIds(s.activity);
+  if (undone.has(ev.id)) return 'undone';
+  if (ev.kind === 'signout') return signoutMoved(s.shift, ev).length > 0 ? null : 'changed';
+  const pid = (ev as { patientId: string }).patientId;
+  const p = s.shift.patients.find(x => x.id === pid);
+  if (!p) return 'gone';
+  const later = s.activity.slice(idx + 1).some(e => e.kind !== 'undo' && !undone.has(e.id) && 'patientId' in e && e.patientId === pid);
+  const signedOutSince = (p.signouts ?? []).some(o => o.at >= ev.at && s.activity.slice(idx + 1).some(e => e.kind === 'signout' && !undone.has(e.id) && e.teamId === o.fromTeamId && e.at === o.at));
+  if (later || signedOutSince) return 'changed';
+  if (ev.kind === 'reassign' && p.assignedTeamId !== ev.toTeamId) return 'changed';
+  if (ev.kind === 'correct' && p.acuity !== ev.toAcuity) return 'changed';
+  return null;
+}
 
 type CoreReducer = (state: ShiftState, action: ShiftAction) => ShiftState;
 type ScoringFor = (state: ShiftState) => ScoringOverrides | undefined;
@@ -133,6 +185,43 @@ export function makeSessionReducer(core: CoreReducer, scoringFor: ScoringFor) {
     if (!s.demoRewind) return s;
     const { demoRewind, ...moment } = s;
     return { ...s, demoRewind: [...demoRewind, moment].slice(-DEMO_REWIND_MAX) };
+  }
+
+  /** Reverse one logged action, if undoBlocked allows it. The original entry stays; the undo is its own entry. */
+  function undoEvent(s: SessionState, eventId: string): SessionState {
+    if (undoBlocked(s, eventId) !== null) return s;
+    const ev = s.activity.find(e => e.id === eventId)!;
+    const before = s.shift;
+    const done = (shift: ShiftState, patientId: string) => {
+      const out = log(s, shift, [{ kind: 'undo', patientId, undoesEventId: ev.id }]);
+      return out.undoable?.eventId === ev.id ? { ...out, undoable: null } : out;
+    };
+    const setPatient = (id: string, f: (p: Patient) => Patient): ShiftState =>
+      ({ ...before, patients: before.patients.map(p => p.id === id ? f(p) : p) });
+    switch (ev.kind) {
+      case 'assign':
+      case 'floor_upgrade':
+      case 'float_arrival':
+        return done(core(before, { type: 'DOWNGRADE_PATIENT', patientId: ev.patientId }), ev.patientId);
+      case 'reassign':
+        return done(setPatient(ev.patientId, p => ({ ...p, assignedTeamId: ev.teamId })), ev.patientId);
+      case 'correct':
+        return done(setPatient(ev.patientId, p => ({ ...p, acuity: ev.acuity })), ev.patientId);
+      case 'float': {
+        const prev = previousFloat(s.activity, ev);
+        return done(setPatient(ev.patientId, p => ({ ...p, floatModifier: prev.modifier === 'none' ? undefined : prev.modifier, floatAttendingName: prev.name ?? undefined })), ev.patientId);
+      }
+      case 'signout': {
+        const moved = signoutMoved(before, ev);
+        const shift = { ...before, patients: before.patients.map(p => moved.includes(p)
+          ? { ...p, assignedTeamId: ev.teamId, signouts: p.signouts!.length > 1 ? p.signouts!.slice(0, -1) : undefined }
+          : p) };
+        const out = log(s, shift, [{ kind: 'signout_undo', teamId: ev.teamId, toTeamId: ev.toTeamId, patientCount: moved.length, undoesEventId: ev.id }]);
+        return out.undoable?.eventId === ev.id ? { ...out, undoable: null } : out;
+      }
+      default:
+        return s;
+    }
   }
 
   function log(s: SessionState, shift: ShiftState, events: NewEvent[], at?: number): SessionState {
@@ -235,12 +324,30 @@ export function makeSessionReducer(core: CoreReducer, scoringFor: ScoringFor) {
         return { ...logged, undoable: { eventId: ev.id, patientId: added.id } };
       }
 
+      case 'ASSIGN_TO_FLOAT': {
+        const placed = core(before, { type: 'ASSIGN_PATIENT', tier: action.tier, teamId: action.teamId, source: 'critical' });
+        const added = placed.patients.find(p => !before.patients.some(q => q.id === p.id));
+        if (!added) return { ...s, shift: placed };
+        const shift = core(placed, { type: 'SET_FLOAT_MODIFIER', patientId: added.id, modifier: 'float_primary', floatName: action.floatName });
+        const logged = log(s, shift, [{ kind: 'float_arrival', patientId: added.id, acuity: action.tier, teamId: action.teamId, floatName: action.floatName ?? null }]);
+        const ev = logged.activity[logged.activity.length - 1];
+        return { ...logged, undoable: { eventId: ev.id, patientId: added.id } };
+      }
+
       case 'UNDO_ASSIGN': {
-        const u = s.undoable;
-        if (!u || u.eventId !== action.eventId || !before.patients.some(p => p.id === u.patientId)) return { ...s, undoable: null };
-        const shift = core(before, { type: 'DOWNGRADE_PATIENT', patientId: u.patientId });
-        const out = log({ ...s, undoable: null }, shift, [{ kind: 'undo', patientId: u.patientId, undoesEventId: u.eventId }]);
-        return { ...out, undoable: null };
+        // The toast's quick undo: the same reversal as the activity log's, bound to its event.
+        if (!s.undoable || s.undoable.eventId !== action.eventId) return { ...s, undoable: null };
+        return { ...undoEvent(s, action.eventId), undoable: null };
+      }
+
+      case 'UNDO_EVENT':
+        return undoEvent(s, action.eventId);
+
+      case 'CORRECT_COLOR': {
+        const p = findPatient(before, action.patientId);
+        const shift = core(before, action);
+        if (!p || shift === before) return s;
+        return log(s, shift, [{ kind: 'correct', patientId: p.id, acuity: p.acuity, toAcuity: action.toTier, teamId: p.assignedTeamId }]);
       }
 
       case 'DOWNGRADE_PATIENT': {
@@ -301,7 +408,9 @@ export function makeSessionReducer(core: CoreReducer, scoringFor: ScoringFor) {
       case 'SIGNOUT_PATIENTS': {
         const count = before.patients.filter(p => p.assignedTeamId === action.fromTeamId).length;
         const shift = core(before, action);
-        return log(s, shift, [{ kind: 'signout', teamId: action.fromTeamId, toTeamId: action.toTeamId, patientCount: count }]);
+        const logged = log(s, shift, [{ kind: 'signout', teamId: action.fromTeamId, toTeamId: action.toTeamId, patientCount: count }]);
+        if (count === 0) return logged;
+        return { ...logged, undoable: { eventId: logged.activity[logged.activity.length - 1].id } };
       }
 
       case 'TICK': {

@@ -2,12 +2,13 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import type { AcuityTier, TeamId } from '../types';
 import { useShift } from '../context/ShiftContext';
-import { ACUITY_NAME, ALL_TEAMS, clock, deceasedMinutesLeft, teamName } from '../ui/model';
+import { ACUITY_NAME, ALL_TEAMS, deceasedMinutesLeft, teamName } from '../ui/model';
 import Gauge from './Gauge';
 import Ledger from './Ledger';
-import { AssignPanel, OverrideSheet } from './Assign';
+import { AssignPanel, FloatArrivalSheet, OverrideSheet } from './Assign';
 import ActivityDrawer from './ActivityDrawer';
 import TeamDetail from './TeamDetail';
+import HeaderClock from './HeaderClock';
 import Sheet, { Confirm, Copyright, SheetHeader } from './Sheet';
 import { CctMark } from './HomeArt';
 
@@ -42,6 +43,7 @@ export default function Board({ mode, dark, onToggleDark, onHome, onHelp, onHow,
   const { state, dispatch, recommendation: rec, activity, undoable } = useShift();
   const [armed, setArmed] = useState<AcuityTier | null>(tourUi?.armed ?? null);
   const [floor, setFloor] = useState(false);
+  const [floatPick, setFloatPick] = useState(false);
   const [override, setOverride] = useState(tourUi?.override ?? false);
   const [detail, setDetail] = useState<TeamId | null>(tourUi?.detail ?? null);
   const [showLog, setShowLog] = useState(tourUi?.activity ?? false);
@@ -69,13 +71,20 @@ export default function Board({ mode, dark, onToggleDark, onHome, onHelp, onHow,
     setTimer({ ...timer, eventId: undoable.eventId });
   }
   const undoEvent = timer && undoable && timer.eventId === undoable.eventId
-    ? activity.find(e => e.id === undoable.eventId && (e.kind === 'assign' || e.kind === 'floor_upgrade')) : undefined;
-  const undo = undoEvent && timer && (undoEvent.kind === 'assign' || undoEvent.kind === 'floor_upgrade')
+    ? activity.find(e => e.id === undoable.eventId && (e.kind === 'assign' || e.kind === 'floor_upgrade' || e.kind === 'float_arrival' || e.kind === 'signout')) : undefined;
+  const undo = undoEvent && timer && undoEvent.kind === 'signout'
+    ? {
+        eventId: undoEvent.id, patientId: 'sign-out', until: timer.until, startedAt: timer.startedAt,
+        text: `${teamName(undoEvent.teamId)} signed out to ${teamName(undoEvent.toTeamId!)}`,
+      }
+    : undoEvent && timer && (undoEvent.kind === 'assign' || undoEvent.kind === 'floor_upgrade' || undoEvent.kind === 'float_arrival')
     ? {
         eventId: undoEvent.id, patientId: undoEvent.patientId, until: timer.until, startedAt: timer.startedAt,
         text: undoEvent.kind === 'assign'
           ? `${undoEvent.patientId} ${ACUITY_NAME[undoEvent.acuity]} placed on ${teamName(undoEvent.chosenTeamId)}`
-          : `${undoEvent.patientId} ${ACUITY_NAME[undoEvent.acuity]} floor upgrade on ${teamName(undoEvent.teamId)}`,
+          : undoEvent.kind === 'floor_upgrade'
+            ? `${undoEvent.patientId} ${ACUITY_NAME[undoEvent.acuity]} floor upgrade on ${teamName(undoEvent.teamId)}`
+            : `${undoEvent.patientId} ${ACUITY_NAME[undoEvent.acuity]} to the float${undoEvent.floatName ? `, Dr. ${undoEvent.floatName}` : ''}`,
       }
     : null;
 
@@ -110,6 +119,16 @@ export default function Board({ mode, dark, onToggleDark, onHome, onHelp, onHow,
     startUndo();
     setArmed(null);
     setFloor(false);
+    setPlaced(n => n + 1);
+  };
+
+  // The float takes a new arrival: listed on the recommended team, no load (Decision 36).
+  const placeFloat = (floatName?: string) => {
+    if (!armed || !rec.first) return;
+    dispatch({ type: 'ASSIGN_TO_FLOAT', tier: armed, teamId: rec.first, floatName });
+    startUndo();
+    setFloatPick(false);
+    setArmed(null);
     setPlaced(n => n + 1);
   };
 
@@ -166,14 +185,15 @@ export default function Board({ mode, dark, onToggleDark, onHome, onHelp, onHow,
         </div>
         <span className="sp" />
         <span className={`live${paused ? ' paused' : ''}`} title={paused ? 'Paused' : 'Live'}><i /><span className="live-word">{paused ? 'Paused' : 'Live'}</span></span>
-        <span className="clock num">{clock(state.now)}</span>
-        <button className="pill themesw" role="switch" aria-checked={dark} aria-label="Dark mode" title={dark ? 'Switch to light mode' : 'Switch to dark mode'} onClick={onToggleDark}>
-          <span className={dark ? '' : 'on'} aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
-          </span>
-          <span className={dark ? 'on' : ''} aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" /></svg>
-          </span>
+        <HeaderClock ms={state.now} />
+        <button className="pill homebtn" onClick={onHome} aria-label="Home" title="Home">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="M3 11 12 4l9 7" /><path d="M5.5 9.5V20h13V9.5" /><path d="M10 20v-5.5h4V20" /></svg>
+        </button>
+        {/* One button, as on the walkthrough: it shows the mode you switch to. */}
+        <button className="pill themebtn" role="switch" aria-checked={dark} aria-label="Dark mode" title={dark ? 'Switch to light mode' : 'Switch to dark mode'} onClick={onToggleDark}>
+          {dark
+            ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
+            : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" /></svg>}
         </button>
         <button className="pill actbtn" onClick={() => setShowLog(true)} aria-label={`Shift activity, ${actCount} events`} data-tour="activity">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10" /></svg>
@@ -199,7 +219,8 @@ export default function Board({ mode, dark, onToggleDark, onHome, onHelp, onHow,
         <Copyright />
       </div>
 
-      <AssignPanel rec={rec} armed={armed} floor={floor} onArm={setArmed} onFloor={() => setFloor(f => !f)} onPlace={place} onPlaceFloor={placeFloor} onOther={() => setOverride(true)} />
+      <AssignPanel rec={rec} armed={armed} floor={floor} onArm={setArmed} onFloor={() => setFloor(f => !f)} onPlace={place} onPlaceFloor={placeFloor} onFloat={() => setFloatPick(true)} onOther={() => setOverride(true)} />
+      {floatPick && <FloatArrivalSheet names={state.floatAttendings} onCancel={() => setFloatPick(false)} onPick={placeFloat} />}
 
       {undoPhase === 'full' && undo && (
         <div className="utoast" role="status">{undo.text}<button onClick={doUndo}>Undo</button></div>
@@ -207,8 +228,8 @@ export default function Board({ mode, dark, onToggleDark, onHome, onHelp, onHow,
       {note && <div className="note-toast" role="status">{note}</div>}
 
       {override && <OverrideSheet rec={rec} closedTeams={state.closedTeams} initialAcuity={armed} onCancel={() => setOverride(false)} onAssign={assignOther} />}
-      {detail !== null && <TeamDetail teamId={detail} onClose={closeDetail} onNote={setNote} />}
-      {showLog && <ActivityDrawer events={activity} onClose={closeLog} />}
+      {detail !== null && <TeamDetail teamId={detail} onClose={closeDetail} onNote={setNote} onSignedOut={() => { startUndo(); closeDetail(); }} />}
+      {showLog && <ActivityDrawer events={activity} onClose={closeLog} onOpenTeam={t => { closeLog(); setDetail(t); }} />}
 
       {menu && (
         <Sheet label="Menu" onClose={() => setMenu(false)}>

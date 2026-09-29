@@ -151,12 +151,12 @@ export function providersAt(day: DaySchedule, hour: number): { providers: Provid
   };
 }
 
-/** A random day's 10:00 roster from the sample schedule; `label` names the day for the demo. */
+/** A random day's 10:00 AM roster from the sample schedule; `label` names the day for the demo. */
 export async function buildScheduledDemoShift(): Promise<{ shift: ShiftState; label: string }> {
   const days = await loadSampleSchedule();
   const day = days[Math.floor(Math.random() * days.length)];
   const hour = 10;
   const { providers, floatAttendings } = providersAt(day, hour);
   if (providers.length === 0) throw new Error('No providers on the sample schedule at that hour.');
-  return { shift: buildDemoShift({ providers, floatAttendings }), label: `${day.dayOfWeek}, ${day.date}, 10:00` };
+  return { shift: buildDemoShift({ providers, floatAttendings }), label: `${day.dayOfWeek}, ${day.date}, 10:00 AM` };
 }

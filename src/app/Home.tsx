@@ -1,6 +1,7 @@
 // © 2026 New York University. All rights reserved.
 import { useShift } from '../context/ShiftContext';
 import { clock } from '../ui/model';
+import HeaderClock from './HeaderClock';
 import { draftCount } from './draft';
 import { CapacitySkyline, CctMark } from './HomeArt';
 
@@ -23,7 +24,7 @@ export default function Home({ dark, onToggleDark, onStart, onResume, onDemo, on
       <header className="appbar">
         <CctMark />
         <span className="sp" />
-        <span className="clock num">{clock(state.now)}</span>
+        <HeaderClock ms={state.now} />
       </header>
       <main>
         <section className="hero">

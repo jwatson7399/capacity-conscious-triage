@@ -169,9 +169,13 @@ Carbon rebuild (branch `carbon-rebuild`, 2026-09-28): a new interface on the unc
 - `src/context/session.ts`: session layer around the core reducer. Records the shift activity events
   (`src/activity.ts`, JSON-safe, append-only; undo is its own event) and adds interface-only actions:
   `HYDRATE` (load a sample shift), `REMOVE_PROVIDER`, `REOPEN_TEAM`, `DEMO_ARRIVALS`, `UNDO_ASSIGN`,
-  `ADD_FLOOR_UPGRADE` (Decision 35: a floor upgrade goes on the patient's own team, never through the
+  `ASSIGN_TO_FLOAT` (Decision 36: the Assign panel's Float button lists the arrival on the recommended team at
+  float primary, logged as `float_arrival`), `ADD_FLOOR_UPGRADE` (Decision 35: a floor upgrade goes on the patient's own team, never through the
   recommendation, and is logged as `floor_upgrade`, not `assign`; the lab simulator still routes them, open item 25).
   Undo is bound to the assignment's event id and ends at any later action on that patient or a new sample.
+  Later corrections: `UNDO_EVENT` reverses one logged action (placement, floor upgrade, float arrival, reassign,
+  sign-out, float change, `CORRECT_COLOR`) for the whole shift while `undoBlocked()` finds no later, not-undone
+  change to that patient; the Shift activity drawer shows Undo or "Open patient". `CORRECT_COLOR` keeps the placed time.
 - `src/ui/model.ts`: display helpers (infinity rule, gauge scale, timers). `src/ui/samples.ts`: demo and
   tour sample shifts (made-up names) and the synthetic schedule loader. `src/ui/carbon.css`: Carbon tokens
   and styles (light default since 2026-09-28, dark optional); Tailwind v4 theme values in `src/index.css` point at them.
@@ -250,6 +254,8 @@ provider scores as active. The code and multipliers below remain in the model.
 | Off Floor       | 0.0        | 15 min |
 
 Float modifiers (applied to the patient's load, per `getCurrentLoad`): none 1.0, float supervising 0.65, float primary 0.0.
+Float primary is the same for stroke and non-stroke A-side patients (Decision 36). Float supervising is hidden in the
+Carbon interface until attendings can enter it after triage (Decision 37); the code and multiplier remain.
 
 ### Acuity weights and decay (4:2:1, D6 linear)
 

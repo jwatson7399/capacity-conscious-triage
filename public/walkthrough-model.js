@@ -212,8 +212,8 @@
 
   function clock(min) {
     var t = START_CLOCK + min;
-    var h = Math.floor(t / 60), mm = t % 60;
-    return (h < 10 ? '0' : '') + h + ':' + (mm < 10 ? '0' : '') + mm;
+    var h = Math.floor(t / 60) % 24, mm = t % 60;
+    return (h % 12 === 0 ? 12 : h % 12) + ':' + (mm < 10 ? '0' : '') + mm + (h < 12 ? ' AM' : ' PM');
   }
 
   var api = {

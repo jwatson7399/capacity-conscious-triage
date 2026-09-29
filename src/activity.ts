@@ -66,6 +66,19 @@ export interface FloorUpgradeEvent extends EventBase {
   auto: boolean;
 }
 
+/**
+ * A new arrival the float attending took at triage (float primary). It is listed on a team for
+ * the record but adds no load there, so it is not an accepted or overridden recommendation.
+ */
+export interface FloatArrivalEvent extends EventBase {
+  kind: 'float_arrival';
+  patientId: string;
+  acuity: AcuityTier;
+  /** The team it is listed on: the recommended team at the time. */
+  teamId: TeamId;
+  floatName: string | null;
+}
+
 export interface UndoEvent extends EventBase {
   kind: 'undo';
   patientId: string;
@@ -73,7 +86,7 @@ export interface UndoEvent extends EventBase {
 }
 
 export interface PatientEvent extends EventBase {
-  kind: 'reassign' | 'upgrade' | 'downgrade' | 'deceased';
+  kind: 'reassign' | 'upgrade' | 'downgrade' | 'deceased' | 'correct';
   patientId: string;
   /** Acuity before the action. For an upgrade, toAcuity is the new color. */
   acuity: AcuityTier;
@@ -101,8 +114,10 @@ export interface ProviderEvent extends EventBase {
 }
 
 export interface TeamEvent extends EventBase {
-  kind: 'team_close' | 'team_reopen' | 'signout';
+  kind: 'team_close' | 'team_reopen' | 'signout' | 'signout_undo';
   teamId: TeamId;
+  /** signout_undo: the sign-out it reversed. */
+  undoesEventId?: string;
   toTeamId?: TeamId;
   patientCount?: number;
 }
@@ -115,6 +130,7 @@ export interface ShiftEvent extends EventBase {
 export type ActivityEvent =
   | AssignEvent
   | FloorUpgradeEvent
+  | FloatArrivalEvent
   | UndoEvent
   | PatientEvent
   | FloatEvent
@@ -132,6 +148,6 @@ export type NewEvent = ActivityEvent extends infer E
 /** Assignment ids that were later undone. */
 export function undoneAssignIds(events: ActivityEvent[]): Set<string> {
   const s = new Set<string>();
-  for (const e of events) if (e.kind === 'undo' && e.undoesEventId) s.add(e.undoesEventId);
+  for (const e of events) if ((e.kind === 'undo' || e.kind === 'signout_undo') && e.undoesEventId) s.add(e.undoesEventId);
   return s;
 }

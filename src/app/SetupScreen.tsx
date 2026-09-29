@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Provider, ProviderType, TeamId } from '../types';
 import { parseWeeklySchedule, type DaySchedule } from '../utils/scheduleParser';
-import { ROLE_LONG, teamName } from '../ui/model';
+import { ROLE_LONG, hourMinute, teamName } from '../ui/model';
 import { loadSampleSchedule, providersAt } from '../ui/samples';
 import { uid } from '../uid';
 import { RoleSelect } from './TeamDetail';
@@ -97,11 +97,11 @@ function ScheduleSheet({ onCancel, onApply }: { onCancel: () => void; onApply: (
           </label>
           <label><span className="lbl" style={{ display: 'block', margin: '0 0 6px' }}>Hour</span>
             <select value={hour} onChange={e => { setHour(Number(e.target.value)); setTeams({}); }}>
-              {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
+              {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{hourMinute(h)}</option>)}
             </select>
           </label>
         </div>
-        <div className="lbl">{rows.length} on shift at {String(hour).padStart(2, '0')}:00</div>
+        <div className="lbl">{rows.length} on shift at {hourMinute(hour)}</div>
         {rows.length === 0 && <p>Nobody on this schedule at that hour.</p>}
         {rows.map(r => (
           <div key={r.key} className="prov">
