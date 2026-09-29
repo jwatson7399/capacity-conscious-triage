@@ -47,7 +47,7 @@ export function Help({ onBack }: { onBack: () => void }) {
         <li>Tap <b>Place</b> to put the patient on that team.</li>
       </ol>
       <p>To use a different team, tap <b>Other team</b>, pick the team and give a reason: continuity or bounce-back, a team or attending request, or other with a short note. The reason is saved with the assignment.</p>
-      <p>Tick <b>Floor upgrade</b> first when the patient is coming up from elsewhere in the department. The patient number then starts with F instead of C.</p>
+      <p>Tick <b>Floor upgrade</b> when a patient already on a team gets sicker. Upgrades stay on that team, so there is no recommendation: pick the color, then the patient's team. The patient number starts with F, and the upgrade counts in that team's load at the new color's full weight, which lowers its ratio and steers the next patients elsewhere.</p>
       <p>After a placement you have 30 seconds to undo it. Undo covers assignments only.</p>
 
       <h2>Team details</h2>

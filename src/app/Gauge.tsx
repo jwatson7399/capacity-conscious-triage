@@ -30,10 +30,10 @@ export default function Gauge({ rec, closedTeams, deceased, armed, onOpen }: {
       <div className="ghead">
         <div>
           <div className="sc k">Next recommended</div>
-          <b>{first ? teamName(first) : 'No eligible team'}{s1 && <small className="num">{displayRatio(s1, scores)}</small>}</b>
+          <b>{first ? teamName(first) : 'No eligible team'}{s1 && <>{' '}<small className="num rchip">{displayRatio(s1, scores)}</small></>}</b>
         </div>
         <span className="sp" />
-        {s2 && <span className="then">Next-ranked: {teamName(s2.teamId)}, <span className="num">{displayRatio(s2, scores)}</span></span>}
+        {s2 && <span className="then">Next after: {teamName(s2.teamId)} <span className="num rchip">{displayRatio(s2, scores)}</span></span>}
       </div>
       <div className="gdirection gtop"><span aria-hidden="true">↑</span> More Capacity</div>
       <div className="gwrap">
@@ -76,7 +76,7 @@ export default function Gauge({ rec, closedTeams, deceased, armed, onOpen }: {
                     {deceased[t] > 0 && <span title="Deceased buffer: ranked last until it ends">{t === TRAUMA ? <>Dec.<br />{deceased[t]}m</> : <>Deceased<br />{deceased[t]} min</>}</span>}
                   </div>
                 )}
-                <div className="tlab">{t === TRAUMA ? 'T' : teamName(t)}</div>
+                <div className="tlab">{t === TRAUMA ? 'T4' : teamName(t)}</div>
               </button>
             );
           })}

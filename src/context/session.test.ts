@@ -6,6 +6,7 @@ import { emptySession, makeSessionReducer, type SessionState } from './session';
 import { formatRatio, highCount, gaugeLevel, contribution, isCounted, minutesLeft, timerRunning } from '../ui/model';
 import { getRecommendation } from '../engine/recommendation';
 import { CAPACITY_WEIGHTS, DECEASED_BUFFER_MS } from '../constants';
+import { buildDemoShift } from '../ui/samples';
 
 const reducer = makeSessionReducer(shiftReducer, scoringFor);
 const MIN = 60_000;
@@ -149,6 +150,73 @@ describe('session layer', () => {
       expect(s.shift.patients[0].assignedTeamId).toBe(team);
       expect(s.activity.map(e => e.kind)).toEqual(['shift_start', 'assign', 'team_close']);
     }
+  });
+
+  it('a floor upgrade stays on the chosen team and is not an assignment', () => {
+    let s = started();
+    s = reducer(s, { type: 'ADD_FLOOR_UPGRADE', tier: 'tier_one', teamId: 3 });
+    expect(s.shift.patients).toHaveLength(1);
+    expect(s.shift.patients[0]).toMatchObject({ id: 'F-001', acuity: 'tier_one', assignedTeamId: 3 });
+    expect(s.shift.overrides).toHaveLength(0);
+    const e = s.activity.at(-1)!;
+    expect(e).toMatchObject({ kind: 'floor_upgrade', patientId: 'F-001', acuity: 'tier_one', teamId: 3, auto: false });
+    expect(s.activity.some(x => x.kind === 'assign')).toBe(false);
+    // It adds load to that team, so the ratio drops and the next patient goes elsewhere.
+    const rec = getRecommendation(s.shift.providers, s.shift.patients, s.shift.buffers, s.shift.now, s.shift.closedTeams, scoringFor(s.shift));
+    expect(rec.scores.find(x => x.teamId === 3)!.load).toBeGreaterThan(0);
+    expect(rec.first).not.toBe(3);
+    // Undo works as for an assignment.
+    expect(s.undoable).toEqual({ eventId: e.id, patientId: 'F-001' });
+    s = reducer(s, { type: 'UNDO_ASSIGN', eventId: e.id });
+    expect(s.shift.patients).toHaveLength(0);
+  });
+
+  it('demo floor upgrades land on their own team, not the recommended one', () => {
+    let s = emptySession({ ...initialState });
+    s = reducer(s, { type: 'HYDRATE', shift: buildDemoShift() });
+    const sim = s.shift.simulation!;
+    const now = s.shift.now;
+    s = { ...s, shift: { ...s.shift, simulation: { ...sim, speed: 60, paused: false, nextArrivalIndex: 0, timeline: [
+      { arrivalTime: now + 1000, acuity: 'tier_one', isFloor: true, floorTeamId: 4 },
+      { arrivalTime: now + 2000, acuity: 'tier_two', isFloor: false },
+    ] } } };
+    s = reducer(s, { type: 'TICK' });
+    const f = s.shift.patients.find(p => p.id.startsWith('F') && p.assignedAt > now);
+    expect(f?.assignedTeamId).toBe(4); // Trauma is never recommended, so only the stored team explains this
+    expect(s.activity.filter(e => e.kind === 'floor_upgrade')).toMatchObject([{ patientId: f?.id, teamId: 4, auto: true }]);
+    expect(s.activity.filter(e => e.kind === 'assign' && e.auto)).toHaveLength(1);
+  });
+
+  it('demo skip and back step through arrivals, live or paused', () => {
+    let s = emptySession({ ...initialState });
+    s = reducer(s, { type: 'HYDRATE', shift: buildDemoShift() });
+    s = reducer(s, { type: 'DEMO_ARRIVALS', on: true });
+    s = { ...s, shift: { ...s.shift, simulation: { ...s.shift.simulation!, paused: true } } };
+    const t0 = s.shift.now;
+    const n0 = s.shift.patients.length;
+    const tl = s.shift.simulation!.timeline;
+    const i0 = s.shift.simulation!.nextArrivalIndex;
+
+    s = reducer(s, { type: 'SIM_SKIP_TO_NEXT' });
+    expect(s.shift.now).toBe(tl[i0].arrivalTime);
+    expect(s.shift.patients.length).toBe(n0 + 1);
+    expect(s.activity.at(-1)!.kind === 'assign' || s.activity.at(-1)!.kind === 'floor_upgrade').toBe(true);
+    const t1 = s.shift.now;
+    s = reducer(s, { type: 'SIM_SKIP_TO_NEXT' });
+    expect(s.shift.patients.length).toBe(n0 + 2);
+    expect(s.shift.simulation!.paused).toBe(true);
+
+    s = reducer(s, { type: 'DEMO_BACK' });
+    expect(s.shift.now).toBe(t1);
+    expect(s.shift.patients.length).toBe(n0 + 1);
+    s = reducer(s, { type: 'DEMO_BACK' });
+    expect(s.shift.now).toBe(t0);
+    expect(s.shift.patients.length).toBe(n0);
+    expect(reducer(s, { type: 'DEMO_BACK' })).toBe(s); // nothing earlier
+
+    // Forward again replays the same schedule.
+    s = reducer(s, { type: 'SIM_SKIP_TO_NEXT' });
+    expect(s.shift.now).toBe(t1);
   });
 
   it('reassign keeps the timer and the contribution', () => {

@@ -122,6 +122,13 @@
   display: inline-flex; align-items: center; gap: 4px; font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
   background: var(--soft); color: var(--sig); padding: 3px 6px; border-radius: 4px; font-weight: 700; white-space: nowrap;
 }
+.cct .tag.rec { background: var(--sig); color: var(--on-sig); animation: rec-pulse 1.4s ease-out 1; }
+/* Mounts on the newly recommended row, so the pulse plays once each time the pick moves. */
+@keyframes rec-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--sig) 45%, transparent); }
+  100% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--sig) 0%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) { .cct .tag.rec { animation: none; } }
 .cct .tag.outline { background: transparent; border: 1px solid var(--line2); color: var(--tx2); }
 .cct .gl {
   display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 4px;
@@ -158,6 +165,9 @@
 .cct .ghead b { font-size: 22px; font-weight: 550; letter-spacing: -.5px; }
 .cct .ghead b small { font-size: 13px; color: var(--tx3); font-weight: 500; letter-spacing: 0; margin-left: 4px; }
 .cct .ghead .then { font-size: 11px; color: var(--tx3); }
+.cct .rchip { display: inline-block; background: var(--soft); border: 1px solid var(--line2); border-radius: 6px; padding: 1px 6px; line-height: 1.3; vertical-align: 2px; }
+.cct .ghead b small.rchip { margin-left: 4px; }
+.cct .ghead .then .rchip { margin-left: 3px; color: var(--tx2); font-weight: 600; vertical-align: 0; }
 .cct .gdirection { color: var(--tx3); font-size: 11px; text-align: left; }
 .cct .gtop { margin: 0 2px 12px; }
 .cct .gwrap { display: grid; grid-template-columns: 30px 1fr; gap: 6px; }
@@ -243,6 +253,7 @@
 .cct .seg { display: block; height: 100%; flex: 0 0 0%; transition: flex-basis .4s linear; }
 .cct .seg.red { background: var(--red-fill); } .cct .seg.yellow { background: var(--yellow-fill); } .cct .seg.purple { background: var(--purple-fill); }
 .cct .seg.ghost { background: repeating-linear-gradient(-45deg, var(--pv) 0 3px, transparent 3px 7px); opacity: .85; }
+.cct .row .ros .str { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 600; color: var(--tx2); background: var(--soft); border: 1px solid var(--line2); border-radius: 6px; padding: 0 6px; line-height: 1.5; white-space: nowrap; }
 .cct .smeta { display: flex; justify-content: space-between; margin-top: 6px; font-size: 10px; color: var(--tx3); }
 .cct .legend { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; border-top: 1px solid var(--line); padding: 12px 0; font-size: 10px; color: var(--tx3); }
 .cct .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
@@ -282,6 +293,9 @@
 }
 .cct .go .place:disabled { background: var(--chip); color: var(--tx3); border-color: var(--line2); }
 .cct .go .place small { font-size: 11px; opacity: .8; font-weight: 500; }
+.cct .go.fteams { grid-template-columns: repeat(4, 1fr); }
+.cct .go.fteams .place { background: var(--card); color: var(--tx); border-color: var(--line); font-size: 13px; }
+.cct .go.fteams .place:hover:not(:disabled) { border-color: var(--sig); }
 .cct .go .alt { border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 0 14px; font-size: 13px; color: var(--tx2); min-height: 52px; }
 
 /* ---------- header controls ---------- */
@@ -502,6 +516,24 @@
 .cct .seg-group button { border: 0; background: var(--card); padding: 0 11px; min-height: 36px; font-size: 12px; font-weight: 600; color: var(--tx2); border-right: 1px solid var(--line); }
 .cct .seg-group button:last-child { border-right: 0; }
 .cct .seg-group button[aria-pressed=true] { background: var(--sig); color: var(--on-sig); }
+.cct .seg-group button.step { padding: 0 9px; display: inline-flex; align-items: center; }
+.cct .seg-group button.step svg { width: 11px; height: 11px; fill: currentColor; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
+.cct .seg-group button.step:disabled { color: var(--tx3); opacity: .5; }
+.cct .demobar > .arrivals { flex: 1 1 100%; }
+.cct .roster-note { font-size: 11px; color: var(--tx3); }
+.cct .arrivals { background: var(--card); border: 1px solid var(--line2); border-radius: 10px; padding: 8px 12px 6px; }
+.cct .arr-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 12px; }
+.cct .arr-head .k { color: var(--tx3); }
+.cct .arr-head .sp { flex: 1; }
+.cct .arr-next { font-weight: 600; color: var(--tx); }
+.cct .arr-count { color: var(--tx3); font-size: 11px; }
+.cct .arr-track { position: relative; height: 16px; margin: 8px 6px 2px; border-bottom: 1px solid var(--line2); }
+.cct .arr-hour { position: absolute; bottom: 0; height: 6px; border-left: 1px solid var(--line2); }
+.cct .arr-dot { position: absolute; top: 3px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; }
+.cct .arr-dot.red { background: var(--red-fill); } .cct .arr-dot.yellow { background: var(--yellow-fill); } .cct .arr-dot.purple { background: var(--purple-fill); }
+.cct .arr-up { position: absolute; top: 1px; width: 13px; height: 13px; margin-left: -6.5px; }
+.cct .arr-up.red { fill: var(--red-fill); } .cct .arr-up.yellow { fill: var(--yellow-fill); } .cct .arr-up.purple { fill: var(--purple-fill); }
+.cct .arr-scale { display: flex; justify-content: space-between; margin: 0 1px; font-size: 10px; color: var(--tx3); }
 .cct .tour-card {
   position: fixed; left: 50%; transform: translateX(-50%); z-index: 70; width: min(440px, calc(100vw - 24px));
   background: var(--toast-bg); color: var(--toast-tx); border-radius: 16px; padding: 16px 18px; box-shadow: 0 18px 50px rgba(0,0,0,.35);

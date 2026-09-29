@@ -53,6 +53,19 @@ export interface AssignEvent extends EventBase {
   auto: boolean;
 }
 
+/**
+ * A patient already on a team got sicker and stays on that team. It adds load at the new
+ * color's full weight but is not an assignment: no recommendation was followed or overridden.
+ */
+export interface FloorUpgradeEvent extends EventBase {
+  kind: 'floor_upgrade';
+  patientId: string;
+  acuity: AcuityTier;
+  teamId: TeamId;
+  /** True when the demo clock added it, not a person. */
+  auto: boolean;
+}
+
 export interface UndoEvent extends EventBase {
   kind: 'undo';
   patientId: string;
@@ -101,6 +114,7 @@ export interface ShiftEvent extends EventBase {
 
 export type ActivityEvent =
   | AssignEvent
+  | FloorUpgradeEvent
   | UndoEvent
   | PatientEvent
   | FloatEvent

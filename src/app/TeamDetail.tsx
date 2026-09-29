@@ -178,7 +178,7 @@ export default function TeamDetail({ teamId, onClose, onNote }: { teamId: TeamId
       <div className="between" style={{ alignItems: 'flex-end' }}>
         <div>
           <div className="td-ratio num">{displayRatio(s, rec.scores)}</div>
-          <small className="muted num">{s.capacity === 0 ? 'no providers' : `current ratio · ${s.capacity.toFixed(1)} strength ÷ ${s.load.toFixed(2)} load`}</small>
+          <small className="muted num">{s.capacity === 0 ? 'no providers' : `current capacity = ${s.capacity.toFixed(1)} strength ÷ ${s.load.toFixed(2)} load`}</small>
         </div>
         {deceased > 0 && <span className="tag outline" title="Ranked last until it ends">Deceased · {deceased} min left</span>}
       </div>

@@ -66,11 +66,22 @@ METHODS; the Legal Dossier still needs his go.
 |---|---|---|
 | A technical or product decision and why | `ER Triage App/Cowork Roundtable.md` | Write it, mark it unreviewed |
 | How an analysis, benchmark or build was done | `METHODS.md` | Write it, mark it unreviewed |
-| Anything about IP, TOV, counsel, compliance, public release or deploys | `CCT Legal Dossier.md` | **Draft only.** Put the draft in `ER Triage App/dossier-pending.md` and tell Julian |
+| Anything about IP, TOV, counsel or compliance, and material deploys (see below) | `CCT Legal Dossier.md` | **Draft only.** Put the draft in `ER Triage App/dossier-pending.md` and tell Julian |
 | What you are doing right now | `AGENT_LOG.md` | Always |
 | Deliberation between coding agents | `.rounds/CCTrounds.md` | As before (`/rounds`) |
 
-A deploy to GitHub Pages is always a Legal Dossier item (it is a public release).
+Not every deploy is a Legal Dossier item. A GitHub Pages deploy needs a Dossier draft only when it
+is material:
+
+- the first public release, or bringing the site back after it was taken down;
+- a change to what ships that matters legally or for the study: data or schedule files, weights or
+  scoring, endpoints or environment values, the copyright or advisory notice, or anything that
+  shows results or figures;
+- anything Julian flags.
+
+Routine deploys (wording, layout, styling, bug fixes that do not change scoring) need no Dossier
+draft. The DONE entry in `AGENT_LOG.md` records them: commit, `gh-pages` commit and what was
+verified live.
 
 **Before writing to the Roundtable or the Legal Dossier, back it up:**
 

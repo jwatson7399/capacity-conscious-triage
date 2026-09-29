@@ -24,6 +24,11 @@ function line(e: ActivityEvent, undone: Set<string>, undoneAt: Map<string, numbe
         : e.override ? `Override · ${e.override.reasonLabel}${e.override.note ? `: ${e.override.note}` : ''}` : 'Override';
       return { t1: `${e.patientId} · ${ACUITY_NAME[e.acuity]} → ${teamName(e.chosenTeamId)}`, t2: sub + (e.auto ? ' · demo arrival' : ''), dot: ACUITY_CLASS[e.acuity] };
     }
+    case 'floor_upgrade': return {
+      t1: `${e.patientId} · floor upgrade, ${ACUITY_NAME[e.acuity]} on ${teamName(e.teamId)}`,
+      t2: (undone.has(e.id) ? `Undone at ${clock(undoneAt.get(e.id)!)}` : 'Stays on its team · not a recommendation') + (e.auto ? ' · demo' : ''),
+      dot: ACUITY_CLASS[e.acuity],
+    };
     case 'undo': return { t1: `Undid ${e.patientId}`, t2: 'Assignment reversed', dot: 'hollow' };
     case 'reassign': return { t1: `${e.patientId} moved ${teamName(e.teamId)} → ${teamName(e.toTeamId!)}`, t2: e.reason ? `Reassigned · ${e.reason}` : 'Reassigned', dot: ACUITY_CLASS[e.acuity] };
     case 'upgrade': return { t1: `${e.patientId} upgraded to ${ACUITY_NAME[e.toAcuity ?? 'tier_one']}`, t2: `${teamName(e.teamId)} · was ${ACUITY_NAME[e.acuity]}`, dot: ACUITY_CLASS[e.toAcuity ?? 'tier_one'] };

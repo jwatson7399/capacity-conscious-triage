@@ -69,9 +69,14 @@ export default function Board({ mode, dark, onToggleDark, onHome, onHelp, onHow,
     setTimer({ ...timer, eventId: undoable.eventId });
   }
   const undoEvent = timer && undoable && timer.eventId === undoable.eventId
-    ? activity.find(e => e.id === undoable.eventId && e.kind === 'assign') : undefined;
-  const undo = undoEvent && undoEvent.kind === 'assign' && timer
-    ? { eventId: undoEvent.id, patientId: undoEvent.patientId, text: `${undoEvent.patientId} ${ACUITY_NAME[undoEvent.acuity]} placed on ${teamName(undoEvent.chosenTeamId)}`, until: timer.until, startedAt: timer.startedAt }
+    ? activity.find(e => e.id === undoable.eventId && (e.kind === 'assign' || e.kind === 'floor_upgrade')) : undefined;
+  const undo = undoEvent && timer && (undoEvent.kind === 'assign' || undoEvent.kind === 'floor_upgrade')
+    ? {
+        eventId: undoEvent.id, patientId: undoEvent.patientId, until: timer.until, startedAt: timer.startedAt,
+        text: undoEvent.kind === 'assign'
+          ? `${undoEvent.patientId} ${ACUITY_NAME[undoEvent.acuity]} placed on ${teamName(undoEvent.chosenTeamId)}`
+          : `${undoEvent.patientId} ${ACUITY_NAME[undoEvent.acuity]} floor upgrade on ${teamName(undoEvent.teamId)}`,
+      }
     : null;
 
   useEffect(() => { onUiChange?.({ armed, detail, activity: showLog, override, placed }); }, [armed, detail, showLog, override, placed, onUiChange]);
@@ -101,8 +106,17 @@ export default function Board({ mode, dark, onToggleDark, onHome, onHelp, onHow,
 
   const place = () => {
     if (!armed || !rec.first) return;
-    const source = floor ? 'floor' : 'critical';
-    dispatch({ type: 'ASSIGN_PATIENT', tier: armed, teamId: rec.first, source });
+    dispatch({ type: 'ASSIGN_PATIENT', tier: armed, teamId: rec.first, source: 'critical' });
+    startUndo();
+    setArmed(null);
+    setFloor(false);
+    setPlaced(n => n + 1);
+  };
+
+  // A floor upgrade stays on the patient's own team: no recommendation, no override reason.
+  const placeFloor = (teamId: TeamId) => {
+    if (!armed) return;
+    dispatch({ type: 'ADD_FLOOR_UPGRADE', tier: armed, teamId });
     startUndo();
     setArmed(null);
     setFloor(false);
@@ -110,7 +124,7 @@ export default function Board({ mode, dark, onToggleDark, onHome, onHelp, onHow,
   };
 
   const assignOther = (o: { teamId: TeamId; acuity: AcuityTier; reasonCode: 'continuity' | 'team_request' | 'other'; note: string }) => {
-    const source = floor ? 'floor' : 'critical';
+    const source = 'critical';
     const reasonText = o.reasonCode === 'other' ? `Other: ${o.note}` : o.reasonCode === 'continuity' ? 'Continuity / bounce-back' : 'Team or attending request';
     dispatch({
       type: 'ASSIGN_PATIENT', tier: o.acuity, teamId: o.teamId, source,
@@ -178,14 +192,14 @@ export default function Board({ mode, dark, onToggleDark, onHome, onHelp, onHow,
       <div className="board">
         <div className="board-main">
           <div className="gcol">
-            <Gauge rec={rec} closedTeams={state.closedTeams} deceased={deceasedByTeam} armed={armed} onOpen={setDetail} />
+            <Gauge rec={rec} closedTeams={state.closedTeams} deceased={deceasedByTeam} armed={floor ? null : armed} onOpen={setDetail} />
           </div>
-          <Ledger state={state} rec={rec} armed={armed} onOpen={setDetail} />
+          <Ledger state={state} rec={rec} armed={floor ? null : armed} onOpen={setDetail} />
         </div>
         <Copyright />
       </div>
 
-      <AssignPanel rec={rec} armed={armed} floor={floor} onArm={setArmed} onFloor={() => setFloor(f => !f)} onPlace={place} onOther={() => setOverride(true)} />
+      <AssignPanel rec={rec} armed={armed} floor={floor} onArm={setArmed} onFloor={() => setFloor(f => !f)} onPlace={place} onPlaceFloor={placeFloor} onOther={() => setOverride(true)} />
 
       {undoPhase === 'full' && undo && (
         <div className="utoast" role="status">{undo.text}<button onClick={doUndo}>Undo</button></div>

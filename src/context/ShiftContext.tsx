@@ -159,9 +159,12 @@ export function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState
           const count = patientCounter[prefix] + 1;
           const id = `${prefix}-${String(count).padStart(3, '0')}`;
 
-          // Get team assignment — round-robin or formula-driven
+          // Get team assignment: round-robin or formula-driven. A demo floor upgrade
+          // stays on the team it already belongs to.
           let teamId: TeamId;
-          if (sim.roundRobin) {
+          if (entry.isFloor && entry.floorTeamId !== undefined) {
+            teamId = entry.floorTeamId;
+          } else if (sim.roundRobin) {
             ({ teamId, rrNext } = roundRobinTeam(sim, closedTeams, rrNext));
           } else {
             const rec = getRecommendation(simProviders, simPatients, simBuffers, tickNow, closedTeams, scoringOverrides);
@@ -796,9 +799,12 @@ export function shiftReducer(state: ShiftState, action: ShiftAction): ShiftState
         const count = patientCounter[prefix] + 1;
         const id = `${prefix}-${String(count).padStart(3, '0')}`;
 
-        // Same assignment mode as TICK: round-robin runs stay round-robin.
+        // Same assignment mode as TICK: round-robin runs stay round-robin, and a demo
+        // floor upgrade stays on its team.
         let teamId: TeamId;
-        if (sim.roundRobin) {
+        if (entry.isFloor && entry.floorTeamId !== undefined) {
+          teamId = entry.floorTeamId;
+        } else if (sim.roundRobin) {
           ({ teamId, rrNext } = roundRobinTeam(sim, state.closedTeams, rrNext));
         } else {
           const rec = getRecommendation(providers, simPatients, simBuffers, skipNow, state.closedTeams, scoringOverrides);

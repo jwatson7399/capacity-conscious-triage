@@ -8,13 +8,15 @@ import {
 } from '../ui/model';
 import Sheet, { SheetHeader } from './Sheet';
 
-export function AssignPanel({ rec, armed, floor, onArm, onFloor, onPlace, onOther }: {
+export function AssignPanel({ rec, armed, floor, onArm, onFloor, onPlace, onPlaceFloor, onOther }: {
   rec: Recommendation;
   armed: AcuityTier | null;
   floor: boolean;
   onArm: (a: AcuityTier | null) => void;
   onFloor: () => void;
   onPlace: () => void;
+  /** Floor upgrade: the patient stays on the team they already belong to. */
+  onPlaceFloor: (teamId: TeamId) => void;
   onOther: () => void;
 }) {
   const s1 = rec.scores.find(s => s.teamId === rec.first);
@@ -32,7 +34,8 @@ export function AssignPanel({ rec, armed, floor, onArm, onFloor, onPlace, onOthe
   return (
     <div ref={ref} className="keys" data-tour="assign" role="region" aria-label="Assign the next patient">
       <div className="lab">
-        <span>{rec.first ? <>Next patient to <b>{teamName(rec.first)}</b></> : <b>No eligible team</b>}</span>
+        <span>{floor ? <>Upgrade stays on <b>the patient's current team</b></>
+          : rec.first ? <>Next patient to <b>{teamName(rec.first)}</b></> : <b>No eligible team</b>}</span>
         <span className="sp" />
         <button className={`fl${floor ? ' on' : ''}`} onClick={onFloor} aria-pressed={floor}>
           <i aria-hidden="true">{floor ? '✓' : ''}</i>Floor upgrade
@@ -46,7 +49,20 @@ export function AssignPanel({ rec, armed, floor, onArm, onFloor, onPlace, onOthe
           </button>
         ))}
       </div>
-      {armed && (
+      {armed && floor && (
+        <div className="go fteams" role="group" aria-label="Which team is the patient on?">
+          {ALL_TEAMS.map(t => {
+            const s = rec.scores.find(x => x.teamId === t);
+            return (
+              <button key={t} className="place" onClick={() => onPlaceFloor(t)} disabled={!s}>
+                {t === TRAUMA ? 'Trauma' : teamName(t)}
+                {s && <small className="num">{displayRatio(s, rec.scores)} → {formatRatio(ratioAfter(s, armed), s.capacity, high)}</small>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {armed && !floor && (
         <div className="go">
           <button className="place" onClick={onPlace} disabled={!s1}>
             {s1 ? <>Place {ACUITY_NAME[armed]} on {teamName(s1.teamId)}

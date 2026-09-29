@@ -11,7 +11,7 @@ const PREVIEW_TONE: Record<string, string> = { red: 'var(--red-fill)', yellow: '
 export function TeamTags({ state, t, isNext }: { state: ShiftState; t: TeamId; isNext: boolean }) {
   const deceased = deceasedMinutesLeft(state, t);
   return <>
-    {isNext && <span className="tag">Recommended</span>}
+    {isNext && <span className="tag rec">Recommended</span>}
     {t in state.closedTeams && <span className="tag outline">Closed</span>}
     {deceased > 0 && <span className="tag outline" title="Deceased buffer: this team is ranked last until it ends">Deceased · {deceased} min</span>}
   </>;
@@ -50,7 +50,7 @@ export default function Ledger({ state, rec, armed, onOpen }: {
         const ratio = displayRatio(s, scores);
         return (
           <button key={t} className={`row${isNext ? ' next' : ''}`} style={{ ['--tc' as string]: TEAM_TONE[t] }} onClick={() => onOpen(t)}
-            aria-label={`${teamName(t)}, ratio ${ratio === '∞' ? 'infinity' : ratio}${isNext ? ', recommended' : ''}. Open details.`}>
+            aria-label={`${teamName(t)}, capacity ${ratio === '∞' ? 'infinity' : ratio}${isNext ? ', recommended' : ''}. Open details.`}>
             <div className="g">
               <div className="who">
                 <b><span className="sw" />{teamName(t)} <TeamTags state={state} t={t} isNext={isNext} /></b>
@@ -58,9 +58,10 @@ export default function Ledger({ state, rec, armed, onOpen }: {
                   {providers.length === 0 ? 'No providers' : providers.map((p, i) => (
                     <span key={p.id} style={{ fontSize: 12 }}>{i > 0 && ' · '}{providerLabel(p)} <span>{ROLE_SHORT[p.type]}</span></span>
                   ))}
+                  {providers.length > 0 && <>{' '}<span className="str num" title="Team strength: the sum of its providers' weights">Strength {s.capacity.toFixed(1)}</span></>}
                 </div>
               </div>
-              <div className="n num">{ratio}<small>{s.capacity === 0 ? 'no providers' : 'ratio'}</small></div>
+              <div className="n num">{ratio}<small>{s.capacity === 0 ? 'no providers' : 'capacity'}</small></div>
             </div>
             <div className="cnt">
               {ACUITIES.map(a => <span key={a} className={ACUITY_CLASS[a]}>{ACUITY_NAME[a]} {counting.filter(p => p.acuity === a).length}</span>)}

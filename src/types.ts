@@ -72,6 +72,12 @@ export interface SimTimelineEntry {
   arrivalTime: number;
   acuity: AcuityTier;
   isFloor: boolean;
+  /**
+   * Demo only: the team a floor upgrade already belongs to. When set, the patient goes
+   * straight onto that team instead of through the recommendation (upgrades stay on their
+   * team). The lab simulator and scripts never set it.
+   */
+  floorTeamId?: TeamId;
 }
 
 export interface SimStatusChangeEntry {

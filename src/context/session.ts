@@ -8,7 +8,7 @@
 //      turn demo arrivals on or off).
 // Nothing here changes how a team is scored or ranked.
 
-import type { ShiftAction, ShiftState, TeamId, Patient, Recommendation } from '../types';
+import type { AcuityTier, ShiftAction, ShiftState, TeamId, Patient, Recommendation } from '../types';
 import type { ActivityEvent, NewEvent, OverrideReasonCode, TeamSnapshot } from '../activity';
 import { OVERRIDE_REASONS } from '../activity';
 import { getRecommendation, type ScoringOverrides } from '../engine/recommendation';
@@ -25,7 +25,11 @@ export type SessionOnlyAction =
   | { type: 'REMOVE_PROVIDER'; providerId: string }
   | { type: 'REOPEN_TEAM'; teamId: TeamId }
   | { type: 'DEMO_ARRIVALS'; on: boolean }
-  | { type: 'UNDO_ASSIGN'; eventId: string };
+  /** A patient on teamId got sicker. Stays on that team; never routed by the recommendation. */
+  | { type: 'ADD_FLOOR_UPGRADE'; tier: AcuityTier; teamId: TeamId }
+  | { type: 'UNDO_ASSIGN'; eventId: string }
+  /** Demo: go back to the moment of the previous arrival. */
+  | { type: 'DEMO_BACK' };
 
 export type SessionAction =
   | (ShiftAction & { meta?: AssignMeta })
@@ -42,6 +46,12 @@ export interface SessionState {
    * board on the device clock.
    */
   undoable: { eventId: string; patientId: string } | null;
+  /**
+   * Demo only, while arrivals are on: the session right after each arrival (the first is
+   * the moment arrivals were turned on), so the demo can step back. Cleared by a new
+   * sample or by turning arrivals off or on again, which changes the arrival schedule.
+   */
+  demoRewind?: Omit<SessionState, 'demoRewind'>[];
 }
 
 export const emptySession = (shift: ShiftState): SessionState => ({ shift, activity: [], seq: 0, undoable: null });
@@ -70,8 +80,61 @@ function round(n: number, d: number): number {
 }
 
 const DEMO_ARRIVAL_RATE_PER_HOUR = 5;
+/** Percent of demo arrivals that are floor upgrades; they are uncommon (the engine default is 15). */
+const DEMO_FLOOR_UPGRADE_CHANCE = 10;
+/** Teams a demo floor upgrade can belong to (A-side). */
+const DEMO_FLOOR_TEAMS: TeamId[] = [1, 2, 3];
+const DEMO_REWIND_MAX = 200;
+const DEMO_BACK_GRACE_S = 3;
 
 export function makeSessionReducer(core: CoreReducer, scoringFor: ScoringFor) {
+  /** Activity events for patients the demo clock (a tick or a skip) placed. */
+  function arrivalEvents(before: ShiftState, shift: ShiftState): NewEvent[] {
+    const events: NewEvent[] = [];
+    // Arrivals the demo clock placed through the recommendation engine. Demo floor
+    // upgrades went straight to their own team and are logged as upgrades.
+    if (shift.patients.length > before.patients.length) {
+      const known = new Set(before.patients.map(p => p.id));
+      const arrived = before.simulation && shift.simulation
+        ? before.simulation.timeline.slice(before.simulation.nextArrivalIndex, shift.simulation.nextArrivalIndex) : [];
+      let pts = before.patients;
+      let i = -1;
+      for (const p of shift.patients) {
+        if (known.has(p.id)) continue;
+        i++;
+        if (arrived[i]?.floorTeamId !== undefined) {
+          events.push({ kind: 'floor_upgrade', patientId: p.id, acuity: p.acuity, teamId: p.assignedTeamId, auto: true, at: p.assignedAt } as NewEvent);
+          pts = [...pts, p];
+          continue;
+        }
+        const rec = recommendFor(before, scoringFor, pts, p.assignedAt);
+        events.push({
+          kind: 'assign',
+          patientId: p.id,
+          acuity: p.acuity,
+          source: p.id.startsWith('F') ? 'floor' : 'critical',
+          recommendedTeamId: rec.first,
+          nextRankedTeamId: rec.second,
+          chosenTeamId: p.assignedTeamId,
+          followed: p.assignedTeamId === rec.first,
+          override: null,
+          snapshot: snapshotOf(rec, before.closedTeams),
+          auto: true,
+          at: p.assignedAt,
+        } as NewEvent);
+        pts = [...pts, p];
+      }
+    }
+    return events;
+  }
+
+  /** Demo only: remember the moment after each arrival so DEMO_BACK can return to it. */
+  function keepRewind(s: SessionState): SessionState {
+    if (!s.demoRewind) return s;
+    const { demoRewind, ...moment } = s;
+    return { ...s, demoRewind: [...demoRewind, moment].slice(-DEMO_REWIND_MAX) };
+  }
+
   function log(s: SessionState, shift: ShiftState, events: NewEvent[], at?: number): SessionState {
     if (events.length === 0) return { ...s, shift };
     let seq = s.seq;
@@ -127,11 +190,15 @@ export function makeSessionReducer(core: CoreReducer, scoringFor: ScoringFor) {
         if (action.on) {
           const end = sim.baseTime + sim.shiftDurationMs;
           const remaining = Math.max(0, end - before.now);
-          const future = generateTimeline(randomSeed(), remaining, { ...sim.overrides, arrivalRatePerHour: DEMO_ARRIVAL_RATE_PER_HOUR }, before.now)
-            .filter(e => e.arrivalTime > before.now);
+          const future = generateTimeline(randomSeed(), remaining, { ...sim.overrides, arrivalRatePerHour: DEMO_ARRIVAL_RATE_PER_HOUR, floorUpgradeChance: DEMO_FLOOR_UPGRADE_CHANCE }, before.now)
+            .filter(e => e.arrivalTime > before.now)
+            // Upgrades stay on the team they already belong to: draw it now, not at arrival.
+            .map(e => e.isFloor ? { ...e, floorTeamId: DEMO_FLOOR_TEAMS[Math.floor(Math.random() * DEMO_FLOOR_TEAMS.length)] } : e);
           timeline = [...done, ...future];
         }
-        return { ...s, shift: { ...before, simulation: { ...sim, timeline } } };
+        const out: SessionState = { ...s, shift: { ...before, simulation: { ...sim, timeline } } };
+        const { demoRewind: _old, ...moment } = out;
+        return action.on ? { ...moment, demoRewind: [moment] } : moment;
       }
 
       case 'ASSIGN_PATIENT': {
@@ -155,6 +222,15 @@ export function makeSessionReducer(core: CoreReducer, scoringFor: ScoringFor) {
           snapshot: snapshotOf(rec, before.closedTeams),
           auto: false,
         }]);
+        const ev = logged.activity[logged.activity.length - 1];
+        return { ...logged, undoable: { eventId: ev.id, patientId: added.id } };
+      }
+
+      case 'ADD_FLOOR_UPGRADE': {
+        const shift = core(before, { type: 'ASSIGN_PATIENT', tier: action.tier, teamId: action.teamId, source: 'floor' });
+        const added = shift.patients.find(p => !before.patients.some(q => q.id === p.id));
+        if (!added) return { ...s, shift };
+        const logged = log(s, shift, [{ kind: 'floor_upgrade', patientId: added.id, acuity: action.tier, teamId: action.teamId, auto: false }]);
         const ev = logged.activity[logged.activity.length - 1];
         return { ...logged, undoable: { eventId: ev.id, patientId: added.id } };
       }
@@ -231,33 +307,30 @@ export function makeSessionReducer(core: CoreReducer, scoringFor: ScoringFor) {
       case 'TICK': {
         const shift = core(before, action);
         if (shift === before) return s;
-        const events: NewEvent[] = [];
-        // Arrivals the demo clock placed through the recommendation engine.
-        if (shift.patients.length > before.patients.length) {
-          const known = new Set(before.patients.map(p => p.id));
-          let pts = before.patients;
-          for (const p of shift.patients) {
-            if (known.has(p.id)) continue;
-            const rec = recommendFor(before, scoringFor, pts, p.assignedAt);
-            events.push({
-              kind: 'assign',
-              patientId: p.id,
-              acuity: p.acuity,
-              source: p.id.startsWith('F') ? 'floor' : 'critical',
-              recommendedTeamId: rec.first,
-              nextRankedTeamId: rec.second,
-              chosenTeamId: p.assignedTeamId,
-              followed: p.assignedTeamId === rec.first,
-              override: null,
-              snapshot: snapshotOf(rec, before.closedTeams),
-              auto: true,
-              at: p.assignedAt,
-            } as NewEvent);
-            pts = [...pts, p];
-          }
-        }
+        const events = arrivalEvents(before, shift);
         if (events.length === 0) return { ...s, shift };
-        return log(s, shift, events);
+        return keepRewind(log(s, shift, events));
+      }
+
+      case 'SIM_SKIP_TO_NEXT': {
+        const shift = core(before, action);
+        if (shift === before) return s;
+        return keepRewind(log(s, shift, arrivalEvents(before, shift)));
+      }
+
+      case 'DEMO_BACK': {
+        // A moment reached in the last few real seconds counts as "here", so repeated
+        // presses keep stepping back while the clock runs.
+        const cutoff = before.now - DEMO_BACK_GRACE_S * 1000 * (before.simulation?.paused ? 0 : before.simulation?.speed ?? 0);
+        const stack = [...(s.demoRewind ?? [])];
+        while (stack.length > 1 && stack[stack.length - 1].shift.now >= cutoff) stack.pop();
+        const target = stack[stack.length - 1];
+        if (!target || target.shift.now >= cutoff) return s;
+        const sim = before.simulation;
+        const shift = sim && target.shift.simulation
+          ? { ...target.shift, simulation: { ...target.shift.simulation, paused: sim.paused, speed: sim.speed } }
+          : target.shift;
+        return { ...target, shift, undoable: null, demoRewind: stack };
       }
 
       default: {

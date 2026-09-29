@@ -73,7 +73,7 @@ Vite copies `public/` verbatim into `dist/`, and `dist/` is what gets published.
 - **Real schedules live in `data/provider-schedules/`, never under `public/`.** This includes
   `demo-schedule.xlsx`, which despite its name contains 120 real provider names.
 - The only workbook allowed under `public/` is `public/schedules/demo-week-schedule.xlsx`, a synthetic
-  file with real layout and shift structure but pseudonymous names. The demo's "Sample scheduled shift"
+  file with real layout and shift structure but pseudonymous names. The demo's "Change Teams"
   button and the setup screen's "Use sample scheduled shift" (`src/ui/samples.ts`) fetch it.
 - To regenerate it from a real schedule:
 
@@ -168,7 +168,9 @@ Carbon rebuild (branch `carbon-rebuild`, 2026-09-28): a new interface on the unc
   `toTier` (any higher color, default Red) and restarts at that color's full weight.
 - `src/context/session.ts`: session layer around the core reducer. Records the shift activity events
   (`src/activity.ts`, JSON-safe, append-only; undo is its own event) and adds interface-only actions:
-  `HYDRATE` (load a sample shift), `REMOVE_PROVIDER`, `REOPEN_TEAM`, `DEMO_ARRIVALS`, `UNDO_ASSIGN`.
+  `HYDRATE` (load a sample shift), `REMOVE_PROVIDER`, `REOPEN_TEAM`, `DEMO_ARRIVALS`, `UNDO_ASSIGN`,
+  `ADD_FLOOR_UPGRADE` (Decision 35: a floor upgrade goes on the patient's own team, never through the
+  recommendation, and is logged as `floor_upgrade`, not `assign`; the lab simulator still routes them, open item 25).
   Undo is bound to the assignment's event id and ends at any later action on that patient or a new sample.
 - `src/ui/model.ts`: display helpers (infinity rule, gauge scale, timers). `src/ui/samples.ts`: demo and
   tour sample shifts (made-up names) and the synthetic schedule loader. `src/ui/carbon.css`: Carbon tokens
@@ -336,7 +338,8 @@ scoring never reads the survey.
 - **Team 4 (Trauma)** is visible but excluded from auto-recommendations; assignment only via manual override.
 - **One role, one shared device.** No role picker. Phone portrait and tablet landscape are both first-class.
 - **Demo** is one sample shift with a permanent "Demo · Sample data" badge and a clock toolbar (pause, 1x,
-  60x, 240x, optional arrivals placed through the engine, reset, sample scheduled shift).
+  60x, 240x, optional arrivals placed through the engine with next/last arrival steps, reset, Change Teams:
+  a random day's 10:00 teams from the synthetic schedule).
 - **Tour** is six steps on its own sample shift with the clock held still.
 - **Shift activity** is in memory only and is lost on reload or End shift. The trial still needs a
   durable override record (open item).
