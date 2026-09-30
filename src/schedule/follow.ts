@@ -13,7 +13,7 @@
 import type { Provider, ShiftAction, ShiftState, TeamId } from '../types';
 import type { NewEvent } from '../activity';
 import { uid } from '../uid';
-import { buildSlots, floatsAt, openTeams, rosterAt, TEAMS, type Slot, type FloatSlot, type StoredWeek } from './week';
+import { buildSlots, floatsAt, openTeams, rosterAt, TEAMS, type RosterEntry, type Slot, type FloatSlot, type StoredWeek } from './week';
 
 export interface FollowState {
   week: StoredWeek;
@@ -36,6 +36,14 @@ export function slotsOf(week: StoredWeek): { slots: Slot[]; floats: FloatSlot[] 
 
 export function displayName(s: string): string {
   return s.replace(/[A-Za-z][^\s-]*/g, w => w[0].toUpperCase() + w.slice(1).toLowerCase());
+}
+
+/** The ready screen and scheduled joins create exactly the same provider shape. */
+export function providerFromRoster(e: RosterEntry): Provider {
+  return {
+    id: uid(), name: displayName(e.name), type: e.type, status: 'active', statusExpiresAt: null, teamId: e.teamId,
+    scheduleKey: e.scheduleKey, share: e.share, endsAt: e.endsAt, ...(e.note ? { note: e.note } : {}),
+  };
 }
 
 export function startFollowing(week: StoredWeek, suppress: Record<string, number> = {}): FollowState {
@@ -82,10 +90,7 @@ export function syncToSchedule(shift: ShiftState, follow: FollowState, core: Cor
   const have = new Set(providers.map(p => p.scheduleKey));
   for (const e of want.values()) {
     if (have.has(e.scheduleKey) || (suppressed[e.scheduleKey] ?? 0) > now) continue;
-    const p: Provider = {
-      id: uid(), name: displayName(e.name), type: e.type, status: 'active', statusExpiresAt: null, teamId: e.teamId,
-      scheduleKey: e.scheduleKey, share: e.share, endsAt: e.endsAt, ...(e.note ? { note: e.note } : {}),
-    };
+    const p = providerFromRoster(e);
     providers.push(p);
     events.push({ kind: 'provider_add', teamId: p.teamId, name: p.name, providerType: p.type, auto: true });
   }

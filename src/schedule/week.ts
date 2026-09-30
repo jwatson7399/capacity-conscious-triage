@@ -20,6 +20,17 @@ import { parseTimeToHour, type DaySchedule, type ScheduleProvider } from '../uti
 /** One day of the stored week. isoDate is the calendar date, YYYY-MM-DD. */
 export interface WeekDay extends DaySchedule { isoDate: string }
 
+/** Increment when the live interpretation of a workbook changes. Never affects legacy parsing. */
+export const SCHEDULE_PARSER_VERSION = 2;
+
+export interface OriginalSchedule {
+  source: string;
+  /** Original workbook bytes, base64 encoded for local storage only. */
+  base64: string;
+  /** Dates this upload still owns after a resend. Re-reading cannot resurrect replaced days. */
+  dates: string[];
+}
+
 export interface StoredWeek {
   days: WeekDay[];
   /** File name(s) the days came from, newest last. */
@@ -27,6 +38,10 @@ export interface StoredWeek {
   loadedAt: number;
   /** Roles picked by hand for residents the sheet gives no level for, keyed by lowercase name. */
   roleFixes: Record<string, ProviderType>;
+  parserVersion?: number;
+  originals?: OriginalSchedule[];
+  /** Present only when an older saved week cannot be upgraded from its originals. */
+  migrationError?: string;
 }
 
 export interface Slot {
@@ -123,6 +138,7 @@ export function mergeWeek(prev: StoredWeek | null, days: WeekDay[], source: stri
   const kept = (prev?.days ?? []).filter(d => !incoming.has(d.isoDate) && d.isoDate >= oldest);
   return {
     days: [...kept, ...days].sort((a, b) => a.isoDate.localeCompare(b.isoDate)),
+    parserVersion: SCHEDULE_PARSER_VERSION,
     sources: [...(prev?.sources ?? []), source].slice(-4),
     loadedAt: now,
     roleFixes: { ...(prev?.roleFixes ?? {}), ...roleFixes },
@@ -215,9 +231,9 @@ export function floatsAt(floats: FloatSlot[], t: number): string[] {
 }
 
 /** The next moment after t when anyone joins or leaves, a team opens or closes, or a split changes. */
-export function nextChange(slots: Slot[], t: number): number | null {
+export function nextChange(slots: Slot[], t: number, floats: FloatSlot[] = []): number | null {
   let best = Infinity;
-  for (const s of slots) {
+  for (const s of [...slots, ...floats]) {
     if (s.start > t && s.start < best) best = s.start;
     if (s.end > t && s.end < best) best = s.end;
   }

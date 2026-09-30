@@ -1,5 +1,7 @@
 // © 2026 New York University. All rights reserved.
 import { useEffect, useRef, useState } from 'react';
+import { useShift } from '../context/ShiftContext';
+import { scheduleReadiness } from '../schedule/start';
 import type { Provider, ProviderType, TeamId } from '../types';
 import type { DaySchedule } from '../utils/scheduleParser';
 import { ROLE_LONG, ROLE_ORDER, clock, hourMinute, teamName } from '../ui/model';
@@ -9,8 +11,8 @@ import { RoleSelect } from './TeamDetail';
 import { loadDraft, saveDraft, type DraftEntry, type DraftTeam } from './draft';
 import Sheet, { Confirm, SheetHeader } from './Sheet';
 import { CctMark } from './HomeArt';
-import { clearWeek, loadWeek, readWeek, storeRead, type ReadWeek } from '../schedule/storage';
-import { floatsAt, rosterAt, weekRange, type StoredWeek } from '../schedule/week';
+import { clearWeek, loadWeek, readWeek, storeRead, saveRoleFixes, type ReadWeek } from '../schedule/storage';
+import { floatsAt, rosterAt, weekRange, unresolved, type StoredWeek } from '../schedule/week';
 import { displayName, slotsOf } from '../schedule/follow';
 import { RoleFixes } from './ScheduleMenu';
 
@@ -93,6 +95,9 @@ function ScheduleSheet({ onCancel, onApply }: { onCancel: () => void; onApply: (
     finally { setBusy(false); }
   };
 
+  const savedMissing = week ? unresolved(week.days, week.roleFixes) : [];
+  const needsOriginal = !!week && scheduleReadiness(week, at).needsOriginal;
+
   // Who is on at the chosen moment.
   const rows: Row[] = [];
   let sampleDay = 0;
@@ -101,7 +106,7 @@ function ScheduleSheet({ onCancel, onApply }: { onCancel: () => void; onApply: (
     const { providers, floatAttendings } = providersAt(sample[sampleDay], new Date(at).getHours());
     providers.forEach((p, i) => rows.push({ key: `p${i}-${p.name}`, name: p.name, type: p.type, team: p.teamId }));
     floatAttendings.forEach((n, i) => rows.push({ key: `f${i}-${n}`, name: n, type: 'attending', team: 0 }));
-  } else if (week && !pending) {
+  } else if (week && !pending && !needsOriginal && savedMissing.length === 0) {
     const { slots, floats } = slotsOf(week);
     rosterAt(slots, at).forEach(e => rows.push({ key: e.scheduleKey, name: displayName(e.name), type: e.type, team: e.teamId, scheduleKey: e.scheduleKey, share: e.share, endsAt: e.endsAt, note: e.note }));
     floatsAt(floats, at).forEach(n => rows.push({ key: `float-${n}`, name: displayName(n), type: 'attending', team: 0 }));
@@ -131,6 +136,12 @@ function ScheduleSheet({ onCancel, onApply }: { onCancel: () => void; onApply: (
         </div>
       )}
       {busy && <p style={{ marginTop: 12 }}>Reading…</p>}
+      {!pending && needsOriginal && <p role="alert">{scheduleReadiness(week, at).reason}</p>}
+      {!pending && !needsOriginal && savedMissing.length > 0 && <>
+        <RoleFixes names={savedMissing} fixes={fixes} onChange={(n, t) => setFixes(f => ({ ...f, [n.toLowerCase()]: t }))} />
+        <button className="btn primary" disabled={savedMissing.some(n => !fixes[n.toLowerCase()])}
+          onClick={() => { if (week) { setWeek(saveRoleFixes(week, fixes)); setFixes({}); } }}>Save roles</button>
+      </>}
       {error && <p role="alert" style={{ marginTop: 12, color: 'var(--danger)' }}>{error}</p>}
 
       {pending && <>
@@ -220,6 +231,8 @@ function isoPlus(iso: string, days: number): string {
 export interface FollowStart { week: StoredWeek; suppress: Record<string, number> }
 
 export default function SetupScreen({ onHome, onStart }: { onHome: () => void; onStart: (providers: Provider[], floats: string[], follow?: FollowStart) => void }) {
+  const { state } = useShift();
+  const [startError, setStartError] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftEntry[]>(loadDraft);
   const [schedule, setSchedule] = useState(false);
   const [week, setWeek] = useState<StoredWeek | null>(() => loadWeek());
@@ -248,18 +261,21 @@ export default function SetupScreen({ onHome, onStart }: { onHome: () => void; o
   const shown = draft.filter(e => !e.dropped);
   const named = shown.filter(e => e.name.trim());
   // Follow only a schedule that has people on it now (an old week would empty the board).
-  const coversNow = !!week && rosterAt(slotsOf(week).slots, Date.now()).length > 0;
+  const readiness = scheduleReadiness(week, state.now);
+  const coversNow = readiness.canStart;
   const fromSchedule = !!week && draft.some(e => e.scheduleKey) && coversNow;
   const staleSchedule = !!week && draft.some(e => e.scheduleKey) && !coversNow;
   const valid = named.some(e => e.team === 1 || e.team === 2 || e.team === 3);
   const start = () => {
+    setStartError(null);
     const providers: Provider[] = named.filter(e => e.team !== 0).map(e => ({
       id: uid(), name: e.name.trim(), type: e.type, status: 'active', statusExpiresAt: null, teamId: e.team as TeamId,
       ...(e.scheduleKey && fromSchedule && followOn ? { scheduleKey: e.scheduleKey, share: e.share, endsAt: e.endsAt, ...(e.note ? { note: e.note } : {}) } : {}),
       ...(e.share !== undefined && !(fromSchedule && followOn) ? { share: e.share } : {}),
     }));
-    const suppress = Object.fromEntries(draft.filter(e => e.dropped && e.scheduleKey).map(e => [e.scheduleKey!, e.endsAt ?? Date.now()]));
-    onStart(providers, named.filter(e => e.team === 0).map(e => e.name.trim()), fromSchedule && followOn && week ? { week, suppress } : undefined);
+    const suppress = Object.fromEntries(draft.filter(e => e.dropped && e.scheduleKey).map(e => [e.scheduleKey!, e.endsAt ?? state.now]));
+    try { onStart(providers, named.filter(e => e.team === 0).map(e => e.name.trim()), fromSchedule && followOn && week ? { week, suppress } : undefined); }
+    catch (e) { setStartError(e instanceof Error ? e.message : 'Could not start the shift.'); }
   };
 
   return (
@@ -295,14 +311,15 @@ export default function SetupScreen({ onHome, onStart }: { onHome: () => void; o
           </label>
         )}
         {staleSchedule && (
-          <p className="card" role="status" style={{ marginTop: 12 }}>The schedule on this device has nobody on shift right now, so the board will not follow it. Load this week's schedule to follow shift changes.</p>
+          <p className="card" role="status" style={{ marginTop: 12 }}>{readiness.reason} The board will not follow this schedule until it is ready.</p>
         )}
         {draft.length > 0 && <button className="btn quiet" style={{ marginTop: 12 }} onClick={() => setRemoving({ id: '*', name: 'everyone', type: 'attending', team: 1 })}>Clear draft</button>}
       </main>
+      {startError && <p role="alert" className="page">{startError}</p>}
       <footer className="setup-footer">
         <div className="between" style={{ alignItems: 'center', maxWidth: 1148, margin: '0 auto' }}>
           <div><b className="num">{named.length} provider{named.length === 1 ? '' : 's'}</b><br /><small className="muted">{valid ? 'Nothing starts until you press Start shift.' : 'Add at least one provider to Team 1, 2 or 3.'}</small></div>
-          <button className="btn primary lg" disabled={!valid} onClick={start}>Start shift →</button>
+          <button className="btn primary lg" disabled={!valid || (staleSchedule && (readiness.needsOriginal || readiness.needsRole.length > 0))} onClick={start}>Start shift →</button>
         </div>
         <div className="foot" style={{ paddingBottom: 0 }}>© 2026 New York University</div>
       </footer>

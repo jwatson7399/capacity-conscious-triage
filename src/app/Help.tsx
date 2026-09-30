@@ -49,7 +49,7 @@ export function Help({ onBack }: { onBack: () => void }) {
       <p>To use a different team, tap <b>Other team</b>, pick the team and give a reason: continuity or bounce-back, a team or attending request, or other with a short note. The reason is saved with the assignment.</p>
       <p>Tick <b>Floor upgrade</b> when a patient already on a team gets sicker. Upgrades stay on that team, so there is no recommendation: pick the color, then the patient's team. The patient number starts with F, and the upgrade counts in that team's load at the new color's full weight, which lowers its ratio and steers the next patients elsewhere.</p>
       <p>Tap <b>Float</b> instead of placing when the float attending takes the patient. It is listed on the recommended team for the record but adds no load, so that team stays first for the next patient.</p>
-      <p>After a placement you have 30 seconds to undo it. Undo covers assignments only.</p>
+      <p>After a placement, the board offers a quick Undo for 30 seconds. You can also undo supported actions later from Shift activity, as described below.</p>
 
       <h2>Team details</h2>
       <p>Tap any column or team row to open it. A tap never assigns anyone. From there you can:</p>
@@ -60,11 +60,21 @@ export function Help({ onBack }: { onBack: () => void }) {
         <li><b>Correct color</b> when the color was entered wrongly. Unlike an upgrade, the patient keeps its placed time.</li>
         <li><b>Undo later.</b> Open Shift activity: any placement, reassignment, sign-out, float change or color correction has an Undo button for the rest of the shift, as long as that patient has not been changed since. If it has, the entry offers to open the patient instead. The original entry stays in the list, marked undone.</li>
         <li><b>Mark deceased.</b> The patient's load comes off the team at once, and the team is ranked last for {Math.round(DECEASED_BUFFER_MS / 60000)} minutes (unless every open team is in the same position), shown as a tag with minutes left. The patient shows as not counted.</li>
-        <li><b>Give to float.</b> The float attending takes the patient. It stays listed on the team but counts {pct(FLOAT_MODIFIER_MULTIPLIERS.float_primary)}%, so it shows as not counted. To relieve a team that is underwater, give the float one of that team's patients: taking the next new arrival relieves the team with the most room instead.</li>
+        <li><b>Give to float.</b> The float attending takes the patient. It stays listed on the team but counts {pct(FLOAT_MODIFIER_MULTIPLIERS.float_primary)}, so it shows as not counted. To relieve a team that is underwater, give the float one of that team's patients: taking the next new arrival relieves the team with the most room instead.</li>
         <li>Swap, add or remove providers.</li>
-        <li>Close the team or sign out all its patients. A closed team leaves the recommendations and stays closed until someone reopens it. Its patients move only when you sign them out. A sign-out moves each patient with its timer, so its remaining load now counts on the new team. It can be undone for 30 seconds, and each moved patient shows which team it was signed out from and when.</li>
+        <li>Close the team or sign out all its patients. A team you close by hand leaves the recommendations and stays closed until someone reopens it. Its patients move only when you sign them out. A sign-out moves each patient with its timer, so its remaining load now counts on the new team. The board offers a quick Undo for 30 seconds; Shift activity also offers Undo while the moved patients have no later changes. Each moved patient shows which team it was signed out from and when.</li>
       </ul>
       <p>Patient timers describe the model: how long the patient still adds to team load. They say nothing about clinical status or readiness for discharge.</p>
+
+      <h2>Schedule and shared providers</h2>
+      <p><b>Following the schedule.</b> On Home, choose <b>Upload this week's schedule</b> and select the weekly department .xlsx. Check any missing resident roles, review who is on now, then tap <b>Start shift</b>. Later that week, choose <b>Start shift from schedule</b>. <b>Edit teams first</b> lets you adjust the roster before starting; <b>Build your teams</b> is the manual option.</p>
+      <p>The board adds and removes people at their scheduled times, so team strength changes at each handoff. A call-out or swap stays in effect until that scheduled slot ends. A provider you add by hand stays until you remove them. A team you close by hand stays closed until you reopen it. If you reopen a team the schedule has closed, it stays open until the schedule next opens it itself.</p>
+      <p><b>Teams 3 and 4 at night.</b> Team 3 stops taking new patients at 11 PM and Team 4 at 12 AM. Their own providers stay on the board until their shifts end. Patients stay on their team's record and their load continues to decay unless you move them.</p>
+      <p><b>People who cover more than one team.</b> The A-side resident covers Teams 1, 2 and 3. N-side PAs or residents cover Teams 1 and 3; B-side covers Teams 2 and 4. Overnight Swing covers every team. A day swing resident covers the teams named on the schedule.</p>
+      <p>The app counts each shared provider once and splits their strength evenly across the teams scheduled to be open in their coverage group: a third each for the A-side resident when all three are open, or half each for N-side and B-side while both covered teams are open. When one of those teams closes for the night, that share moves to the covered teams still open. Team detail shows the share counted on each team.</p>
+      <p><b>Why a shared person still matters.</b> Same help, fewer patients to spread it over, bigger boost. A team with less modeled patient load gains more in its ratio from the same shared strength, so counting shared people can change which team is next.</p>
+      <p><b>Not counted.</b> Dental residents are listed but add no strength. A resident whose level is missing needs a role picked before starting; the app never guesses. An evening [PM] tag is not a resident level.</p>
+      <p>If a file does not cover now, upload the current schedule. When a followed schedule ends, the live board holds its roster and asks for the next file. Use <b>Schedule</b> in the board menu to load a resend or stop following. Stopping keeps the current roster for hand updates.</p>
 
       <h2>The numbers behind it</h2>
       <table>
@@ -76,9 +86,10 @@ export function Help({ onBack }: { onBack: () => void }) {
         <thead><tr><th>Acuity</th><th>Load at placement</th><th>Counts for</th></tr></thead>
         <tbody>{ACUITIES.map(a => <tr key={a}><td>{ACUITY_NAME[a]}</td><td className="num">{baseWeight(a)}</td><td className="num">{countMinutes(a)} min</td></tr>)}</tbody>
       </table>
-      <p>Each patient's load shrinks steadily to zero over its time. Trauma (Team 4) is shown on its own and is never recommended. Closed teams and teams with no providers are not recommended either. When two teams tie, the one that took a patient least recently goes first.</p>
+      <p>Each patient's load shrinks steadily to zero over its time. Trauma (Team 4) is shown on its own and is never recommended. Closed teams are outside the recommendations. The schedule closes a team when nobody of its own is scheduled. When two teams tie, the one that took a patient least recently goes first.</p>
 
       <h2>What it keeps</h2>
+      <p>The original uploaded schedule, its parsed roster and your resident role picks are saved on this device only. They are not sent anywhere. After an update to how schedules are read, the app re-reads the saved original automatically and keeps your role picks. If new missing roles appear, it asks before starting. If an older saved schedule has no original file, it asks you to upload it again.</p>
       <p>No patient names or record numbers. The shift activity list stays in memory on this device and is cleared when the shift ends or the page reloads.</p>
     </Page>
   );
@@ -91,6 +102,7 @@ export function HowItWorks({ onBack, onHome, startWalk = false }: { onBack: () =
       <p>Round-robin gives each team the next patient in turn. It does not look at who is on each team or how sick their current patients are.</p>
       <p>This board does. For each team it adds up <b>provider strength</b> (a senior resident counts more than an intern) and divides by <b>patient load</b> (a Red counts more than a Purple, and recent patients count more than ones placed hours ago). That ratio is the team's <b>capacity</b>: its real room for one more patient. The highest capacity is suggested next.</p>
       <p>Patient load fades over time. A Red counts for {countMinutes('tier_one')} minutes, a Yellow for {countMinutes('tier_two')} and a Purple for {countMinutes('tier_three')}, shrinking steadily until the patient no longer counts. That keeps the number close to how busy the team is now, not how busy it was at the start of the shift.</p>
+      <p>Upload the weekly schedule to start with the people on now and follow their shift changes automatically. Shared providers count once, with their strength divided equally across their covered teams that are scheduled to be open.</p>
       <p>The suggestion is advice. The charge nurse places every patient, and can send a patient elsewhere with a reason whenever the board does not match what is happening at the bedside.</p>
       <div style={{ margin: '24px 0 8px' }}>
         <button className="btn primary lg full" onClick={() => setWalk(true)}>Walk through the method ›</button>

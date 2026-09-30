@@ -9,13 +9,14 @@ import { useShift } from '../context/ShiftContext';
 import { ROLE_LONG, ROLE_ORDER, clock } from '../ui/model';
 import { displayName, slotsOf } from '../schedule/follow';
 import { loadWeek, readWeek, storeRead, type ReadWeek } from '../schedule/storage';
-import { nextChange, rosterAt, weekRange } from '../schedule/week';
+import { mergeWeek, nextChange, rosterAt, weekRange } from '../schedule/week';
+import { scheduleReadiness, scheduleRange } from '../schedule/start';
 import Sheet, { Confirm, Copyright, SheetHeader } from './Sheet';
 
 /** Pick a role for each resident the sheet gives no level for. Nothing is saved until every one has a role. */
 export function RoleFixes({ names, fixes, onChange }: { names: string[]; fixes: Record<string, ProviderType>; onChange: (name: string, t: ProviderType) => void }) {
   return (
-    <div className="card" style={{ marginTop: 12 }}>
+    <div className="card" style={{ marginTop: 12, padding: 16 }}>
       <b>{names.length} resident{names.length === 1 ? ' has' : 's have'} no level on the sheet</b>
       <p className="muted" style={{ margin: '4px 0 10px', fontSize: 13 }}>Pick a role for each. The app will not guess, because the role sets the team's strength. Your choice is kept on this device for later weeks.</p>
       {names.map(n => (
@@ -50,9 +51,9 @@ export function ScheduleChip({ onOpen }: { onOpen: () => void }) {
   }, []);
   // On a phone the header has no room; the schedule is in the menu instead.
   if (!follow || !wide) return null;
-  const { slots } = slotsOf(follow.week);
+  const { slots, floats } = slotsOf(follow.week);
   const ended = rosterAt(slots, state.now).length === 0;
-  const next = nextChange(slots, state.now);
+  const next = nextChange(slots, state.now, floats);
   return (
     <button className="pill" onClick={onOpen} aria-label="Schedule" title="The board follows the uploaded schedule"
       style={{ fontSize: 12, padding: '0 10px', gap: 6, whiteSpace: 'nowrap' }}>
@@ -69,7 +70,8 @@ export function ScheduleSheet({ onClose, onNote }: { onClose: () => void; onNote
   const [confirmStop, setConfirmStop] = useState(false);
   if (!follow) return null;
   const range = weekRange(follow.week);
-  const next = nextChange(slotsOf(follow.week).slots, state.now);
+  const { slots, floats } = slotsOf(follow.week);
+  const next = nextChange(slots, state.now, floats);
   const held = follow.held;
   const unresolvedNow = pending ? pending.needsRole.filter(n => !fixes[n.toLowerCase()]) : [];
 
@@ -80,6 +82,8 @@ export function ScheduleSheet({ onClose, onNote }: { onClose: () => void; onNote
   };
   const save = () => {
     if (!pending) return;
+    const candidate = mergeWeek(null, pending.days, pending.source, { ...follow.week.roleFixes, ...fixes }, state.now);
+    if (!scheduleReadiness(candidate, state.now).canStart) { setError(`${scheduleRange(candidate)}: ${scheduleReadiness(candidate, state.now).reason}`); return; }
     const w = storeRead(loadWeek() ?? follow.week, pending, fixes);
     dispatch({ type: 'SCHEDULE_UPDATE', week: w });
     setPending(null);
@@ -118,6 +122,7 @@ export function ScheduleSheet({ onClose, onNote }: { onClose: () => void; onNote
           </button>
         </div>
       </>}
+      {pending && error && <p role="alert" style={{ color: 'var(--danger)' }}>{error}</p>}
       <Copyright />
       {confirmStop && <Confirm title="Stop following the schedule?" danger confirmLabel="Stop"
         body={<p>The board keeps the people on it now. From here, shift changes are made by hand in team detail.</p>}

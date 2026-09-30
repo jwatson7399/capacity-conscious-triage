@@ -16,6 +16,7 @@ import { generateTimeline, randomSeed } from '../engine/simulation';
 import { uid } from '../uid';
 import { startFollowing, syncToSchedule, type FollowState } from '../schedule/follow';
 import type { StoredWeek } from '../schedule/week';
+import { scheduleReadiness } from '../schedule/start';
 
 export interface AssignMeta {
   reasonCode?: OverrideReasonCode;
@@ -292,10 +293,12 @@ export function makeSessionReducer(core: CoreReducer, scoringFor: ScoringFor) {
       }
 
       case 'SCHEDULE_FOLLOW':
-        return follow({ ...s, follow: startFollowing(action.week, action.suppress) });
+        return scheduleReadiness(action.week, before.now).canStart
+          ? follow({ ...s, follow: startFollowing(action.week, action.suppress) }) : s;
 
       case 'SCHEDULE_UPDATE':
-        return s.follow ? follow({ ...s, follow: { ...s.follow, week: action.week } }) : s;
+        return s.follow && scheduleReadiness(action.week, before.now).canStart
+          ? follow({ ...s, follow: { ...s.follow, week: action.week } }) : s;
 
       case 'SCHEDULE_STOP': {
         if (!s.follow) return s;
@@ -327,7 +330,8 @@ export function makeSessionReducer(core: CoreReducer, scoringFor: ScoringFor) {
           timeline = [...done, ...future];
         }
         const out: SessionState = { ...s, shift: { ...before, simulation: { ...sim, timeline } } };
-        const { demoRewind: _old, ...moment } = out;
+        const moment = { ...out };
+        delete moment.demoRewind;
         return action.on ? { ...moment, demoRewind: [moment] } : moment;
       }
 
