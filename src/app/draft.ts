@@ -7,7 +7,19 @@ import type { ProviderType, TeamId } from '../types';
 
 /** Team 0 in the draft means float attending. */
 export type DraftTeam = TeamId | 0;
-export interface DraftEntry { id: string; name: string; type: ProviderType; team: DraftTeam }
+export interface DraftEntry {
+  id: string;
+  name: string;
+  type: ProviderType;
+  team: DraftTeam;
+  /** From the uploaded schedule (see src/schedule/week.ts). */
+  scheduleKey?: string;
+  share?: number;
+  endsAt?: number;
+  note?: string;
+  /** A scheduled entry deleted from the draft: kept hidden so the schedule does not add it back. */
+  dropped?: boolean;
+}
 
 const DRAFT_KEY = 'cct-shift-draft-v1';
 

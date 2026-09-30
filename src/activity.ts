@@ -111,6 +111,8 @@ export interface ProviderEvent extends EventBase {
   providerType: ProviderType;
   replacedName?: string;
   replacedType?: ProviderType;
+  /** True when the uploaded schedule made the change at a shift change, not a person. */
+  auto?: boolean;
 }
 
 export interface TeamEvent extends EventBase {
@@ -120,6 +122,8 @@ export interface TeamEvent extends EventBase {
   undoesEventId?: string;
   toTeamId?: TeamId;
   patientCount?: number;
+  /** True when the uploaded schedule opened or closed the team, not a person. */
+  auto?: boolean;
 }
 
 export interface ShiftEvent extends EventBase {

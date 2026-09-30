@@ -45,11 +45,11 @@ function line(e: ActivityEvent, undone: Set<string>, undoneAt: Map<string, numbe
     case 'downgrade': return { t1: `${e.patientId} downgraded`, t2: `Removed from ${teamName(e.teamId)} load`, dot: 'hollow' };
     case 'deceased': return { t1: `${e.patientId} marked deceased`, t2: `${teamName(e.teamId)} · 30-minute buffer started`, dot: 'hollow' };
     case 'float': return { t1: `${e.patientId} float: ${FLOAT_MODIFIER_LABELS[e.modifier]}`, t2: `${teamName(e.teamId)}${e.floatName ? ` · ${e.floatName}` : ''}`, dot: '' };
-    case 'provider_add': return { t1: `${e.name} added`, t2: `${ROLE_LONG[e.providerType]} · ${teamName(e.teamId)}`, dot: '' };
-    case 'provider_remove': return { t1: `${e.name} removed`, t2: `${ROLE_LONG[e.providerType]} · ${teamName(e.teamId)}`, dot: '' };
+    case 'provider_add': return { t1: `${e.name} ${e.auto ? 'on shift' : 'added'}`, t2: `${ROLE_LONG[e.providerType]} · ${teamName(e.teamId)}${e.auto ? ' · from the schedule' : ''}`, dot: '' };
+    case 'provider_remove': return { t1: `${e.name} ${e.auto ? 'off shift' : 'removed'}`, t2: `${ROLE_LONG[e.providerType]} · ${teamName(e.teamId)}${e.auto ? ' · from the schedule' : ''}`, dot: '' };
     case 'provider_swap': return { t1: `${e.replacedName ?? 'Provider'} swapped for ${e.name}`, t2: `${ROLE_LONG[e.providerType]} · ${teamName(e.teamId)}`, dot: '' };
-    case 'team_close': return { t1: `${teamName(e.teamId)} closed`, t2: 'Out of recommendations', dot: '' };
-    case 'team_reopen': return { t1: `${teamName(e.teamId)} reopened`, t2: 'Back in recommendations', dot: '' };
+    case 'team_close': return { t1: `${teamName(e.teamId)} closed`, t2: `Out of recommendations${e.auto ? ' · from the schedule' : ''}`, dot: '' };
+    case 'team_reopen': return { t1: `${teamName(e.teamId)} ${e.auto ? 'opened' : 'reopened'}`, t2: `Back in recommendations${e.auto ? ' · from the schedule' : ''}`, dot: '' };
     case 'signout_undo': return { t1: `Undid ${teamName(e.teamId)} sign-out`, t2: `${e.patientCount} patient${e.patientCount === 1 ? '' : 's'} back from ${teamName(e.toTeamId!)}`, dot: 'hollow' };
     case 'signout': return { t1: `${teamName(e.teamId)} signed out`, t2: `${e.patientCount} patient${e.patientCount === 1 ? '' : 's'} to ${teamName(e.toTeamId!)}`, dot: '' };
   }

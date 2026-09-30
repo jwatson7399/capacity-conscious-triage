@@ -8,7 +8,7 @@ import { useCallback, useState } from 'react';
 import type { Provider } from '../types';
 import { ShiftProvider, useShift } from '../context/ShiftContext';
 import Home from './Home';
-import SetupScreen from './SetupScreen';
+import SetupScreen, { type FollowStart } from './SetupScreen';
 import { clearDraft } from './draft';
 import { useTheme } from './useTheme';
 import Ticker from './Ticker';
@@ -43,9 +43,10 @@ function Screens() {
     if (hasParam('walkthrough')) history.replaceState(null, '', window.location.pathname);
   }, []);
 
-  const start = (providers: Provider[], floats: string[]) => {
+  const start = (providers: Provider[], floats: string[], follow?: FollowStart) => {
     dispatch({ type: 'START_SHIFT', providers });
     dispatch({ type: 'SET_FLOAT_ATTENDINGS', names: floats });
+    if (follow) dispatch({ type: 'SCHEDULE_FOLLOW', week: follow.week, suppress: follow.suppress });
     clearDraft();
     go('board');
   };

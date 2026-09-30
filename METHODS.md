@@ -596,6 +596,33 @@ Each New York-derived result document now carries a dated note at the top pointi
 
 ---
 
+## 11. Weekly Schedule Upload and Automatic Shift Changes
+_(unreviewed, written by Claude Opus (Claude Code, Cowork session))_
+
+**Objective.** For the trial, every shift is known in advance and the department schedule arrives by email each week as an .xlsx. Replace hand entry of rosters (and the ShiftAdmin API idea, deferred by Julian, Roundtable Decision 39) with a one-time weekly upload, and have the live board follow the schedule through every shift change, because replacements are often not equally experienced and team strength changes at each handoff (Decisions 40 to 42).
+
+**Data.** The 11 weeks used for back testing (December 2025 to March 2026) plus six recent weeks Julian supplied (August 24 to September 28, 2026), all in `data/provider-schedules/schedules/` (gitignored, never shipped).
+
+**Audit of the existing parser (read only, before any change).**
+- On the 11 older weeks the layout reading was sound: 7 days each, 2,253 provider shifts, 1 with no time, no unreadable time format.
+- Overnight bug in the app's use of the parser: choosing a day at 3 AM showed the crew starting that night at 11 PM, not the previous night's crew (confirmed on every day of the December 29 week). The scripts call the same `getProvidersForShift`, so the replay and benchmarks may carry the same offset for early-morning arrivals. Not changed here; open item for Julian.
+- Residents missing from the PGY key were silently scored as senior residents (15.2): 18 of 485 across the 11 weeks.
+- The six recent weeks changed format: the PGY key header varies ("Resident Name", "Name", "RESIDENT"), so 3 of 6 weeks read no key and every resident scored senior; levels now sit in brackets in the name cell ("[2]", "[IM]", "[DENTAL]"); times appear without a colon ("830A-5P", "1030P-7A"; 26 shifts were counted as on all day); 24 dental resident cells; overnight side labels written as "T2 / B-side"; day swing residents written "(Swing T1/T3)"; unfilled slots written "OPEN".
+
+**Method.**
+- `parseWeeklySchedule(data, { live: true })` reads the new format (bracket level first, then the PGY key under any of its headers; unknown levels flagged, never guessed; dental `countsZero`; [IM] and [PEM] as rotators; colonless times; cover teams for N-side (1 and 3), B-side (2 and 4), "Tn / side" labels and day swing; placeholders skipped; calendar date). Called with no options it gives the legacy reading, byte for byte: a JSON dump of every file's parse and every hour's roster matched main (e51714f) before and after, and per-file hashes are pinned in `src/schedule/realWeeks.test.ts`.
+- `src/schedule/week.ts` turns the week into timed slots (an end at or before the start is the next day) and answers who is on at any moment. Team 3 takes no new patients 11 PM to 7 AM and Team 4 12 AM to 7 AM; their people stay on the board until their shifts end so current patients still count. A team with nobody of its own on shift is closed. A provider covering two open teams counts half on each, and fully on Team 1 or 2 once the other closes. A sheet date that disagrees with its weekday is moved one year to match (the February 16 week was typed as 2025).
+- The engine's capacity sum gains one factor, `share` (missing means 1). Nothing outside the schedule-driven board sets it, so every earlier score and benchmark is unchanged.
+- `src/schedule/follow.ts` runs on each live tick: adds and removes scheduled providers, updates splits, closes and reopens teams, sets floats, and logs each change as an activity event marked as from the schedule. Hand edits win as decided (Decision 40). Past the end of the uploaded week the board holds instead of emptying.
+
+**Results.** Across all 17 weeks at 15-minute steps: Teams 1 and 2 are never closed by the schedule; Team 3 is closed about 9 hours a night and Team 4 about 9 hours; no person ever counts for more than one full provider; after roles are picked, no resident is left without a level. Unknown levels remaining in the live reading: 39 across 17 weeks (for example 4 in the September 28 week, including "Moonlight" slots), each picked by a person at upload.
+
+**Design rationale.** Keeping the legacy reading separate protects every recorded figure; the trial reading is where the sheet's current format is honored. Splitting cover weight avoids counting one person twice at night, when teams are thinnest.
+
+**Assumptions to confirm (flagged for Julian).** An overnight "Swing" provider (legacy reading: all four teams) is split evenly over every open team; "Tn / Swing" is read as that team's side; "[PM]" tags are treated as unknown and must be picked. Day swing residents "(Swing T1/T3)" are split like overnight side cover.
+
+**Implementation notes.** Branch `schedule-auto-shifts` (from main e51714f). Files: `src/utils/scheduleParser.ts`, `src/schedule/{week,follow,storage}.ts`, `src/context/session.ts` (SCHEDULE_FOLLOW, SCHEDULE_UPDATE, SCHEDULE_STOP; hand-edit holds), `src/engine/recommendation.ts` (share), `src/types.ts`, `src/activity.ts`, `src/app/{SetupScreen,ScheduleMenu,Board,TeamDetail,ActivityDrawer,CarbonApp,draft}.tsx`. Tests: 179 pass (`src/schedule/*.test.ts`, parser live-mode tests; the real-week tests skip where `data/` is absent). Each new rule was checked to fail its test when removed. Checked in a browser at tablet and phone width with a fixed clock: upload, role picks, roster preview, start, the 11 PM Team 3 close and the resulting log.
+
 # Historical Methodology Record
 
 _The sections below document earlier methodology work preserved from a prior version of this document._

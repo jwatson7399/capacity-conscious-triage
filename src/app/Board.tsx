@@ -11,6 +11,7 @@ import TeamDetail from './TeamDetail';
 import HeaderClock from './HeaderClock';
 import Sheet, { Confirm, Copyright, SheetHeader } from './Sheet';
 import { CctMark } from './HomeArt';
+import { ScheduleChip, ScheduleSheet } from './ScheduleMenu';
 
 export type BoardMode = 'live' | 'demo' | 'tour';
 
@@ -40,7 +41,7 @@ export interface BoardProps {
 }
 
 export default function Board({ mode, dark, onToggleDark, onHome, onHelp, onHow, onEndShift, toolbar, tourUi, onUiChange }: BoardProps) {
-  const { state, dispatch, recommendation: rec, activity, undoable } = useShift();
+  const { state, dispatch, recommendation: rec, activity, undoable, follow } = useShift();
   const [armed, setArmed] = useState<AcuityTier | null>(tourUi?.armed ?? null);
   const [floor, setFloor] = useState(false);
   const [floatPick, setFloatPick] = useState(false);
@@ -48,6 +49,7 @@ export default function Board({ mode, dark, onToggleDark, onHome, onHelp, onHow,
   const [detail, setDetail] = useState<TeamId | null>(tourUi?.detail ?? null);
   const [showLog, setShowLog] = useState(tourUi?.activity ?? false);
   const [menu, setMenu] = useState(false);
+  const [sched, setSched] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [timer, setTimer] = useState<UndoTimer | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -186,6 +188,7 @@ export default function Board({ mode, dark, onToggleDark, onHome, onHelp, onHow,
         <span className="sp" />
         <span className={`live${paused ? ' paused' : ''}`} title={paused ? 'Paused' : 'Live'}><i /><span className="live-word">{paused ? 'Paused' : 'Live'}</span></span>
         <HeaderClock ms={state.now} />
+        {mode === 'live' && <ScheduleChip onOpen={() => setSched(true)} />}
         <button className="pill homebtn" onClick={onHome} aria-label="Home" title="Home">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="M3 11 12 4l9 7" /><path d="M5.5 9.5V20h13V9.5" /><path d="M10 20v-5.5h4V20" /></svg>
         </button>
@@ -231,10 +234,12 @@ export default function Board({ mode, dark, onToggleDark, onHome, onHelp, onHow,
       {detail !== null && <TeamDetail teamId={detail} onClose={closeDetail} onNote={setNote} onSignedOut={() => { startUndo(); closeDetail(); }} />}
       {showLog && <ActivityDrawer events={activity} onClose={closeLog} onOpenTeam={t => { closeLog(); setDetail(t); }} />}
 
+      {sched && <ScheduleSheet onClose={() => setSched(false)} onNote={setNote} />}
       {menu && (
         <Sheet label="Menu" onClose={() => setMenu(false)}>
           <SheetHeader title="Menu" onClose={() => setMenu(false)} />
           <div className="opts">
+            {mode === 'live' && follow && <button className="opt" onClick={() => { setMenu(false); setSched(true); }}><span><b>Schedule</b><small>Following the uploaded schedule. Load a newer one or stop.</small></span></button>}
             <button className="opt" onClick={() => { setMenu(false); onHelp(); }}><b>Help</b></button>
             <button className="opt" onClick={() => { setMenu(false); onHow(); }}><b>How it works</b></button>
             <button className="opt" onClick={() => { setMenu(false); onHome(); }}>

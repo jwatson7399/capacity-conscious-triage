@@ -17,6 +17,17 @@ export interface Provider {
   status: ProviderStatus;
   statusExpiresAt: number | null;
   teamId: TeamId;
+  /** Set when the uploaded schedule put this provider on the board (src/schedule/week.ts). */
+  scheduleKey?: string;
+  /**
+   * Fraction of this provider's strength counted on this team. Missing means 1. Half for an
+   * overnight side or swing provider covering two open teams, 0 for a dental resident (Decision 42).
+   */
+  share?: number;
+  /** When the schedule takes this provider off the board (end of their shift, or of the slot they fill). */
+  endsAt?: number;
+  /** Short plain note shown with the provider, e.g. "Covers Team 1 and Team 3, counted half here". */
+  note?: string;
 }
 
 export interface Patient {
