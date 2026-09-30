@@ -218,3 +218,30 @@ explicit go, and the Dossier draft comes first.
 4. Wire into `ShiftProvider`, Setup (passcode), board (code, status), End shift.
 5. Admin screen and export.
 6. End-to-end check; records; CLAUDE.md.
+
+## 13. Revision 2026-09-29 (after external audit)
+
+The design is unchanged in shape: Supabase, separate admin and device auth, RPC-only writes,
+snapshot plus append-only events. The persistence protocol is tightened:
+
+- The server rejects null passcodes, versions and arguments, and compares them null-safely.
+- Each state save carries a save id. Repeating the last committed id succeeds without writing, so
+  a save whose reply was lost is not a conflict.
+- Upload queue entries have stable ids and are removed only when acknowledged. A save that has
+  been sent is never replaced.
+- The newest board is stored on the device at every change; only the upload waits (at most 1 s,
+  never pushed back by clock ticks).
+- A conflict is resolved on reload or from the status chip by comparing boards: the newer board
+  wins and unsent events always upload.
+- One browser tab records the shift (Web Locks). Other tabs are blocked with a notice.
+- Admin reads page through every row and fail rather than export a partial record.
+
+- Every page load drains the upload queue, even with no open shift, so a shift ended offline
+  still closes on the server after a reload.
+- A board not yet queued for upload is flagged on the device, so an offline reload queues it.
+- Adopting another device's board cancels any save scheduled from the old one.
+- The newest board is always the one queued, even if an older save is waiting.
+- Ending a shift during a conflict waits until the newer board is saved; the local board is kept
+  until then.
+
+Details and tests are in the plan's "Revision 2026-09-29" note.
