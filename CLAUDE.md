@@ -196,7 +196,31 @@ Carbon rebuild (branch `carbon-rebuild`, 2026-09-28): a new interface on the unc
   engine's ranking). `src/walkthrough/walkthroughModel.test.ts` fails if that file drifts from
   `constants.ts` or the engine, or if a slide goes back to typed-in numbers or em dashes. If the weights
   change, update the model file and review the slide text the test pins.
-- `src/utils/scheduleParser.ts`: layout-sensitive parser for departmental schedule workbooks
+- `src/utils/scheduleParser.ts`: layout-sensitive parser for departmental schedule workbooks.
+  `parseWeeklySchedule(data)` with no options is the **legacy reading** the benchmark and replay scripts
+  use; it must not change (hashes pinned in `src/schedule/realWeeks.test.ts`). The app passes
+  `{ live: true }` (Roundtable Decisions 41 and 42): bracket levels in name cells ("[2]", "[IM]",
+  "[DENTAL]"), any PGY key header ("Residents", "Resident Name", "Name"), times without a colon
+  ("830A"), dental residents `countsZero`, unknown levels flagged `unknownLevel` (never guessed),
+  A-side resident coverage of Teams 1 to 3, overnight side and day swing `coverTeams` plus
+  `coverSource` provenance, placeholders ("OPEN") skipped, and `isoDate`.
+- `src/schedule/`: the weekly schedule the live board follows (Decisions 40 to 42). `week.ts` (pure):
+  timed slots, `rosterAt(t)` (a shift runs start to end exactly, so 3 AM uses the previous evening's
+  crew), `openTeams(t)` (Team 3 takes no new patients 11 PM to 7 AM, Team 4 12 AM to 7 AM; people stay
+  on the board to their shift end), cover split (half on each open covered team, full on Team 1 or 2
+  once the other closes; overnight "Swing" splits over every open team). `follow.ts`:
+  `syncToSchedule`, run by the session on each live TICK: adds and removes scheduled providers
+  (`Provider.scheduleKey`, `share`, `endsAt`, `note`), closes and reopens teams, sets floats, logs
+  `auto` events. Hand edits win: a removed or swapped-out slot stays off until its shift ends; a
+  swap-in leaves at the slot's end; hand-added providers stay; a hand close is never reopened; a hand
+  reopen holds until the schedule opens that team itself. Past the uploaded week the board holds.
+  `storage.ts`: the parsed week, original workbook bytes, parser version and role picks in
+  localStorage (`cct-week-schedule-v1`, never leaves the device). Older versions re-read retained
+  originals automatically; missing or unreadable originals require upload. A resend replaces
+  the same dates, including original-file ownership, so migration cannot revive replaced days.
+  `start.ts` and `app/ScheduleStart.tsx`: current-roster readiness and direct start from Home.
+  Unknown roles and outdated or stale weeks cannot start following. The ready screen builds
+  providers with the same helper as scheduled joins and rechecks the clock on Start shift.
 - `src/utils/delphiResponses.ts`: the survey missing-value policy (see "Delphi survey: missing values")
 - `src/components/benchmarkResults.ts`: numbers for the lab benchmark page, generated from
   `npx tsx scripts/benchmark.ts --json <file outside data/>`; regenerate, never hand-edit
@@ -207,7 +231,7 @@ Carbon rebuild (branch `carbon-rebuild`, 2026-09-28): a new interface on the unc
 
 ```
 Capacity Ratio = Team Capacity / Patient Load
-Team Capacity  = sum(provider weight x status multiplier)
+Team Capacity  = sum(provider weight x status multiplier x share)
 Patient Load   = sum(decayed acuity weight x patient float modifier)
 ```
 
@@ -347,6 +371,12 @@ scoring never reads the survey.
   60x, 240x, optional arrivals placed through the engine with next/last arrival steps, reset, Change Teams:
   a random day's 10:00 teams from the synthetic schedule).
 - **Tour** is six steps on its own sample shift with the clock held still.
+- **Weekly schedule upload** (Home, "Upload this week's schedule" or "Start shift from schedule";
+  also in manual setup): the .xlsx is read on the device,
+  residents with no level must get a role before the week is saved, and the shift follows the
+  schedule automatically. `Provider.share` is missing (1) everywhere outside this path, so all earlier
+  scoring and every benchmark are unchanged. ShiftAdmin API access is deferred until after the trial
+  (Decision 39).
 - **Shift activity** is in memory only and is lost on reload or End shift. The trial still needs a
   durable override record (open item).
 - **Override reasons:** Continuity / bounce-back; Team or attending request; Other (note required).
@@ -371,3 +401,19 @@ real protection for the weights, since a client-side engine must ship them to th
 - Auth can be simple (shift code / room code)
 - Planned trial requirement: an override log (every recommendation, accepted or overridden, with
   structured reason codes plus free text) must exist before day one of the trial
+
+## Shared-provider bounded check (September 30, 2026)
+
+The live parser now includes A-side residents, split equally through `rosterAt` across their open
+covered teams. Legacy parsing remains unchanged. Setup and team detail show the exact cover rule;
+scoring uses the unrounded share. Unknown levels still need a role pick. Swing covers all teams;
+[PM] is not a level (PGY key first, otherwise role pick). The scheduled-close redistribution remains
+as in Decision 42. Saved schedules with older parser versions automatically re-read their original
+workbooks to include A-side rows and retain role picks. Only a missing or unreadable original
+requires re-upload (upload-and-go follow-up).
+The rule is provisional pending Julian's final trial freeze review.
+
+`node --import tsx scripts/shared-provider-check.ts` runs only in an isolated checkout with copied
+private schedules and writes new aggregate outputs under `data/shared-provider-check/`. It compares
+sharing rules with corrected rosters, excludes unresolved/ambiguous full windows, and never writes
+old benchmarks. See METHODS section 12 for cohort limitations and same-run results.

@@ -20,6 +20,12 @@ type Dialog =
 
 const DECEASED_MIN = Math.round(DECEASED_BUFFER_MS / 60000);
 
+/** A provider's counted strength on this team: the scale value, or its share when split or not counted. */
+function strengthText(weight: number, share: number | undefined): string {
+  if (share === undefined || share === 1) return String(weight);
+  return `${Math.round(weight * share * 10) / 10} of ${weight}`;
+}
+
 /** Colors above the current one (Red is highest). */
 function higherTiers(t: AcuityTier): AcuityTier[] {
   return ACUITIES.slice(0, ACUITIES.indexOf(t));
@@ -239,7 +245,11 @@ export default function TeamDetail({ teamId, onClose, onNote, onSignedOut }: { t
           {providers.length === 0 && <p style={{ marginTop: 14 }}>No providers on this team.</p>}
           {providers.map(p => (
             <div key={p.id} className="prov">
-              <div className="who"><b>{providerLabel(p)}</b><small>{ROLE_LONG[p.type]} <span className="str num">Strength {capacityWeights[p.type]}</span></small></div>
+              <div className="who">
+                <b>{providerLabel(p)}</b>
+                <small>{ROLE_LONG[p.type]} <span className="str num">Strength {strengthText(capacityWeights[p.type], p.share)}</span>{p.endsAt !== undefined && <span className="num"> · until {clock(p.endsAt)}</span>}</small>
+                {p.note && <small className="muted" style={{ display: 'block' }}>{p.note}</small>}
+              </div>
               <button className="btn sm" onClick={() => setDialog({ kind: 'provider', provider: p })}>Swap</button>
               <button className="btn sm" onClick={() => setDialog({ kind: 'remove', provider: p })}>Remove</button>
             </div>

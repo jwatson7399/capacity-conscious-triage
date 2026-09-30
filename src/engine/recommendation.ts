@@ -23,7 +23,9 @@ export function getEffectiveCapacity(providers: Provider[], now: number, overrid
   const sm = overrides?.statusMultipliers ?? STATUS_MULTIPLIERS;
   return providers.reduce((sum, p) => {
     const status = (p.statusExpiresAt !== null && p.statusExpiresAt <= now) ? 'active' : p.status;
-    return sum + (cw[p.type] ?? 0) * (sm[status] ?? 0);
+    // share: part of a provider covering two teams, or 0 for one listed but not counted (Decision 42).
+    // Missing for every provider outside the schedule-driven board, so all earlier scoring is unchanged.
+    return sum + (cw[p.type] ?? 0) * (sm[status] ?? 0) * (p.share ?? 1);
   }, 0);
 }
 

@@ -4,8 +4,13 @@ import { clock } from '../ui/model';
 import HeaderClock from './HeaderClock';
 import { draftCount } from './draft';
 import { CapacitySkyline, CctMark } from './HomeArt';
+import type { StoredWeek } from '../schedule/week';
+import { scheduleRange, scheduleReadiness } from '../schedule/start';
 
-export default function Home({ dark, onToggleDark, onStart, onResume, onDemo, onTour, onHow }: {
+export default function Home({ dark, onToggleDark, onStart, onResume, onDemo, onTour, onHow, week, onSchedule, onUpload }: {
+  week: StoredWeek | null;
+  onSchedule: () => void;
+  onUpload: () => void;
   dark: boolean;
   onToggleDark: () => void;
   onStart: () => void;
@@ -18,6 +23,8 @@ export default function Home({ dark, onToggleDark, onStart, onResume, onDemo, on
   const running = state.shiftStarted;
   const started = activity.find(e => e.kind === 'shift_start');
   const draft = running ? 0 : draftCount();
+  const schedule = scheduleReadiness(week, state.now);
+  const useStored = !!week && !schedule.needsOriginal && schedule.coversNow;
 
   return (
     <div className="home">
@@ -35,7 +42,16 @@ export default function Home({ dark, onToggleDark, onStart, onResume, onDemo, on
           </div>
           {running
             ? <button className="btn primary lg full" onClick={onResume}>Resume shift →</button>
-            : <button className="btn primary lg full" onClick={onStart}>Start shift →</button>}
+            : <>
+              <button className="btn primary lg full" onClick={useStored ? onSchedule : onUpload}>
+                {useStored ? 'Start shift from schedule' : "Upload this week's schedule"}
+              </button>
+              {week && <p className="muted" style={{ margin: '10px 0', fontSize: 13, textAlign: 'center' }}>
+                Schedule on this device: {scheduleRange(week)}.<br />
+                {schedule.needsOriginal ? schedule.reason : !schedule.coversNow ? 'It does not cover now. Upload a current schedule.' : schedule.expiresSoon ? `It ends within 24 hours, at ${clock(schedule.endsAt!)}.` : 'The board will follow the current roster.'}
+              </p>}
+              <button className="btn full" style={{ marginTop: 10 }} onClick={onStart}>Build your teams</button>
+            </>}
           <div className="muted" style={{ fontSize: 13, margin: '10px 0 22px', textAlign: 'center' }}>
             {running
               ? `Started ${started ? clock(started.at) : ''} · ${state.providers.length} providers · ${state.patients.length} patient${state.patients.length === 1 ? '' : 's'} placed`

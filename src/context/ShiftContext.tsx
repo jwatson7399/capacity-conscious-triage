@@ -966,6 +966,8 @@ interface ShiftContextValue {
   activity: ActivityEvent[];
   /** The assignment that can still be undone, if any. */
   undoable: SessionState['undoable'];
+  /** Live shift: the uploaded schedule the board follows, if any. */
+  follow: SessionState['follow'];
 }
 
 // Provider weights are frozen for the whole study at the constants.ts values
@@ -1003,8 +1005,8 @@ export function ShiftProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ state, dispatch, recommendation, capacityWeights, activity: session.activity, undoable: session.undoable }),
-    [state, dispatch, recommendation, capacityWeights, session.activity, session.undoable],
+    () => ({ state, dispatch, recommendation, capacityWeights, activity: session.activity, undoable: session.undoable, follow: session.follow }),
+    [state, dispatch, recommendation, capacityWeights, session.activity, session.undoable, session.follow],
   );
 
   return <ShiftContext.Provider value={value}>{children}</ShiftContext.Provider>;

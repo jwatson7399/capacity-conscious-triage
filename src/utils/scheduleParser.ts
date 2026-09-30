@@ -9,6 +9,24 @@ export interface ScheduleProvider {
   teamId: TeamId;
   shiftStart?: string; // e.g. "7A"
   shiftEnd?: string;   // e.g. "3P"
+  /** Live mode only: a resident whose level the sheet does not give. `type` is a placeholder until someone picks one. */
+  unknownLevel?: boolean;
+  /** Live mode only: listed on the team but adds no strength (dental residents, Decision 42). */
+  countsZero?: boolean;
+  /** Live mode only: shared coverage (A-side, overnight side or day swing). */
+  coverTeams?: TeamId[];
+  /** Source of shared coverage, retained for audits even when a day swing ends at midnight. */
+  coverSource?: 'a_side' | 'overnight' | 'day_swing';
+}
+
+/**
+ * Options for parseWeeklySchedule. The benchmark and replay scripts call it without options and get
+ * exactly the reading their recorded figures used. The app passes { live: true } for the trial
+ * reading (Roundtable Decisions 41 and 42): level tags in brackets, any PGY key header, dental at 0,
+ * a flag instead of a silent default for unknown residents, overnight cover teams and calendar dates.
+ */
+export interface ParseOptions {
+  live?: boolean;
 }
 
 export interface FloatAttending {
@@ -22,6 +40,8 @@ export interface DaySchedule {
   dayOfWeek: string;
   providers: ScheduleProvider[];
   floatAttendings: FloatAttending[];
+  /** Live mode only: the calendar date, YYYY-MM-DD, read from the sheet's date cell. */
+  isoDate?: string;
 }
 
 export interface ParsedSchedule {
@@ -50,7 +70,8 @@ export function mapPgyToProviderType(info: PgyInfo): ProviderType {
 /** Parse a time string like "7A", "3P", "11P", "7:30A" into 24h hour number */
 export function parseTimeToHour(t: string): number {
   const cleaned = t.trim().toUpperCase();
-  const match = cleaned.match(/^(\d{1,2})(?::(\d{2}))?\s*(A|P|AM|PM)$/);
+  // "7A", "7:30A" and, in newer sheets, "730A" or "1030P" (no colon).
+  const match = cleaned.match(/^(\d{1,2})(?::(\d{2}))?\s*(A|P|AM|PM)$/) ?? cleaned.match(/^(\d{1,2})(\d{2})\s*(A|P|AM|PM)$/);
   if (!match) return -1;
   let hour = parseInt(match[1], 10);
   const minutes = match[2] ? parseInt(match[2], 10) : 0;
@@ -73,14 +94,31 @@ function isWithinShift(shiftStart: string | undefined, shiftEnd: string | undefi
   }
 }
 
+/**
+ * One clock time in a shift cell. Legacy: "7A" or "7:30A". Live also reads "730A" / "1030P"
+ * (no colon), which newer sheets use; the legacy reading skips those cells as before.
+ */
+const TIME_LEGACY = '\\d{1,2}(?::\\d{2})?\\s*[AaPp][Mm]?';
+const TIME_LIVE = '(?:\\d{3,4}|\\d{1,2}(?::\\d{2})?)\\s*[AaPp][Mm]?';
+function shiftRegexes(live: boolean) {
+  const T = live ? TIME_LIVE : TIME_LEGACY;
+  return {
+    whole: new RegExp(`^${T}\\s*[-–]\\s*${T}$`),
+    parts: new RegExp(`(${T})\\s*[-–]\\s*(${T})`),
+    team: new RegExp(`^T([1-4])\\s+(${T})\\s*[-–]\\s*(${T})$`),
+  };
+}
+const RX = { legacy: shiftRegexes(false), live: shiftRegexes(true) };
+const rx = (live?: boolean) => (live ? RX.live : RX.legacy);
+
 /** Check if a cell value is a shift time pattern like "7A-3P" */
-function isShiftTime(val: string): boolean {
-  return /^\d{1,2}(?::\d{2})?\s*[AaPp][Mm]?\s*[-–]\s*\d{1,2}(?::\d{2})?\s*[AaPp][Mm]?$/.test(val.trim());
+function isShiftTime(val: string, live?: boolean): boolean {
+  return rx(live).whole.test(val.trim());
 }
 
 /** Parse shift time string "7A-3P" into start/end components */
-function parseShiftTime(cell: string): { shiftStart: string; shiftEnd: string } | null {
-  const m = cell.match(/(\d{1,2}(?::\d{2})?\s*[AaPp][Mm]?)\s*[-–]\s*(\d{1,2}(?::\d{2})?\s*[AaPp][Mm]?)/);
+function parseShiftTime(cell: string, live?: boolean): { shiftStart: string; shiftEnd: string } | null {
+  const m = cell.match(rx(live).parts);
   if (!m) return null;
   return { shiftStart: m[1], shiftEnd: m[2] };
 }
@@ -102,7 +140,7 @@ function cellRaw(sheet: XLSX.WorkSheet, row: number, col: number): unknown {
 }
 
 /** Convert Excel serial date to formatted string */
-function excelSerialToDate(serial: number): { formatted: string; dayOfWeek: string } {
+function excelSerialToDate(serial: number): { formatted: string; dayOfWeek: string; iso: string } {
   const date = new Date((serial - 25569) * 86400000);
   const months = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];
@@ -110,13 +148,16 @@ function excelSerialToDate(serial: number): { formatted: string; dayOfWeek: stri
   return {
     formatted: `${months[date.getUTCMonth()]} ${date.getUTCDate()}`,
     dayOfWeek: days[date.getUTCDay()],
+    iso: date.toISOString().slice(0, 10),
   };
 }
 
 /** Clean a provider name: strip annotations like (ML), (Swing T1/T3), etc. */
-function cleanProviderName(raw: string): string {
-  // Remove parenthetical annotations
-  let name = raw.replace(/\s*\(.*?\)\s*/g, '').trim();
+function cleanProviderName(raw: string, live?: boolean): string {
+  // Remove parenthetical annotations; live also removes bracketed level tags ("WELLS [1]")
+  let name = live
+    ? raw.replace(/\s*\(.*?\)\s*/g, ' ').replace(/\s*\[.*?\]\s*/g, ' ').trim()
+    : raw.replace(/\s*\(.*?\)\s*/g, '').trim();
   // Take first word (last name) if multiple words remain
   name = name.split(/\s+/)[0];
   return name;
@@ -126,7 +167,9 @@ function cleanProviderName(raw: string): string {
  * Extract the PGY key table.
  * Format: "Residents" in col X, "PGY" in col X+1, then name/year pairs below.
  */
-export function extractPgyKey(sheet: XLSX.WorkSheet): Record<string, PgyInfo> {
+export function extractPgyKey(sheet: XLSX.WorkSheet, opts: ParseOptions = {}): Record<string, PgyInfo> {
+  // Newer sheets head the key "Resident Name", "Name" or "RESIDENT" instead of "Residents".
+  const header = opts.live ? /^(Residents?|Resident\s*Name|Name)$/i : /^Residents?$/i;
   const range = XLSX.utils.decode_range(sheet['!ref'] ?? 'A1');
   const pgyMap: Record<string, PgyInfo> = {};
 
@@ -135,12 +178,12 @@ export function extractPgyKey(sheet: XLSX.WorkSheet): Record<string, PgyInfo> {
       const val = cellStr(sheet, r, c);
       const valRight = cellStr(sheet, r, c + 1);
 
-      if (/^Residents?$/i.test(val) && /^PGY$/i.test(valRight)) {
+      if (header.test(val) && /^PGY$/i.test(valRight)) {
         for (let rr = r + 1; rr <= Math.min(r + 40, range.e.r); rr++) {
           const name = cellStr(sheet, rr, c);
           const yearVal = cellStr(sheet, rr, c + 1);
           if (!name) continue;
-          if (/^(Residents?|PGY|Name)$/i.test(name)) continue;
+          if (/^(Residents?|Resident\s*Name|PGY|Name)$/i.test(name)) continue;
 
           if (/^\d$/.test(yearVal)) {
             pgyMap[name.toLowerCase()] = { year: parseInt(yearVal, 10) };
@@ -178,7 +221,7 @@ export function extractPgyKey(sheet: XLSX.WorkSheet): Record<string, PgyInfo> {
  * Row 3: Second attending shift+name pairs
  * Row ~5: "PA" label row, then PA shift+name pairs below
  * Row ~10: "Resident" label row, then resident shift+name pairs below
- * Row ~14: "A-Side" label row — SKIP these
+ * Row ~14: "A-Side" label row: shared resident in live mode, skipped in legacy mode
  * Row ~17: "Float Attending" label row, then float shift+name pairs below
  *
  * Each team uses TWO columns: odd col = shift time, even col = provider name
@@ -190,6 +233,7 @@ interface DayBlock {
   dayOfWeek: string;
   dateLabel: string;
   dateSortKey: number;
+  isoDate?: string;
   /** Column pairs for teams 1-4: [[timeCol, nameCol], ...] */
   teamColPairs: [number, number][];
   /** OVN column pair [timeCol, nameCol] if present */
@@ -237,6 +281,7 @@ function findDayBlocks(sheet: XLSX.WorkSheet): DayBlock[] {
     let dayOfWeek = '';
     let dateLabel = '';
     let dateSortKey = 0;
+    let isoDate: string | undefined;
     let labelCol = -1;
 
     for (let c = Math.max(0, t1Col - 2); c <= t1Col; c++) {
@@ -269,6 +314,7 @@ function findDayBlocks(sheet: XLSX.WorkSheet): DayBlock[] {
         const parsed = excelSerialToDate(raw);
         dateLabel = parsed.formatted;
         dateSortKey = raw;
+        isoDate = parsed.iso;
       } else {
         const dv = cellStr(sheet, dateRow, labelCol);
         if (dv) dateLabel = dv;
@@ -296,6 +342,7 @@ function findDayBlocks(sheet: XLSX.WorkSheet): DayBlock[] {
       dayOfWeek,
       dateLabel: dateLabel || 'Unknown',
       dateSortKey,
+      isoDate,
       teamColPairs,
       ovnColPair,
       headerRow,
@@ -317,6 +364,54 @@ function findDayBlocks(sheet: XLSX.WorkSheet): DayBlock[] {
   });
 }
 
+/** Live: names that mean an unfilled slot, not a person. */
+const PLACEHOLDER = /^(OPEN|TBD|TBA|VACANT|NONE|N\/A)$/i;
+
+/** Live: the two teams a day swing resident covers, from "(Swing T1/T3)" or "(T2 / T4 Swing)". */
+function gridSwingTeams(raw: string): TeamId[] | undefined {
+  const m = raw.match(/Swing\s*T?\s*([1-4])\s*\/\s*T?\s*([1-4])/i) ?? raw.match(/T\s*([1-4])\s*\/\s*T?\s*([1-4])\s*Swing/i);
+  if (!m || m[1] === m[2]) return undefined;
+  return [Number(m[1]) as TeamId, Number(m[2]) as TeamId];
+}
+
+interface Level {
+  type: ProviderType;
+  flags: Pick<ScheduleProvider, 'unknownLevel' | 'countsZero'>;
+  unknownLevel?: boolean;
+  countsZero?: boolean;
+}
+
+/**
+ * A resident's level. Legacy reading (no options): the PGY key, else senior resident, exactly as the
+ * recorded benchmarks used it. Live reading: the bracket tag in the name cell first ("[2]", "[IM]",
+ * "[DENTAL]", "[3 - ML]"), then the PGY key, and an unknown level is flagged instead of guessed.
+ */
+function residentLevel(rawName: string, cleanName: string, pgyMap: Record<string, PgyInfo>, opts: ParseOptions): Level {
+  const info = pgyMap[cleanName.toLowerCase()];
+  if (!opts.live) return { type: info ? mapPgyToProviderType(info) : 'senior_resident', flags: {} };
+  const tag = rawName.match(/\[([^\]]+)\]/)?.[1]?.trim() ?? '';
+  const fromTag = tag ? levelFromText(tag) : null;
+  if (fromTag) return fromTag;
+  if (info) {
+    const fromKey = info.year ? levelFromText(String(info.year)) : levelFromText(info.role ?? '');
+    if (fromKey) return fromKey;
+    if (info.isOffService) return { type: 'rotator', flags: {} };
+  }
+  return { type: 'senior_resident', unknownLevel: true, flags: { unknownLevel: true } };
+}
+
+/** Read a level from a tag or key cell. Null when the text says nothing the app can use. */
+function levelFromText(text: string): Level | null {
+  const t = text.trim();
+  const year = t.match(/^([1-5])(?!\d)/);
+  if (year) return { type: mapPgyToProviderType({ year: Number(year[1]) }), flags: {} };
+  // Dental residents are listed on teams but add no strength (Julian, Decision 42).
+  if (/dental/i.test(t)) return { type: 'rotator', countsZero: true, flags: { countsZero: true } };
+  if (/^(IM|PEM)\b|PEM\s*Fellow|Off[- ]?Service|Rotat/i.test(t)) return { type: 'rotator', flags: {} };
+  if (/^PA\b/i.test(t)) return { type: 'pa', flags: {} };
+  return null;
+}
+
 /**
  * Extract providers from a day block.
  * Scans rows within the block, identifies role sections by label,
@@ -326,6 +421,7 @@ function extractDayProviders(
   sheet: XLSX.WorkSheet,
   block: DayBlock,
   pgyMap: Record<string, PgyInfo>,
+  opts: ParseOptions = {},
 ): { providers: ScheduleProvider[]; floatAttendings: FloatAttending[] } {
   const providers: ScheduleProvider[] = [];
   const floatAttendings: FloatAttending[] = [];
@@ -333,9 +429,9 @@ function extractDayProviders(
 
   // Scan for role label rows within the block
   // Role labels appear in the time columns (odd cols) of each team
-  // Also track A-Side and other skip sections
+  // The A-side section is read only by the trial parser.
   type RoleSection = {
-    role: 'attending' | 'pa' | 'resident' | 'float_attending' | 'skip';
+    role: 'attending' | 'pa' | 'resident' | 'float_attending' | 'a_side' | 'skip';
     row: number;
   };
   const roleSections: RoleSection[] = [];
@@ -358,7 +454,7 @@ function extractDayProviders(
         if (!roleSections.some(s => s.row === r)) roleSections.push({ role: 'float_attending', row: r });
         break;
       } else if (/^A-Side/i.test(val)) {
-        if (!roleSections.some(s => s.row === r)) roleSections.push({ role: 'skip', row: r });
+        if (!roleSections.some(s => s.row === r)) roleSections.push({ role: opts.live ? 'a_side' : 'skip', row: r });
         break;
       }
     }
@@ -370,7 +466,7 @@ function extractDayProviders(
   // For each role section, scan from that row to the next role section
   for (let si = 0; si < roleSections.length; si++) {
     const section = roleSections[si];
-    if (section.role === 'skip') continue; // Skip A-Side sections entirely
+    if (section.role === 'skip') continue; // Preserve the legacy reading.
 
     const nextRow = si + 1 < roleSections.length
       ? roleSections[si + 1].row
@@ -382,11 +478,12 @@ function extractDayProviders(
       for (let ti = 0; ti < block.teamColPairs.length; ti++) {
         const [timeCol, nameCol] = block.teamColPairs[ti];
         const teamId = (ti + 1) as TeamId;
+        if (section.role === 'a_side' && teamId === 4) continue;
         const timeVal = cellStr(sheet, r, timeCol);
         const nameVal = cellStr(sheet, r, nameCol);
 
         // Skip if this row has another role label (e.g. we hit "PA" for this team)
-        if (/^(Attending|PA|Resident|Float|A-Side|B-Side|N-side|Swing|Team)/i.test(timeVal) && !isShiftTime(timeVal)) {
+        if (/^(Attending|PA|Resident|Float|A-Side|B-Side|N-side|Swing|Team)/i.test(timeVal) && !isShiftTime(timeVal, opts.live)) {
           continue;
         }
 
@@ -395,14 +492,20 @@ function extractDayProviders(
         // Skip B-side, N-side, Swing annotations in names
         if (/^(B-side|N-side|Swing)/i.test(nameVal)) continue;
 
-        const cleanName = cleanProviderName(nameVal);
+        const cleanName = cleanProviderName(nameVal, opts.live);
         if (!cleanName || cleanName.length < 2) continue;
+        // Live: an unfilled slot ("OPEN", "TBD") is nobody.
+        if (opts.live && PLACEHOLDER.test(cleanName)) continue;
+        // Live: a day swing resident covers two teams ("WELLS [3] (Swing T1/T3)").
+        const swingPair: TeamId[] | undefined = section.role === 'a_side'
+          ? [1, 2, 3]
+          : opts.live ? gridSwingTeams(nameVal) : undefined;
 
         // Parse shift time
         let shiftStart: string | undefined;
         let shiftEnd: string | undefined;
-        if (isShiftTime(timeVal)) {
-          const parsed = parseShiftTime(timeVal);
+        if (isShiftTime(timeVal, opts.live)) {
+          const parsed = parseShiftTime(timeVal, opts.live);
           if (parsed) {
             shiftStart = parsed.shiftStart;
             shiftEnd = parsed.shiftEnd;
@@ -428,14 +531,18 @@ function extractDayProviders(
           type = 'attending';
         } else if (section.role === 'pa') {
           type = 'pa';
-        } else if (section.role === 'resident') {
-          const pgyInfo = pgyMap[cleanName.toLowerCase()];
-          type = pgyInfo ? mapPgyToProviderType(pgyInfo) : 'senior_resident';
+        } else if (section.role === 'resident' || section.role === 'a_side') {
+          const lv = residentLevel(nameVal, cleanName, pgyMap, opts);
+          if (lv.unknownLevel || lv.countsZero) {
+            providers.push({ name: cleanName, type: lv.type, teamId, shiftStart, shiftEnd, ...lv.flags, ...(swingPair ? { coverTeams: swingPair, coverSource: section.role === 'a_side' ? 'a_side' as const : 'day_swing' as const } : {}) });
+            continue;
+          }
+          type = lv.type;
         } else {
           type = 'senior_resident';
         }
 
-        providers.push({ name: cleanName, type, teamId, shiftStart, shiftEnd });
+        providers.push({ name: cleanName, type, teamId, shiftStart, shiftEnd, ...(swingPair ? { coverTeams: swingPair, coverSource: section.role === 'a_side' ? 'a_side' as const : 'day_swing' as const } : {}) });
       }
     }
   }
@@ -473,12 +580,24 @@ function extractDayProviders(
         if (/^B-[Ss]ide/i.test(sv)) { currentSide = 'b-side'; break; }
         if (/^Swing/i.test(sv)) { currentSide = 'swing'; break; }
       }
+      // Live: newer sheets write the side with a home team, "T2 / B-side", "T3 / N-side", "T2 / Swing".
+      // N-side covers Teams 1 and 3, B-side Teams 2 and 4 (Julian, Decision 42). "Tn / Swing" is read
+      // as a swing on that team's side (an assumption, flagged for Julian).
+      if (opts.live) {
+        for (const sv of sideVals) {
+          const m = sv.match(/^T([1-4])\s*\/\s*(N-?\s*side|B-?\s*side|Swing)/i);
+          if (!m) continue;
+          const word = m[2].toLowerCase();
+          currentSide = word.startsWith('n') ? 'n-side' : word.startsWith('b') ? 'b-side' : ([1, 3].includes(Number(m[1])) ? 'n-side' : 'b-side');
+          break;
+        }
+      }
 
       // Team-specific overnight attending: "T1 11P-7A" or "T2 11P-7A"
-      const teamShiftMatch = timeVal.match(/^T([1-4])\s+(\d{1,2}(?::\d{2})?\s*[AaPp][Mm]?)\s*[-–]\s*(\d{1,2}(?::\d{2})?\s*[AaPp][Mm]?)$/);
+      const teamShiftMatch = timeVal.match(rx(opts.live).team);
       if (teamShiftMatch && nameVal && nameVal.length >= 2) {
         const ovnTeamId = parseInt(teamShiftMatch[1], 10) as TeamId;
-        const cleanName = cleanProviderName(nameVal);
+        const cleanName = cleanProviderName(nameVal, opts.live);
         if (!cleanName || cleanName.length < 2) continue;
         if (/^\d{3}/.test(cleanName)) continue;
 
@@ -509,20 +628,23 @@ function extractDayProviders(
         continue;
       }
 
-      if (targetName && targetName.length >= 2 && isShiftTime(timeVal)) {
-        const cleanName = cleanProviderName(targetName);
+      if (targetName && targetName.length >= 2 && isShiftTime(timeVal, opts.live)) {
+        const cleanName = cleanProviderName(targetName, opts.live);
         if (!cleanName || cleanName.length < 2) continue;
+        if (opts.live && PLACEHOLDER.test(cleanName)) continue;
         if (/^\d{3}/.test(cleanName)) continue;
 
-        const shift = parseShiftTime(timeVal);
+        const shift = parseShiftTime(timeVal, opts.live);
         if (!shift) continue;
 
         let type: ProviderType;
+        let ovnFlags: Pick<ScheduleProvider, 'unknownLevel' | 'countsZero'> = {};
         if (ovnRole === 'pa') {
           type = 'pa';
         } else if (ovnRole === 'resident') {
-          const pgyInfo = pgyMap[cleanName.toLowerCase()];
-          type = pgyInfo ? mapPgyToProviderType(pgyInfo) : 'senior_resident';
+          const lv = residentLevel(targetName, cleanName, pgyMap, opts);
+          type = lv.type;
+          ovnFlags = lv.flags;
         } else {
           type = 'attending';
         }
@@ -543,6 +665,7 @@ function extractDayProviders(
             teamId: tid,
             shiftStart: shift.shiftStart,
             shiftEnd: shift.shiftEnd,
+            ...(opts.live ? { ...ovnFlags, ...(currentSide ? { coverTeams: teams, coverSource: 'overnight' as const } : {}) } : {}),
           });
         }
       }
@@ -562,21 +685,22 @@ function extractDayProviders(
 /**
  * Parse a weekly schedule workbook.
  */
-export function parseWeeklySchedule(data: ArrayBuffer): ParsedSchedule {
+export function parseWeeklySchedule(data: ArrayBuffer, opts: ParseOptions = {}): ParsedSchedule {
   const workbook = XLSX.read(data, { type: 'array' });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   if (!sheet) throw new Error('No sheet found in workbook');
 
-  const pgyMap = extractPgyKey(sheet);
+  const pgyMap = extractPgyKey(sheet, opts);
   const dayBlocks = findDayBlocks(sheet);
 
   const days: DaySchedule[] = dayBlocks.map(block => {
-    const { providers, floatAttendings } = extractDayProviders(sheet, block, pgyMap);
+    const { providers, floatAttendings } = extractDayProviders(sheet, block, pgyMap, opts);
     return {
       date: block.dateLabel,
       dayOfWeek: block.dayOfWeek,
       providers,
       floatAttendings,
+      ...(opts.live && block.isoDate ? { isoDate: block.isoDate } : {}),
     };
   });
 

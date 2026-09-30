@@ -14,6 +14,9 @@ import { OVERRIDE_REASONS, undoneAssignIds } from '../activity';
 import { getRecommendation, type ScoringOverrides } from '../engine/recommendation';
 import { generateTimeline, randomSeed } from '../engine/simulation';
 import { uid } from '../uid';
+import { startFollowing, syncToSchedule, type FollowState } from '../schedule/follow';
+import type { StoredWeek } from '../schedule/week';
+import { scheduleReadiness } from '../schedule/start';
 
 export interface AssignMeta {
   reasonCode?: OverrideReasonCode;
@@ -33,7 +36,16 @@ export type SessionOnlyAction =
   /** Reverse one entry in the shift activity log (see undoBlocked). */
   | { type: 'UNDO_EVENT'; eventId: string }
   /** Demo: go back to the moment of the previous arrival. */
-  | { type: 'DEMO_BACK' };
+  | { type: 'DEMO_BACK' }
+  /**
+   * Live shift: follow the uploaded schedule from now on (Decisions 40 to 42). suppress lists
+   * schedule slots already taken off by hand (e.g. deleted from the setup draft), with the time
+   * each hand edit stops applying.
+   */
+  | { type: 'SCHEDULE_FOLLOW'; week: StoredWeek; suppress?: Record<string, number> }
+  /** A resent or newer schedule replaces the stored one; hand edits are kept. */
+  | { type: 'SCHEDULE_UPDATE'; week: StoredWeek }
+  | { type: 'SCHEDULE_STOP' };
 
 export type SessionAction =
   | (ShiftAction & { meta?: AssignMeta })
@@ -56,6 +68,8 @@ export interface SessionState {
    * sample or by turning arrivals off or on again, which changes the arrival schedule.
    */
   demoRewind?: Omit<SessionState, 'demoRewind'>[];
+  /** Live shift only: the schedule the board follows, and the hand edits it respects. */
+  follow?: FollowState;
 }
 
 export const emptySession = (shift: ShiftState): SessionState => ({ shift, activity: [], seq: 0, undoable: null });
@@ -236,6 +250,20 @@ export function makeSessionReducer(core: CoreReducer, scoringFor: ScoringFor) {
     return { ...s, shift, activity: [...s.activity, ...stamped], seq, undoable: touched ? null : s.undoable };
   }
 
+  /** Live shift: apply the schedule at shift.now and log what it changed. */
+  function follow(s: SessionState): SessionState {
+    if (!s.follow || s.shift.simulation || !s.shift.shiftStarted) return s;
+    const r = syncToSchedule(s.shift, s.follow, core);
+    if (r.shift === s.shift && r.follow === s.follow && r.events.length === 0) return s;
+    return { ...log(s, r.shift, r.events), follow: r.follow };
+  }
+
+  /** A hand edit to a scheduled slot holds until that slot's shift ends. */
+  function suppress(s: SessionState, key: string | undefined, until: number | undefined): SessionState {
+    if (!s.follow || !key) return s;
+    return { ...s, follow: { ...s.follow, suppressed: { ...s.follow.suppressed, [key]: until ?? s.shift.now + 24 * 3_600_000 } } };
+  }
+
   function findPatient(state: ShiftState, id: string): Patient | undefined {
     return state.patients.find(p => p.id === id);
   }
@@ -261,14 +289,30 @@ export function makeSessionReducer(core: CoreReducer, scoringFor: ScoringFor) {
         const p = before.providers.find(x => x.id === action.providerId);
         if (!p) return s;
         const shift = { ...before, providers: before.providers.filter(x => x.id !== p.id) };
-        return log(s, shift, [{ kind: 'provider_remove', teamId: p.teamId, name: p.name, providerType: p.type }]);
+        return suppress(log(s, shift, [{ kind: 'provider_remove', teamId: p.teamId, name: p.name, providerType: p.type }]), p.scheduleKey, p.endsAt);
+      }
+
+      case 'SCHEDULE_FOLLOW':
+        return scheduleReadiness(action.week, before.now).canStart
+          ? follow({ ...s, follow: startFollowing(action.week, action.suppress) }) : s;
+
+      case 'SCHEDULE_UPDATE':
+        return s.follow && scheduleReadiness(action.week, before.now).canStart
+          ? follow({ ...s, follow: { ...s.follow, week: action.week } }) : s;
+
+      case 'SCHEDULE_STOP': {
+        if (!s.follow) return s;
+        return { ...s, follow: undefined };
       }
 
       case 'REOPEN_TEAM': {
         if (!(action.teamId in before.closedTeams)) return s;
         const closedTeams = { ...before.closedTeams };
         delete closedTeams[action.teamId];
-        return log(s, { ...before, closedTeams }, [{ kind: 'team_reopen', teamId: action.teamId }]);
+        const out = log(s, { ...before, closedTeams }, [{ kind: 'team_reopen', teamId: action.teamId }]);
+        // Reopened by hand while the schedule had it closed: stays open until the schedule opens it itself.
+        if (!out.follow?.autoClosed.includes(action.teamId)) return out;
+        return { ...out, follow: { ...out.follow, autoClosed: out.follow.autoClosed.filter(t => t !== action.teamId), held: [...out.follow.held, action.teamId] } };
       }
 
       case 'DEMO_ARRIVALS': {
@@ -286,7 +330,8 @@ export function makeSessionReducer(core: CoreReducer, scoringFor: ScoringFor) {
           timeline = [...done, ...future];
         }
         const out: SessionState = { ...s, shift: { ...before, simulation: { ...sim, timeline } } };
-        const { demoRewind: _old, ...moment } = out;
+        const moment = { ...out };
+        delete moment.demoRewind;
         return action.on ? { ...moment, demoRewind: [moment] } : moment;
       }
 
@@ -387,11 +432,15 @@ export function makeSessionReducer(core: CoreReducer, scoringFor: ScoringFor) {
 
       case 'SWAP_PROVIDER': {
         const out = before.providers.find(p => p.id === action.outProviderId);
-        const shift = core(before, action);
-        return log(s, shift, [{
+        // Someone swapped into a scheduled slot fills it until that slot's shift ends; the schedule
+        // does not put the original provider back meanwhile. Share and note do not carry over.
+        const incoming = out?.endsAt !== undefined ? { ...action.incoming, endsAt: out.endsAt } : action.incoming;
+        const shift = core(before, { ...action, incoming });
+        const logged = log(s, shift, [{
           kind: 'provider_swap', teamId: action.incoming.teamId, name: action.incoming.name, providerType: action.incoming.type,
           replacedName: out?.name, replacedType: out?.type,
         }]);
+        return suppress(logged, out?.scheduleKey, out?.endsAt);
       }
 
       case 'ADD_PROVIDERS': {
@@ -402,7 +451,10 @@ export function makeSessionReducer(core: CoreReducer, scoringFor: ScoringFor) {
 
       case 'CLOSE_TEAM': {
         const shift = core(before, action);
-        return log(s, shift, [{ kind: 'team_close', teamId: action.teamId }]);
+        const out = log(s, shift, [{ kind: 'team_close', teamId: action.teamId }]);
+        // Closed by hand: the schedule never reopens it.
+        if (!out.follow) return out;
+        return { ...out, follow: { ...out.follow, autoClosed: out.follow.autoClosed.filter(t => t !== action.teamId), held: out.follow.held.filter(t => t !== action.teamId) } };
       }
 
       case 'SIGNOUT_PATIENTS': {
@@ -417,7 +469,7 @@ export function makeSessionReducer(core: CoreReducer, scoringFor: ScoringFor) {
         const shift = core(before, action);
         if (shift === before) return s;
         const events = arrivalEvents(before, shift);
-        if (events.length === 0) return { ...s, shift };
+        if (events.length === 0) return follow({ ...s, shift });
         return keepRewind(log(s, shift, events));
       }
 

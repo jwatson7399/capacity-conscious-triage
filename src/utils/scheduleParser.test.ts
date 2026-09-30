@@ -369,3 +369,85 @@ describe('scheduleParser — synthetic data', () => {
     expect(pm.providers.map(p => p.name)).not.toContain('MORNING');
   });
 });
+
+describe('A-side shared resident', () => {
+  const cells: (string | number | null)[][] = [
+    [null, 'Team 1', null, 'Team 2', null, 'Team 3', null, 'Team 4'],
+    ['Monday', 'Attending', null, 'Attending', null, 'Attending', null, 'Attending'],
+    [46293, '7A-3P', 'DOCA', '7A-3P', 'DOCB', '7A-3P', 'DOCC'],
+    [null, 'A-Side', null, 'A-Side', null, 'A-Side'],
+    [null, '10A-8P', 'SHARED [3]', '10A-8P', 'SHARED [3]', '10A-8P', 'SHARED [3]'],
+    [null, '10A-8P', 'UNKEYED [PM]', '10A-8P', 'UNKEYED [PM]', '10A-8P', 'UNKEYED [PM]'],
+  ];
+  it('live reading covers Teams 1 to 3; legacy still omits the A-side section', () => {
+    const live = parseWeeklySchedule(makeWorkbook(cells), { live: true }).days[0];
+    const shared = live.providers.filter(p => p.name === 'SHARED');
+    expect(shared.map(p => p.teamId)).toEqual([1, 2, 3]);
+    for (const p of shared) expect(p).toMatchObject({ type: 'senior_resident', coverTeams: [1, 2, 3], coverSource: 'a_side', shiftStart: '10A', shiftEnd: '8P' });
+    const legacy = parseWeeklySchedule(makeWorkbook(cells)).days[0];
+    expect(legacy.providers).toHaveLength(3);
+  });
+  it('A-side unknown levels are flagged, including PM without a PGY key', () => {
+    const live = parseWeeklySchedule(makeWorkbook(cells), { live: true }).days[0];
+    const unknown = live.providers.filter(p => p.name === 'UNKEYED');
+    expect(unknown).toHaveLength(3);
+    for (const p of unknown) expect(p.unknownLevel).toBe(true);
+  });
+});
+
+describe('trial (live) reading, Roundtable Decisions 41 and 42', () => {
+  // Made-up names. Layout as in the Aug to Sep 2026 sheets: level tags in brackets, times without a
+  // colon, a PGY key headed "Resident Name", overnight side labels written as "T2 / B-side".
+  const cells: (string | number | null)[][] = [
+    [null, 'Team 1', null, 'Team 2', null, 'Team 3', null, 'Team 4', null, null, null, null, null, 'OVN'],
+    ['Monday', 'Attending', null, 'Attending', null, 'Attending', null, 'Attending', null, null, null, null, null, 'Attending'],
+    [46293, '7A-3P', 'DOCA', null, null, null, null, null, null, null, null, null, null, 'T1 11P-7A', 'NIGHTDOC'],
+    [null, 'Resident', null, 'Resident', null, 'Resident', null, 'Resident', null, null, null, null, null, 'PA'],
+    [null, '830A-5P', 'SMILE [DENTAL]', '9A-7P', 'WELLS [2]', '10A-8P', 'ROTA [IM]', '9A-7P', 'OPEN', null, null, null, 'T2 / B-side', '7P-7A', 'BEEPA'],
+    [null, '9A-7P', 'HALVES [3] (Swing T1/T3)', '9A-7P', 'NOKEY', '9A-7P', 'KEYED', null, null, null, null, null, null, 'RESIDENT'],
+    [null, null, null, null, null, null, null, null, null, null, null, null, 'T1 / N-side', '8P-6A', 'NRES [4]'],
+    [],
+    [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 'Resident Name', 'PGY'],
+    [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 'KEYED', 1],
+  ];
+  const live = parseWeeklySchedule(makeWorkbook(cells), { live: true }).days[0];
+  const legacy = parseWeeklySchedule(makeWorkbook(cells)).days[0];
+  const find = (d: typeof live, name: string, team?: number) => d.providers.find(p => p.name === name && (team === undefined || p.teamId === team));
+
+  it('gives the calendar date', () => {
+    expect(live.isoDate).toBe('2026-09-28');
+    expect(legacy.isoDate).toBeUndefined();
+  });
+  it('reads bracket levels, times without a colon, and dental at 0', () => {
+    expect(find(live, 'WELLS')?.type).toBe('junior_resident');
+    expect(find(live, 'ROTA')?.type).toBe('rotator');
+    expect(find(live, 'SMILE')).toMatchObject({ countsZero: true, shiftStart: '830A', shiftEnd: '5P' });
+  });
+  it('finds a PGY key headed "Resident Name"', () => {
+    expect(find(live, 'KEYED')?.type).toBe('intern');
+  });
+  it('flags a resident with no level instead of guessing', () => {
+    expect(find(live, 'NOKEY')).toMatchObject({ unknownLevel: true });
+  });
+  it('skips an unfilled slot', () => {
+    expect(find(live, 'OPEN')).toBeUndefined();
+  });
+  it('reads a day swing resident as covering two teams', () => {
+    expect(find(live, 'HALVES')?.coverTeams).toEqual([1, 3]);
+    expect(find(live, 'HALVES')?.coverSource).toBe('day_swing');
+  });
+  it('reads "T2 / B-side" and "T1 / N-side" overnight labels as side cover', () => {
+    expect(find(live, 'BEEPA', 2)?.coverTeams).toEqual([2, 4]);
+    expect(find(live, 'BEEPA', 2)?.coverSource).toBe('overnight');
+    expect(find(live, 'BEEPA', 4)?.coverTeams).toEqual([2, 4]);
+    expect(find(live, 'NRES', 1)).toMatchObject({ type: 'senior_resident', coverTeams: [1, 3] });
+    expect(find(live, 'NRES', 3)).toBeDefined();
+  });
+  it('the legacy reading used by the benchmark scripts is unchanged', () => {
+    // No bracket levels, no colonless times, no "Resident Name" key, no flags.
+    expect(find(legacy, 'KEYED')?.type).toBe('senior_resident');
+    expect(find(legacy, 'SMILE')?.shiftStart).toBeUndefined();
+    expect(find(legacy, 'NOKEY')?.unknownLevel).toBeUndefined();
+    expect(find(legacy, 'HALVES')?.coverTeams).toBeUndefined();
+  });
+});
