@@ -13,8 +13,10 @@ export interface ScheduleProvider {
   unknownLevel?: boolean;
   /** Live mode only: listed on the team but adds no strength (dental residents, Decision 42). */
   countsZero?: boolean;
-  /** Live mode only: an overnight side provider (N-side, B-side, Swing) listed on every team in this list. */
+  /** Live mode only: shared coverage (A-side, overnight side or day swing). */
   coverTeams?: TeamId[];
+  /** Source of shared coverage, retained for audits even when a day swing ends at midnight. */
+  coverSource?: 'a_side' | 'overnight' | 'day_swing';
 }
 
 /**
@@ -219,7 +221,7 @@ export function extractPgyKey(sheet: XLSX.WorkSheet, opts: ParseOptions = {}): R
  * Row 3: Second attending shift+name pairs
  * Row ~5: "PA" label row, then PA shift+name pairs below
  * Row ~10: "Resident" label row, then resident shift+name pairs below
- * Row ~14: "A-Side" label row — SKIP these
+ * Row ~14: "A-Side" label row: shared resident in live mode, skipped in legacy mode
  * Row ~17: "Float Attending" label row, then float shift+name pairs below
  *
  * Each team uses TWO columns: odd col = shift time, even col = provider name
@@ -427,9 +429,9 @@ function extractDayProviders(
 
   // Scan for role label rows within the block
   // Role labels appear in the time columns (odd cols) of each team
-  // Also track A-Side and other skip sections
+  // The A-side section is read only by the trial parser.
   type RoleSection = {
-    role: 'attending' | 'pa' | 'resident' | 'float_attending' | 'skip';
+    role: 'attending' | 'pa' | 'resident' | 'float_attending' | 'a_side' | 'skip';
     row: number;
   };
   const roleSections: RoleSection[] = [];
@@ -452,7 +454,7 @@ function extractDayProviders(
         if (!roleSections.some(s => s.row === r)) roleSections.push({ role: 'float_attending', row: r });
         break;
       } else if (/^A-Side/i.test(val)) {
-        if (!roleSections.some(s => s.row === r)) roleSections.push({ role: 'skip', row: r });
+        if (!roleSections.some(s => s.row === r)) roleSections.push({ role: opts.live ? 'a_side' : 'skip', row: r });
         break;
       }
     }
@@ -464,7 +466,7 @@ function extractDayProviders(
   // For each role section, scan from that row to the next role section
   for (let si = 0; si < roleSections.length; si++) {
     const section = roleSections[si];
-    if (section.role === 'skip') continue; // Skip A-Side sections entirely
+    if (section.role === 'skip') continue; // Preserve the legacy reading.
 
     const nextRow = si + 1 < roleSections.length
       ? roleSections[si + 1].row
@@ -476,6 +478,7 @@ function extractDayProviders(
       for (let ti = 0; ti < block.teamColPairs.length; ti++) {
         const [timeCol, nameCol] = block.teamColPairs[ti];
         const teamId = (ti + 1) as TeamId;
+        if (section.role === 'a_side' && teamId === 4) continue;
         const timeVal = cellStr(sheet, r, timeCol);
         const nameVal = cellStr(sheet, r, nameCol);
 
@@ -494,7 +497,9 @@ function extractDayProviders(
         // Live: an unfilled slot ("OPEN", "TBD") is nobody.
         if (opts.live && PLACEHOLDER.test(cleanName)) continue;
         // Live: a day swing resident covers two teams ("WELLS [3] (Swing T1/T3)").
-        const swingPair = opts.live ? gridSwingTeams(nameVal) : undefined;
+        const swingPair: TeamId[] | undefined = section.role === 'a_side'
+          ? [1, 2, 3]
+          : opts.live ? gridSwingTeams(nameVal) : undefined;
 
         // Parse shift time
         let shiftStart: string | undefined;
@@ -526,10 +531,10 @@ function extractDayProviders(
           type = 'attending';
         } else if (section.role === 'pa') {
           type = 'pa';
-        } else if (section.role === 'resident') {
+        } else if (section.role === 'resident' || section.role === 'a_side') {
           const lv = residentLevel(nameVal, cleanName, pgyMap, opts);
           if (lv.unknownLevel || lv.countsZero) {
-            providers.push({ name: cleanName, type: lv.type, teamId, shiftStart, shiftEnd, ...lv.flags, ...(swingPair ? { coverTeams: swingPair } : {}) });
+            providers.push({ name: cleanName, type: lv.type, teamId, shiftStart, shiftEnd, ...lv.flags, ...(swingPair ? { coverTeams: swingPair, coverSource: section.role === 'a_side' ? 'a_side' as const : 'day_swing' as const } : {}) });
             continue;
           }
           type = lv.type;
@@ -537,7 +542,7 @@ function extractDayProviders(
           type = 'senior_resident';
         }
 
-        providers.push({ name: cleanName, type, teamId, shiftStart, shiftEnd, ...(swingPair ? { coverTeams: swingPair } : {}) });
+        providers.push({ name: cleanName, type, teamId, shiftStart, shiftEnd, ...(swingPair ? { coverTeams: swingPair, coverSource: section.role === 'a_side' ? 'a_side' as const : 'day_swing' as const } : {}) });
       }
     }
   }
@@ -660,7 +665,7 @@ function extractDayProviders(
             teamId: tid,
             shiftStart: shift.shiftStart,
             shiftEnd: shift.shiftEnd,
-            ...(opts.live ? { ...ovnFlags, ...(currentSide ? { coverTeams: teams } : {}) } : {}),
+            ...(opts.live ? { ...ovnFlags, ...(currentSide ? { coverTeams: teams, coverSource: 'overnight' as const } : {}) } : {}),
           });
         }
       }

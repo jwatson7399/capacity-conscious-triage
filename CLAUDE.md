@@ -202,7 +202,8 @@ Carbon rebuild (branch `carbon-rebuild`, 2026-09-28): a new interface on the unc
   `{ live: true }` (Roundtable Decisions 41 and 42): bracket levels in name cells ("[2]", "[IM]",
   "[DENTAL]"), any PGY key header ("Residents", "Resident Name", "Name"), times without a colon
   ("830A"), dental residents `countsZero`, unknown levels flagged `unknownLevel` (never guessed),
-  overnight side and day swing `coverTeams`, placeholders ("OPEN") skipped, and `isoDate`.
+  A-side resident coverage of Teams 1 to 3, overnight side and day swing `coverTeams` plus
+  `coverSource` provenance, placeholders ("OPEN") skipped, and `isoDate`.
 - `src/schedule/`: the weekly schedule the live board follows (Decisions 40 to 42). `week.ts` (pure):
   timed slots, `rosterAt(t)` (a shift runs start to end exactly, so 3 AM uses the previous evening's
   crew), `openTeams(t)` (Team 3 takes no new patients 11 PM to 7 AM, Team 4 12 AM to 7 AM; people stay
@@ -394,3 +395,17 @@ real protection for the weights, since a client-side engine must ship them to th
 - Auth can be simple (shift code / room code)
 - Planned trial requirement: an override log (every recommendation, accepted or overridden, with
   structured reason codes plus free text) must exist before day one of the trial
+
+## Shared-provider bounded check (September 30, 2026)
+
+The live parser now includes A-side residents, split equally through `rosterAt` across their open
+covered teams. Legacy parsing remains unchanged. Setup and team detail show the exact cover rule;
+scoring uses the unrounded share. Unknown levels still need a role pick. Swing covers all teams;
+[PM] is not a level (PGY key first, otherwise role pick). The scheduled-close redistribution remains
+as in Decision 42. Previously saved parsed schedules must be re-uploaded to include A-side rows.
+The rule is provisional pending Julian's final trial freeze review.
+
+`node --import tsx scripts/shared-provider-check.ts` runs only in an isolated checkout with copied
+private schedules and writes new aggregate outputs under `data/shared-provider-check/`. It compares
+sharing rules with corrected rosters, excludes unresolved/ambiguous full windows, and never writes
+old benchmarks. See METHODS section 12 for cohort limitations and same-run results.

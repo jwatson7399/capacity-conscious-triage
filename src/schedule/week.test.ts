@@ -1,6 +1,8 @@
 // © 2026 New York University. All rights reserved.
 // Schedule-driven roster rules (Roundtable Decisions 40 to 42), on small made-up weeks.
 import { describe, expect, it } from 'vitest';
+import { getEffectiveCapacity, getRecommendation } from '../engine/recommendation';
+import type { Provider, Patient, TeamId } from '../types';
 import type { DaySchedule, ScheduleProvider } from '../utils/scheduleParser';
 import { buildSlots, datedDays, floatsAt, mergeWeek, nextChange, openTeams, rosterAt, shiftWindow, unresolved, type WeekDay } from './week';
 
@@ -87,6 +89,41 @@ describe('overnight side cover and night closing (Decision 42)', () => {
     const { slots } = buildSlots({ days: early, roleFixes: {} });
     expect(openTeams(slots, at(TUE, 6)).has(3)).toBe(false);
     expect(openTeams(slots, at(TUE, 7)).has(3)).toBe(true);
+  });
+});
+
+describe('A-side shared strength', () => {
+  const teams: TeamId[] = [1, 2, 3];
+  const days = [day(MON, 'Monday', [
+    ...teams.map(t => p(`ATT${t}`, t, '7A', '1A')),
+    ...teams.map(t => p('ASIDE', t, '10A', '12A', { type: 'senior_resident', coverTeams: teams })),
+  ])];
+  const now = at(MON, 12);
+  const shared = roster(days, now).filter(e => e.name === 'ASIDE');
+  const providers: Provider[] = shared.map(e => ({ ...e, id: e.scheduleKey, status: 'active', statusExpiresAt: null }));
+  it('deduplicates three listings and conserves one provider with one third on each team', () => {
+    expect(buildSlots({ days, roleFixes: {} }).slots.filter(s => s.name === 'ASIDE')).toHaveLength(1);
+    expect(shared).toHaveLength(3);
+    expect(shared.reduce((sum, e) => sum + e.share, 0)).toBeCloseTo(1);
+    for (const e of shared) {
+      expect(e.share).toBeCloseTo(1 / 3);
+      expect(getEffectiveCapacity(providers.filter(p => p.teamId === e.teamId), now)).toBeCloseTo(15.2 / 3);
+      expect(e.note).toBe('Covers Team 1, Team 2 and Team 3, counted a third here');
+    }
+  });
+  it('splits between Teams 1 and 2 after the Team 3 scheduled close', () => {
+    const late = roster(days, at(MON, 23)).filter(e => e.name === 'ASIDE');
+    expect(late.map(e => [e.teamId, e.share])).toEqual([[1, 0.5], [2, 0.5]]);
+  });
+  it('the worked example changes the recommendation from Team 2 to Team 1', () => {
+    // Synthetic capacities 20, 44, 30, with loads 1, 2, 3 at the same instant.
+    const base: Provider[] = teams.map((teamId, i) => ({ id: `base${teamId}`, name: 'EXAMPLE', teamId, type: 'attending', status: 'active', statusExpiresAt: null, share: [20, 44, 30][i] / 20 }));
+    const patients: Patient[] = teams.flatMap(teamId => Array.from({ length: teamId }, (_, i) => ({ id: `${teamId}-${i}`, acuity: 'tier_three' as const, assignedTeamId: teamId, assignedAt: now })));
+    expect(getRecommendation(base, patients, [], now).first).toBe(2);
+    const after = getRecommendation([...base, ...providers], patients, [], now);
+    expect(after.first).toBe(1);
+    expect(after.scores.find(s => s.teamId === 1)?.capacityRatio).toBeCloseTo(25.0667, 4);
+    expect(after.scores.find(s => s.teamId === 2)?.capacityRatio).toBeCloseTo(24.5333, 4);
   });
 });
 

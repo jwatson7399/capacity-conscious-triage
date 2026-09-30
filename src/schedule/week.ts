@@ -37,8 +37,9 @@ export interface Slot {
   teamId: TeamId;
   start: number;
   end: number;
-  /** Teams covered at once (overnight side or day swing). */
+  /** Teams covered at once (A-side, overnight side or day swing). */
   coverTeams?: TeamId[];
+  coverSource?: ScheduleProvider['coverSource'];
   countsZero?: boolean;
   unknownLevel?: boolean;
 }
@@ -52,7 +53,7 @@ export interface RosterEntry {
   name: string;
   type: ProviderType;
   teamId: TeamId;
-  /** Fraction of the provider's strength counted on this team (1, 0.5, or 0 for dental). */
+  /** Fraction of the provider's strength counted on this team; 0 for dental. */
   share: number;
   endsAt: number;
   note?: string;
@@ -146,7 +147,7 @@ export function buildSlots(week: Pick<StoredWeek, 'days' | 'roleFixes'>): { slot
       if (byKey.has(key)) continue;
       byKey.set(key, {
         key, name: p.name, type, teamId: p.teamId, start: w.start, end: w.end,
-        ...(cover ? { coverTeams: cover } : {}),
+        ...(cover ? { coverTeams: cover, ...(p.coverSource ? { coverSource: p.coverSource } : {}) } : {}),
         ...(p.countsZero ? { countsZero: true } : {}),
         ...(p.unknownLevel && !fixed ? { unknownLevel: true } : {}),
       });
@@ -176,6 +177,12 @@ export function openTeams(slots: Slot[], t: number): Set<TeamId> {
   return open;
 }
 
+/** Natural-language list used by setup and team detail. */
+function teamList(teams: TeamId[]): string {
+  const labels = teams.map(x => `Team ${x}`);
+  return labels.length < 2 ? labels[0] : `${labels.slice(0, -1).join(', ')} and ${labels.at(-1)}`;
+}
+
 /** Who the schedule puts on each team at t. */
 export function rosterAt(slots: Slot[], t: number): RosterEntry[] {
   const open = openTeams(slots, t);
@@ -191,9 +198,10 @@ export function rosterAt(slots: Slot[], t: number): RosterEntry[] {
     const live = s.coverTeams.filter(team => open.has(team));
     const teams = live.length > 0 ? live : [HOME[s.coverTeams[0]]];
     const share = base / teams.length;
+    const fraction = share === 0.5 ? 'half' : share === 1 / 3 ? 'a third' : `${Math.round(share * 100)}%`;
     const note = teams.length > 1
-      ? `Covers ${teams.map(x => `Team ${x}`).join(' and ')}, counted ${share === 0.5 ? 'half' : `${Math.round(share * 100)}%`} here`
-      : `Covers ${s.coverTeams.map(x => `Team ${x}`).join(' and ')}; only this team is open`;
+      ? `Covers ${teamList(teams)}, counted ${fraction} here`
+      : `Covers ${teamList(s.coverTeams)}; only this team is open`;
     for (const team of teams) {
       out.push({ scheduleKey: `${s.key}#${team}`, name: s.name, type: s.type, teamId: team, share, endsAt: s.end, note: zeroNote ?? note });
     }

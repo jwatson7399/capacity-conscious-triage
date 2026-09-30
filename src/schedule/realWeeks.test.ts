@@ -11,8 +11,11 @@ import { fileURLToPath } from 'url';
 import { parseWeeklySchedule } from '../utils/scheduleParser';
 import { buildSlots, datedDays, openTeams, rosterAt, unresolved } from './week';
 
-const DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../data/provider-schedules/schedules');
-const files = existsSync(DIR) ? readdirSync(DIR).filter(f => f.endsWith('.xlsx') && f !== 'demo-schedule.xlsx').sort() : [];
+const DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../data/provider-schedules');
+const files = ['schedules', 'initially missing schedules'].flatMap(folder => {
+  const dir = path.join(DIR, folder);
+  return existsSync(dir) ? readdirSync(dir).filter(f => f.endsWith('.xlsx') && !f.startsWith('~$') && f !== 'demo-schedule.xlsx').sort().map(f => path.join(folder, f)) : [];
+});
 const read = (f: string) => { const b = readFileSync(path.join(DIR, f)); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength); };
 
 /**
@@ -20,6 +23,13 @@ const read = (f: string) => { const b = readFileSync(path.join(DIR, f)); return 
  * pin that reading as it was on main at e51714f, so the trial changes cannot move a recorded figure.
  */
 const LEGACY: Record<string, string> = {
+  "January 19_Weekly Schedule (1).xlsx": "2e0d3a71eca3a353",
+  "January 5_Weekly Schedule.xlsx": "bc5373519d36808e",
+  "March 16_Weekly Schedule.xlsx": "2d587f2adda2ec91",
+  "March 23_Weekly Schedule.xlsx": "e979919a710ec93f",
+  "March 30_Weekly Schedule_Updated.xlsx": "61b3dab4a73982cd",
+  "March 9_Weekly Schedule.xlsx": "45709771d0e580f9",
+  "Week of 2.23.2026 - BK ED Schedule.xlsx": "1e171c86f65c911c",
   "August_24_Weekly_Schedule.xlsx": "54f84c758ab75ec7",
   "August_31_Weekly_Schedule.xlsx": "65298abedd31194c",
   "Department Schedule Week December 1_Updated.xlsx": "4f6697d05007c113",
@@ -40,9 +50,9 @@ const LEGACY: Record<string, string> = {
 };
 
 describe.skipIf(files.length === 0)('real weekly schedules (local only)', () => {
-  it.each(files.filter(f => f in LEGACY))('legacy reading unchanged: %s', f => {
+  it.each(files.filter(f => path.basename(f) in LEGACY))('legacy reading unchanged: %s', f => {
     const h = createHash('sha256').update(JSON.stringify(parseWeeklySchedule(read(f)))).digest('hex').slice(0, 16);
-    expect(h).toBe(LEGACY[f]);
+    expect(h).toBe(LEGACY[path.basename(f)]);
   });
 
   it.each(files)('trial reading holds the shift rules: %s', f => {
@@ -60,7 +70,8 @@ describe.skipIf(files.length === 0)('real weekly schedules (local only)', () => 
       expect(open.has(1) && open.has(2)).toBe(true);
       if (h >= 23 || h < 7) expect(open.has(3)).toBe(false);
       if (h < 7) expect(open.has(4)).toBe(false);
-      // Nobody counts for more than one full provider, however many teams they cover.
+      // Each scheduled cover slot counts once, however many teams it covers. Surnames alone
+      // cannot prove identity across separate slots; the research check flags those ambiguities.
       const per = new Map<string, number>();
       for (const e of rosterAt(slots, t)) per.set(e.scheduleKey.split('#')[0], (per.get(e.scheduleKey.split('#')[0]) ?? 0) + e.share);
       for (const v of per.values()) expect(v).toBeLessThanOrEqual(1 + 1e-9);

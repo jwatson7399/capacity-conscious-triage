@@ -370,6 +370,31 @@ describe('scheduleParser — synthetic data', () => {
   });
 });
 
+describe('A-side shared resident', () => {
+  const cells: (string | number | null)[][] = [
+    [null, 'Team 1', null, 'Team 2', null, 'Team 3', null, 'Team 4'],
+    ['Monday', 'Attending', null, 'Attending', null, 'Attending', null, 'Attending'],
+    [46293, '7A-3P', 'DOCA', '7A-3P', 'DOCB', '7A-3P', 'DOCC'],
+    [null, 'A-Side', null, 'A-Side', null, 'A-Side'],
+    [null, '10A-8P', 'SHARED [3]', '10A-8P', 'SHARED [3]', '10A-8P', 'SHARED [3]'],
+    [null, '10A-8P', 'UNKEYED [PM]', '10A-8P', 'UNKEYED [PM]', '10A-8P', 'UNKEYED [PM]'],
+  ];
+  it('live reading covers Teams 1 to 3; legacy still omits the A-side section', () => {
+    const live = parseWeeklySchedule(makeWorkbook(cells), { live: true }).days[0];
+    const shared = live.providers.filter(p => p.name === 'SHARED');
+    expect(shared.map(p => p.teamId)).toEqual([1, 2, 3]);
+    for (const p of shared) expect(p).toMatchObject({ type: 'senior_resident', coverTeams: [1, 2, 3], coverSource: 'a_side', shiftStart: '10A', shiftEnd: '8P' });
+    const legacy = parseWeeklySchedule(makeWorkbook(cells)).days[0];
+    expect(legacy.providers).toHaveLength(3);
+  });
+  it('A-side unknown levels are flagged, including PM without a PGY key', () => {
+    const live = parseWeeklySchedule(makeWorkbook(cells), { live: true }).days[0];
+    const unknown = live.providers.filter(p => p.name === 'UNKEYED');
+    expect(unknown).toHaveLength(3);
+    for (const p of unknown) expect(p.unknownLevel).toBe(true);
+  });
+});
+
 describe('trial (live) reading, Roundtable Decisions 41 and 42', () => {
   // Made-up names. Layout as in the Aug to Sep 2026 sheets: level tags in brackets, times without a
   // colon, a PGY key headed "Resident Name", overnight side labels written as "T2 / B-side".
@@ -409,9 +434,11 @@ describe('trial (live) reading, Roundtable Decisions 41 and 42', () => {
   });
   it('reads a day swing resident as covering two teams', () => {
     expect(find(live, 'HALVES')?.coverTeams).toEqual([1, 3]);
+    expect(find(live, 'HALVES')?.coverSource).toBe('day_swing');
   });
   it('reads "T2 / B-side" and "T1 / N-side" overnight labels as side cover', () => {
     expect(find(live, 'BEEPA', 2)?.coverTeams).toEqual([2, 4]);
+    expect(find(live, 'BEEPA', 2)?.coverSource).toBe('overnight');
     expect(find(live, 'BEEPA', 4)?.coverTeams).toEqual([2, 4]);
     expect(find(live, 'NRES', 1)).toMatchObject({ type: 'senior_resident', coverTeams: [1, 3] });
     expect(find(live, 'NRES', 3)).toBeDefined();
