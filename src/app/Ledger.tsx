@@ -58,10 +58,17 @@ export default function Ledger({ state, rec, armed, onOpen }: {
                   {providers.length === 0 ? 'No providers' : providers.map((p, i) => (
                     <span key={p.id} style={{ fontSize: 12 }}>{i > 0 && ' · '}{providerLabel(p)} <span>{ROLE_SHORT[p.type]}</span></span>
                   ))}
-                  {providers.length > 0 && <>{' '}<span className="str num" title="Team strength: the sum of its providers' weights">Strength {s.capacity.toFixed(1)}</span></>}
                 </div>
               </div>
-              <div className="n num">{ratio}<small>{s.capacity === 0 ? 'no providers' : 'capacity'}</small></div>
+              <div className="n num">
+                <span className="nl">
+                  {s.capacity > 0 && <span className="frac" aria-hidden="true" title="Capacity = strength ÷ load">
+                    <i>Team strength</i><b>{s.capacity.toFixed(1)}</b><i>Patient load</i><b>{s.load.toFixed(2)}</b>
+                  </span>}
+                  {s.capacity > 0 && <span className="eq" aria-hidden="true">=</span>}
+                  {ratio}
+                </span>
+                <small>{s.capacity === 0 ? 'no providers' : 'capacity'}</small></div>
             </div>
             <div className="cnt">
               {ACUITIES.map(a => <span key={a} className={ACUITY_CLASS[a]}>{ACUITY_NAME[a]} {counting.filter(p => p.acuity === a).length}</span>)}
